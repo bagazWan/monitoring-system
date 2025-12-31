@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.v1 import alerts, auth, devices, locations, switches, users
+from app.api.v1 import alerts, auth, devices, locations, switches, sync, users
 from app.core.config import settings
 
 app = FastAPI(
@@ -30,3 +30,4 @@ app.include_router(locations.router, prefix="/api/v1")
 app.include_router(users.router, prefix="/api/v1")
 app.include_router(alerts.router, prefix="/api/v1")
 app.include_router(auth.router, prefix="/api/v1")
+app.include_router(sync.router, prefix="/api/v1")

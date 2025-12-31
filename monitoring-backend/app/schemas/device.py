@@ -15,26 +15,16 @@ class DeviceCreate(BaseModel):
     )
     switch_id: Optional[int] = Field(None, description="Switch device is connected to")
     status: str = Field(default="offline", description="Device status")
+    description: Optional[str] = Field(None, max_length=500)
 
 
-# Creating a new device from LibreNMS data
-class DeviceCreateWithLibreNMS(BaseModel):
-    name: str
-    ip_address: str
-    mac_address: Optional[str]
-    device_type: Optional[str]
-    location_id: Optional[int]
-    librenms_device_id: int
-    librenms_hostname: str
-
-
-# Syncing devices from LibreNMS
-class DeviceSyncConfig(BaseModel):
+# Syncing all devices (include switch) from LibreNMS
+class AllDevicesSyncConfig(BaseModel):
     default_location_id: int = Field(1, description="Default location for new devices")
     update_existing: bool = Field(True, description="Update already-synced devices")
 
 
-class DeviceSyncReport(BaseModel):
+class AllDevicesSyncReport(BaseModel):
     """Sync result report"""
 
     created: list[dict]
@@ -66,6 +56,7 @@ class DeviceResponse(BaseModel):
     librenms_device_id: Optional[int]
     librenms_hostname: Optional[str]
     librenms_last_synced: Optional[datetime]
+    description: Optional[str]
     created_at: datetime
     updated_at: datetime
     last_replaced_at: Optional[datetime]

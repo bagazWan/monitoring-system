@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import List, Optional
 
 from app.api.dependencies import require_admin, require_technician_or_admin
@@ -9,6 +10,7 @@ from app.schemas.switch import (
     SwitchUpdate,
     SwitchWithLocation,
 )
+from app.services.librenms_service import LibreNMSService
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
@@ -33,6 +35,100 @@ def get_all_switches(
     switches = query.offset(skip).limit(limit).all()
 
     return switches
+
+
+@router.get("/{switch_id}/bandwidth/current")
+async def get_switch_bandwidth(switch_id: int, db: Session = Depends(get_db)):
+    """
+    Get real-time bandwidth from LibreNMS for a device
+    """
+    switch = db.query(Switch).filter_by(device_id=switch_id).first()
+    if not switch:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Switch not found"
+        )
+
+    if not switch.librenms_device_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Switch is not monitored by LibreNMS. Cannot fetch bandwidth.",
+        )
+
+    try:
+        librenms = LibreNMSService()
+        port_stats = await librenms.get_device_port_stats(switch.librenms_device_id)
+
+        # Aggregate bandwidth from all ports
+        total_in = 0.0
+        total_out = 0.0
+
+        for port in port_stats.get("ports", []):
+            # Convert bytes/sec to Mbps
+            in_rate = port.get("ifInOctets_rate", 0) * 8 / 1_000_000
+            out_rate = port.get("ifOutOctets_rate", 0) * 8 / 1_000_000
+            total_in += in_rate
+            total_out += out_rate
+
+        return {
+            "device_id": switch.device_id,
+            "device_name": switch.name,
+            "timestamp": datetime.now(),
+            "in_mbps": round(total_in, 2),
+            "out_mbps": round(total_out, 2),
+            "total_mbps": round(total_in + total_out, 2),
+        }
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"Failed to fetch bandwidth from LibreNMS: {str(e)}",
+        )
+
+
+@router.get("/{switch_id}/status")
+async def check_device_status(switch_id: int, db: Session = Depends(get_db)):
+    """
+    Check switch status from LibreNMS
+    """
+    switch = db.query(Switch).filter_by(switch_id=switch_id).first()
+    if not switch:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Device not found"
+        )
+
+    if not switch.librenms_device_id:
+        return {
+            "device_id": switch.switch_id,
+            "status": switch.status,
+            "monitored": False,
+            "message": "Switch not linked to LibreNMS",
+        }
+
+    try:
+        librenms = LibreNMSService()
+        lnms_device = await librenms.get_device_by_id(switch.librenms_device_id)
+
+        if lnms_device:
+            librenms_status = "online" if lnms_device.get("status") == 1 else "offline"
+
+            # Update database
+            switch.status = librenms_status
+            switch.librenms_last_synced = datetime.now()
+            db.commit()
+
+            return {
+                "switch_id": switch.switch_id,
+                "status": librenms_status,
+                "monitored": True,
+                "last_seen": lnms_device.get("last_polled"),
+            }
+    except Exception as e:
+        return {
+            "switch_id": switch.switch_id,
+            "status": switch.status,
+            "monitored": True,
+            "error": str(e),
+        }
 
 
 # get switch by location for map display
@@ -74,7 +170,7 @@ def get_switch(switch_id: int, db: Session = Depends(get_db)):
     return switch
 
 
-# Create new switch
+# Create new switch by manual input
 @router.post("", response_model=SwitchResponse, status_code=status.HTTP_201_CREATED)
 def create_switch(
     switch_data: SwitchCreate,
@@ -92,18 +188,17 @@ def create_switch(
             detail=f"Switch with IP address {switch_data.ip_address} already exists",
         )
 
-    # Check if location exists
-    location = (
-        db.query(Location)
-        .filter(Location.location_id == switch_data.location_id)
-        .first()
-    )
-
-    if not location:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Location with id {switch_data.location_id} not found",
+    if switch_data.location_id is not None:
+        location = (
+            db.query(Location)
+            .filter(Location.location_id == switch_data.location_id)
+            .first()
         )
+        if not location:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Location with id {switch_data.location_id} not found",
+            )
 
     # Create new switch
     new_switch = Switch(**switch_data.model_dump())

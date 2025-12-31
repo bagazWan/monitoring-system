@@ -7,8 +7,6 @@ from app.models import Device, Location, User
 from app.schemas.device import (
     DeviceCreate,
     DeviceResponse,
-    DeviceSyncConfig,
-    DeviceSyncReport,
     DeviceUpdate,
     DeviceWithLocation,
 )
@@ -42,114 +40,8 @@ def get_all_devices(
     return devices
 
 
-@router.post("/sync-from-librenms", response_model=DeviceSyncReport)
-async def sync_devices_from_librenms(
-    config: DeviceSyncConfig,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require_admin),
-):
-    """
-    Import/sync devices from LibreNMS into database
-
-    This endpoint:
-    1. Fetches all devices from LibreNMS API
-    2. Creates new devices in PostgreSQL
-    3. Updates existing devices
-    4. Returns the report
-    """
-
-    librenms = LibreNMSService()
-    report = {
-        "created": [],
-        "updated": [],
-        "errors": [],
-        "summary": {"total_created": 0, "total_updated": 0, "total_errors": 0},
-    }
-
-    try:
-        # Get all devices from LibreNMS
-        librenms_devices = await librenms.get_devices()
-
-        for lnms_device in librenms_devices:
-            try:
-                librenms_id = lnms_device["device_id"]
-
-                # Check if device already exists
-                existing = (
-                    db.query(Device).filter_by(librenms_device_id=librenms_id).first()
-                )
-
-                if existing and config.update_existing:
-                    # Update existing
-                    existing.librenms_hostname = lnms_device.get("hostname")
-                    existing.ip_address = lnms_device.get("ip", existing.ip_address)
-                    existing.status = (
-                        "online" if lnms_device.get("status") == 1 else "offline"
-                    )
-                    existing.librenms_last_synced = datetime.now()
-
-                    report["updated"].append(
-                        {
-                            "device_id": existing.device_id,
-                            "name": existing.name,
-                            "ip_address": existing.ip_address,
-                        }
-                    )
-                    report["summary"]["total_updated"] += 1
-
-                elif not existing:
-                    new_device = Device(
-                        name=lnms_device.get("hostname", lnms_device.get("ip")),
-                        ip_address=lnms_device.get("ip"),
-                        mac_address=lnms_device.get("mac"),
-                        device_type="unknown",
-                        location_id=config.default_location_id,
-                        librenms_device_id=librenms_id,
-                        librenms_hostname=lnms_device.get("hostname"),
-                        status="online"
-                        if lnms_device.get("status") == 1
-                        else "offline",
-                        librenms_last_synced=datetime.now(),
-                    )
-                    db.add(new_device)
-                    db.flush()
-
-                    report["created"].append(
-                        {
-                            "device_id": new_device.device_id,
-                            "name": new_device.name,
-                            "ip_address": new_device.ip_address,
-                        }
-                    )
-                    report["summary"]["total_created"] += 1
-
-            except Exception as e:
-                report["errors"].append(
-                    {
-                        "librenms_device_id": lnms_device.get("device_id"),
-                        "error": str(e),
-                    }
-                )
-                report["summary"]["total_errors"] += 1
-
-        db.commit()
-
-    except Exception as e:
-        db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Sync failed: {str(e)}",
-        )
-
-    return report
-
-
 @router.get("/{device_id}/bandwidth/current")
-async def get_device_bandwidth(
-    device_id: int,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require_technician_or_admin),
-):
+async def get_device_bandwidth(device_id: int, db: Session = Depends(get_db)):
     """
     Get real-time bandwidth from LibreNMS for a device
     """
@@ -218,8 +110,6 @@ async def check_device_status(
             "monitored": False,
             "message": "Device not linked to LibreNMS",
         }
-
-    from app.services.librenms_service import LibreNMSService
 
     try:
         librenms = LibreNMSService()

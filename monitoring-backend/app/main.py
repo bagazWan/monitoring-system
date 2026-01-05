@@ -7,7 +7,10 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.v1 import alerts, auth, devices, locations, switches, sync, users
 from app.core.config import settings
-from app.services.alerts import start_alerts_poller_task, stop_alerts_poller_task
+from app.services.alerts_service import (
+    start_alerts_poller_task,
+    stop_alerts_poller_task,
+)
 from app.services.librenms_service import LibreNMSService
 
 logger = logging.getLogger(__name__)

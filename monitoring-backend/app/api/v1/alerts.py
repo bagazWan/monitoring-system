@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 from app.api.dependencies import (
     get_current_user,
@@ -7,11 +7,33 @@ from app.api.dependencies import (
 )
 from app.core.database import get_db
 from app.models import Alert, SwitchAlert, User
+from app.notifications import websocket_endpoint
 from app.schemas.alert import AlertResponse, AlertUpdate
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, WebSocket, status
 from sqlalchemy.orm import Session
 
 router = APIRouter(prefix="/alerts", tags=["Alerts"])
+
+
+def _alert_to_response_dict(alert_obj: Any) -> Dict[str, Any]:
+    """
+    Convert Alert/SwitchAlert SQLAlchemy model into a dictionary that matches
+    AlertResponse schema to avoid leaking SQLAlchemy internals
+    """
+    return {
+        "alert_id": getattr(alert_obj, "alert_id", None),
+        "device_id": getattr(alert_obj, "device_id", None),
+        "switch_id": getattr(alert_obj, "switch_id", None),
+        "librenms_alert_id": getattr(alert_obj, "librenms_alert_id", None),
+        "category_id": getattr(alert_obj, "category_id", None),
+        "alert_type": getattr(alert_obj, "alert_type", ""),
+        "severity": getattr(alert_obj, "severity", ""),
+        "message": getattr(alert_obj, "message", ""),
+        "status": getattr(alert_obj, "status", ""),
+        "assigned_to_user_id": getattr(alert_obj, "assigned_to_user_id", None),
+        "created_at": getattr(alert_obj, "created_at", None),
+        "cleared_at": getattr(alert_obj, "cleared_at", None),
+    }
 
 
 @router.get("/", response_model=List[AlertResponse])
@@ -21,6 +43,9 @@ def get_all_alerts(
     assigned_to: Optional[int] = Query(None, description="Filter by assigned user"),
     db: Session = Depends(get_db),
 ):
+    """
+    Return combined list of device and switch alerts
+    """
     # Query device alerts
     device_query = db.query(Alert)
     if status_filter:
@@ -47,26 +72,16 @@ def get_all_alerts(
 
     all_alerts = []
 
-    # Add device alerts
-    for alert in device_alerts:
-        all_alerts.append(
-            {
-                **alert.__dict__,
-                "switch_id": None,  # Device alerts don't have switch_id
-            }
-        )
+    # Normalize device alerts
+    for a in device_alerts:
+        all_alerts.append(_alert_to_response_dict(a))
 
-    # Add switch alerts
-    for alert in switch_alerts:
-        all_alerts.append(
-            {
-                **alert.__dict__,
-                "device_id": None,  # Switch alerts don't have device_id
-            }
-        )
+    # Normalize switch alerts
+    for a in switch_alerts:
+        all_alerts.append(_alert_to_response_dict(a))
 
-    # Sort by newest first
-    all_alerts.sort(key=lambda x: x.get("created_at", ""), reverse=True)
+    # Sort by newest first (created_at may none)
+    all_alerts.sort(key=lambda x: x.get("created_at") or "", reverse=True)
 
     return all_alerts
 
@@ -79,8 +94,10 @@ def get_active_alerts(db: Session = Depends(get_db)):
     device_alerts = db.query(Alert).filter(Alert.status == "active").all()
     switch_alerts = db.query(SwitchAlert).filter(SwitchAlert.status == "active").all()
 
-    # Combine and return
-    return device_alerts + switch_alerts
+    results = [_alert_to_response_dict(a) for a in device_alerts + switch_alerts]
+    # Keep newest first
+    results.sort(key=lambda x: x.get("created_at") or "", reverse=True)
+    return results
 
 
 @router.get("/{alert_id}", response_model=AlertResponse)
@@ -90,18 +107,17 @@ def get_alert(
     current_user: User = Depends(get_current_user),
 ):
     """
-    Get single alert by ID
-    Checks both device and switch alerts
+    Get single alert by ID (searches both device and switch alerts)
     """
     # Try device alerts first
     alert = db.query(Alert).filter(Alert.alert_id == alert_id).first()
     if alert:
-        return alert
+        return _alert_to_response_dict(alert)
 
     # Try switch alerts
     alert = db.query(SwitchAlert).filter(SwitchAlert.alert_id == alert_id).first()
     if alert:
-        return alert
+        return _alert_to_response_dict(alert)
 
     raise HTTPException(
         status_code=status.HTTP_404_NOT_FOUND,
@@ -116,6 +132,9 @@ def update_alert(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_technician_or_admin),
 ):
+    """
+    Update fields on an alert (device or switch) for admin/teknisi
+    """
     # Try device alerts
     alert = db.query(Alert).filter(Alert.alert_id == alert_id).first()
     if not alert:
@@ -131,8 +150,12 @@ def update_alert(
     # Update fields
     update_data = alert_data.model_dump(exclude_unset=True)
 
-    # Auto-set cleared_at if status changed to "cleared"
-    if update_data.get("status") == "cleared" and "cleared_at" not in update_data:
+    # Auto-set cleared_at if status changed to a cleared-like state
+    if (
+        update_data.get("status")
+        and update_data.get("status") == "cleared"
+        and "cleared_at" not in update_data
+    ):
         from datetime import datetime
 
         update_data["cleared_at"] = datetime.utcnow()
@@ -140,10 +163,11 @@ def update_alert(
     for field, value in update_data.items():
         setattr(alert, field, value)
 
+    db.add(alert)
     db.commit()
     db.refresh(alert)
 
-    return alert
+    return _alert_to_response_dict(alert)
 
 
 @router.delete("/{alert_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -152,10 +176,11 @@ def delete_alert(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_admin),
 ):
-    # Try device alerts
+    """
+    Delete an alert (device or switch) for admin only
+    """
     alert = db.query(Alert).filter(Alert.alert_id == alert_id).first()
     if not alert:
-        # Try switch alerts
         alert = db.query(SwitchAlert).filter(SwitchAlert.alert_id == alert_id).first()
 
     if not alert:
@@ -168,3 +193,11 @@ def delete_alert(
     db.commit()
 
     return None
+
+
+@router.websocket("/ws/alerts")
+async def alerts_websocket(websocket: WebSocket):
+    """
+    WebSocket endpoint that forwards the connection to the shared notifications websocket handler.
+    """
+    await websocket_endpoint(websocket)

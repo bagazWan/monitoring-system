@@ -4,6 +4,7 @@ from app.api.dependencies import require_admin
 from app.core.database import get_db
 from app.models import Device, Switch, User
 from app.schemas.device import AllDevicesSyncConfig, AllDevicesSyncReport
+from app.services.alerts_service import sync_alerts_once
 from app.services.librenms_service import LibreNMSService
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
@@ -210,3 +211,26 @@ async def _sync_switch(
                 "reason": "update_existing is false",
             },
         }
+
+
+@router.post("/alerts", status_code=status.HTTP_200_OK)
+async def sync_alerts_now(
+    current_user: User = Depends(require_admin),
+):
+    """
+    Manual trigger to immediately fetch alerts from LibreNMS and process them.
+    For testing, admin-triggered scans, or to force a sync.
+    Returns:
+        {"processed": <number_of_alerts_processed>}
+    """
+    librenms = LibreNMSService()
+    try:
+        processed = await sync_alerts_once(librenms)
+    except Exception as exc:
+        # Surface a 502 Bad Gateway if LibreNMS cannot be contacted or processing fails
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Failed to sync alerts from LibreNMS: {str(exc)}",
+        )
+
+    return {"processed": processed}

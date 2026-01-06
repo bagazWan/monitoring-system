@@ -2,46 +2,45 @@ import 'package:flutter/material.dart';
 import '../../services/auth_service.dart';
 import '../../widgets/hover_link.dart';
 
-class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key});
+class RegisterScreen extends StatefulWidget {
+  const RegisterScreen({super.key});
 
   @override
-  State<LoginScreen> createState() => _LoginScreenState();
+  State<RegisterScreen> createState() => _RegisterScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
+class _RegisterScreenState extends State<RegisterScreen> {
   final _formKey = GlobalKey<FormState>();
   final _authService = AuthService();
   final _usernameController = TextEditingController();
+  final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _fullNameController = TextEditingController();
   bool _isLoading = false;
 
-  void _handleLogin() async {
+  void _handleRegister() async {
     if (_formKey.currentState!.validate()) {
       setState(() => _isLoading = true);
       try {
-        // Call existing login service logic
-        await _authService.login(
-            _usernameController.text, _passwordController.text);
+        await _authService.register(
+          username: _usernameController.text,
+          email: _emailController.text,
+          password: _passwordController.text,
+          fullName: _fullNameController.text,
+        );
         if (mounted) {
-          // Success
-          // Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const HomeScreen()));
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text("Login Successful"),
+              content: Text("Registration successful"),
               backgroundColor: Colors.green,
             ),
           );
+          Navigator.pop(context); // Go back to login
         }
       } catch (e) {
         if (mounted) {
-          // Show error from backend
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text("Error: ${e.toString()}"),
-              backgroundColor: Colors.red,
-            ),
-          );
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+              content: Text(e.toString()), backgroundColor: Colors.red));
         }
       } finally {
         if (mounted) setState(() => _isLoading = false);
@@ -56,17 +55,13 @@ class _LoginScreenState extends State<LoginScreen> {
       body: Center(
         child: SingleChildScrollView(
           child: Container(
-            width: 450,
+            width: 450, // Matches Login width for consistency
             padding: const EdgeInsets.all(40),
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(16),
               boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
-                  blurRadius: 20,
-                  offset: const Offset(0, 10),
-                )
+                BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 20)
               ],
             ),
             child: Form(
@@ -75,40 +70,50 @@ class _LoginScreenState extends State<LoginScreen> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Fields
-                  const Text("Username",
-                      style: TextStyle(fontWeight: FontWeight.w600)),
-                  const SizedBox(height: 8),
+                  const Center(
+                      child: Text("Create Account",
+                          style: TextStyle(
+                              fontSize: 28, fontWeight: FontWeight.bold))),
+                  const SizedBox(height: 32),
+                  _buildLabel("Full Name"),
                   TextFormField(
-                    controller: _usernameController,
-                    decoration: const InputDecoration(
-                      prefixIcon: Icon(Icons.person_outline),
-                      border: OutlineInputBorder(),
-                    ),
+                    controller: _fullNameController,
+                    decoration:
+                        const InputDecoration(border: OutlineInputBorder()),
                     validator: (val) => val!.isEmpty ? "Required" : null,
                   ),
-                  const SizedBox(height: 20),
-
-                  const Text("Password",
-                      style: TextStyle(fontWeight: FontWeight.w600)),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 16),
+                  _buildLabel("Username"),
+                  TextFormField(
+                    controller: _usernameController,
+                    decoration:
+                        const InputDecoration(border: OutlineInputBorder()),
+                    validator: (val) => val!.isEmpty ? "Required" : null,
+                  ),
+                  const SizedBox(height: 16),
+                  _buildLabel("Email"),
+                  TextFormField(
+                    controller: _emailController,
+                    decoration:
+                        const InputDecoration(border: OutlineInputBorder()),
+                    validator: (val) => val!.isEmpty ? "Required" : null,
+                  ),
+                  const SizedBox(height: 16),
+                  _buildLabel("Password"),
                   TextFormField(
                     controller: _passwordController,
                     obscureText: true,
-                    decoration: const InputDecoration(
-                      prefixIcon: Icon(Icons.lock_outline),
-                      border: OutlineInputBorder(),
-                    ),
-                    validator: (val) => val!.length < 6 ? "Too short" : null,
+                    decoration:
+                        const InputDecoration(border: OutlineInputBorder()),
+                    validator: (val) =>
+                        val!.length < 6 ? "Minimum 6 characters" : null,
                   ),
                   const SizedBox(height: 32),
-
-                  // Login Button
                   SizedBox(
                     width: double.infinity,
                     height: 50,
                     child: ElevatedButton(
-                      onPressed: _isLoading ? null : _handleLogin,
+                      onPressed: _isLoading ? null : _handleRegister,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.blueAccent,
                         foregroundColor: Colors.white,
@@ -121,17 +126,17 @@ class _LoginScreenState extends State<LoginScreen> {
                               height: 20,
                               child: CircularProgressIndicator(
                                   color: Colors.white))
-                          : const Text("Log In"),
+                          : const Text("Register"),
                     ),
                   ),
                   const SizedBox(height: 16),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Text("Don't have an account?"),
+                      const Text("Already have an account? "),
                       HoverLink(
-                        text: "Register",
-                        onTap: () => Navigator.pushNamed(context, '/register'),
+                        text: "Login",
+                        onTap: () => Navigator.pop(context),
                       ),
                     ],
                   )
@@ -141,6 +146,13 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildLabel(String label) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8.0),
+      child: Text(label, style: const TextStyle(fontWeight: FontWeight.w600)),
     );
   }
 }

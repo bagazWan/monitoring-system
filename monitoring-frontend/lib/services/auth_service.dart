@@ -29,6 +29,31 @@ class AuthService {
     }
   }
 
+  Future<void> register({
+    required String fullName,
+    required String username,
+    required String email,
+    required String password,
+  }) async {
+    final response = await http.post(
+      Uri.parse(ApiConfig.register),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'full_name': fullName,
+        'username': username,
+        'email': email,
+        'password': password,
+      }),
+    );
+
+    if (response.statusCode == 201 || response.statusCode == 200) {
+      return; // Success
+    } else {
+      final errorData = jsonDecode(response.body);
+      throw Exception(errorData['detail'] ?? 'Registration failed');
+    }
+  }
+
   Future<User> getCurrentUser() async {
     final token = await storage.read(key: 'auth_token');
 

@@ -4,6 +4,7 @@ class ApiConfig {
 
   // Endpoints
   static const String login = '$baseUrl$apiVersion/auth/login';
+  static const String register = '$baseUrl$apiVersion/auth/register';
   static const String me = '$baseUrl$apiVersion/auth/me';
   static const String devices = '$baseUrl$apiVersion/devices';
   static const String switches = '$baseUrl$apiVersion/switches';

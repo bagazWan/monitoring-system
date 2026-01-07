@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../services/auth_service.dart';
 import '../../widgets/hover_link.dart';
+import '../dashboard/main_layout.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -32,6 +33,8 @@ class _LoginScreenState extends State<LoginScreen> {
               backgroundColor: Colors.green,
             ),
           );
+          Navigator.pushReplacement(context,
+              MaterialPageRoute(builder: (context) => const MainLayout()));
         }
       } catch (e) {
         if (mounted) {

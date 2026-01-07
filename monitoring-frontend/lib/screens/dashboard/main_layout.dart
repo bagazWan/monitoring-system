@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../widgets/side_menu.dart';
 import '../../services/auth_service.dart';
+import 'dashboard_screen.dart';
 
 class MainLayout extends StatefulWidget {
   const MainLayout({super.key});
@@ -12,9 +13,8 @@ class MainLayout extends StatefulWidget {
 class _MainLayoutState extends State<MainLayout> {
   int _currentPageIndex = 0;
 
-  // List of pages to display in the content area
   final List<Widget> _pages = [
-    const Center(child: Text("Dashboard")),
+    const DashboardScreen(),
     const Center(child: Text("Devices List")),
     const Center(child: Text("Map Visualization")),
     const Center(child: Text("Notifications Center")),

@@ -5,7 +5,16 @@ from typing import Optional
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.v1 import alerts, auth, devices, locations, switches, sync, users
+from app.api.v1 import (
+    alerts,
+    auth,
+    dashboard,
+    devices,
+    locations,
+    switches,
+    sync,
+    users,
+)
 from app.core.config import settings
 from app.services.alerts_service import (
     start_alerts_poller_task,
@@ -89,3 +98,4 @@ app.include_router(users.router, prefix="/api/v1")
 app.include_router(alerts.router, prefix="/api/v1")
 app.include_router(auth.router, prefix="/api/v1")
 app.include_router(sync.router, prefix="/api/v1")
+app.include_router(dashboard.router, prefix="/api/v1")

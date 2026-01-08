@@ -31,7 +31,7 @@ class _MainLayoutState extends State<MainLayout> {
   @override
   Widget build(BuildContext context) {
     bool isMobile = MediaQuery.of(context).size.width < 600;
-    final Color headerColor = Colors.white;
+    const Color headerColor = Colors.white;
     final Color dividerColor = Colors.grey[300]!;
 
     return Scaffold(

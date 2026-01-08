@@ -55,7 +55,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       body: Center(
         child: SingleChildScrollView(
           child: Container(
-            width: 450, // Matches Login width for consistency
+            width: 450,
             padding: const EdgeInsets.all(40),
             decoration: BoxDecoration(
               color: Colors.white,

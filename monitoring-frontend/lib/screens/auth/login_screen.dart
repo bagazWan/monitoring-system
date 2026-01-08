@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../services/auth_service.dart';
 import '../../widgets/hover_link.dart';
-import '../dashboard/main_layout.dart';
+import '../main_layout.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});

@@ -155,11 +155,15 @@ def get_devices_with_locations(db: Session = Depends(get_db)):
             {
                 "device_id": device.device_id,
                 "name": device.name,
+                "ip_address": device.ip_address,
+                "mac_address": device.mac_address,
                 "device_type": device.device_type,
                 "status": device.status,
                 "latitude": location.latitude,
                 "longitude": location.longitude,
                 "location_name": location.name,
+                "description": device.description,
+                "last_replaced_at": device.last_replaced_at,
             }
         )
 

@@ -45,7 +45,10 @@ class SwitchResponse(BaseModel):
 class SwitchWithLocation(BaseModel):
     switch_id: int
     name: str
+    ip_address: str
     status: str
+    description: Optional[str]
+    last_replaced_at: Optional[datetime]
     # Location info
     latitude: float
     longitude: float

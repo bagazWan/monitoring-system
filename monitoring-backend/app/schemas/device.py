@@ -69,8 +69,12 @@ class DeviceResponse(BaseModel):
 class DeviceWithLocation(BaseModel):
     device_id: int
     name: str
+    ip_address: str
+    mac_address: Optional[str]
     device_type: Optional[str]
     status: str
+    description: Optional[str]
+    last_replaced_at: Optional[datetime]
     # Location info
     latitude: float
     longitude: float

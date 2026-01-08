@@ -13,4 +13,7 @@ class ApiConfig {
   static const String users = '$baseUrl$apiVersion/users';
   static const String dashboardStats = '$baseUrl$apiVersion/stats';
   static const String deviceStats = '$baseUrl$apiVersion/device/stats';
+  static const String deviceList = '$baseUrl$apiVersion/devices/with-locations';
+  static const String switchList =
+      '$baseUrl$apiVersion/switches/with-locations';
 }

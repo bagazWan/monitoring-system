@@ -147,10 +147,13 @@ def get_switch_with_locations(db: Session = Depends(get_db)):
             {
                 "switch_id": switch.switch_id,
                 "name": switch.name,
+                "ip_address": switch.ip_address,
                 "status": switch.status,
                 "latitude": location.latitude,
                 "longitude": location.longitude,
                 "location_name": location.name,
+                "description": switch.description,
+                "last_replaced_at": switch.last_replaced_at,
             }
         )
 

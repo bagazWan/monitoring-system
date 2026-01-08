@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../widgets/side_menu.dart';
 import '../../services/auth_service.dart';
-import 'dashboard_screen.dart';
+import 'dashboard/dashboard_screen.dart';
+import 'devices/device_list_screen.dart';
 
 class MainLayout extends StatefulWidget {
   const MainLayout({super.key});
@@ -15,7 +16,7 @@ class _MainLayoutState extends State<MainLayout> {
 
   final List<Widget> _pages = [
     const DashboardScreen(),
-    const Center(child: Text("Devices List")),
+    const DeviceListScreen(),
     const Center(child: Text("Map Visualization")),
     const Center(child: Text("Notifications Center")),
     const Center(child: Text("Profile Settings")),

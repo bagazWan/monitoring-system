@@ -31,7 +31,6 @@ async def get_dashboard_summary(db: Session = Depends(get_db)):
 
     try:
         for node in all_monitored:
-            # Reusing the logic from your devices.py/switches.py
             port_stats = await librenms.get_device_port_stats(node.librenms_device_id)
             for port in port_stats.get("ports", []):
                 in_rate = port.get("ifInOctets_rate", 0) * 8 / 1_000_000

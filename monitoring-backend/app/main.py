@@ -52,7 +52,7 @@ async def on_startup():
     """
     global _alerts_poller_task
     try:
-        # interval can be configured in settings, fallback to 30s
+        # configured in settings, fallback to 30s
         interval = getattr(settings, "ALERT_POLL_INTERVAL", 30)
         # create and store the background task that polls LibreNMS for alerts
         _alerts_poller_task = start_alerts_poller_task(

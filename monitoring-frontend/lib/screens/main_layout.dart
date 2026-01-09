@@ -38,8 +38,9 @@ class _MainLayoutState extends State<MainLayout> {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: headerColor,
+        surfaceTintColor: Colors.transparent,
         elevation: 0,
-        toolbarHeight: 80,
+        toolbarHeight: 70,
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(1.0),
           child: Container(color: dividerColor, height: 1.0),
@@ -56,7 +57,7 @@ class _MainLayoutState extends State<MainLayout> {
                 children: [
                   Image.asset(
                     'assets/images/logo_mmn.png',
-                    height: 100,
+                    height: 95,
                   ),
                 ],
               ),
@@ -84,7 +85,8 @@ class _MainLayoutState extends State<MainLayout> {
                     icon: Icon(Icons.dashboard), label: "Home"),
                 BottomNavigationBarItem(
                     icon: Icon(Icons.router), label: "Devices"),
-                BottomNavigationBarItem(icon: Icon(Icons.map), label: "Map"),
+                BottomNavigationBarItem(
+                    icon: Icon(Icons.location_on), label: "Map"),
                 BottomNavigationBarItem(
                     icon: Icon(Icons.notifications), label: "Alerts"),
                 BottomNavigationBarItem(

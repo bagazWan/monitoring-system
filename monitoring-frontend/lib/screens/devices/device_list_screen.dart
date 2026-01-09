@@ -29,40 +29,56 @@ class _DeviceListScreenState extends State<DeviceListScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
-        title: const Text("List of registered devices",
-            style: TextStyle(color: Colors.black)),
-        backgroundColor: Colors.white,
+        backgroundColor: Colors.transparent,
+        surfaceTintColor: Colors.white,
+        toolbarHeight: 0,
         elevation: 0,
       ),
       body: RefreshIndicator(
         onRefresh: _refresh,
-        child: FutureBuilder<List<BaseNode>>(
-          future: _nodesFuture,
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator());
-            }
-            if (snapshot.hasError) {
-              return Center(child: Text("Error: ${snapshot.error}"));
-            }
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text("Monitored devices",
+                  style: TextStyle(
+                      color: Colors.black,
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold)),
+              const SizedBox(height: 24),
+              FutureBuilder<List<BaseNode>>(
+                future: _nodesFuture,
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+                  if (snapshot.hasError) {
+                    return Center(child: Text("Error: ${snapshot.error}"));
+                  }
 
-            final nodes = snapshot.data ?? [];
+                  final nodes = snapshot.data ?? [];
 
-            if (nodes.isEmpty) {
-              return const Center(
-                  child: Text("No devices registered in database."));
-            }
+                  if (nodes.isEmpty) {
+                    return const Center(
+                        child: Text("No devices registered in database."));
+                  }
 
-            return ListView.builder(
-              padding: const EdgeInsets.all(20),
-              itemCount: nodes.length,
-              itemBuilder: (context, index) {
-                return DeviceCard(node: nodes[index]);
-              },
-            );
-          },
+                  return ListView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: nodes.length,
+                    itemBuilder: (context, index) {
+                      return DeviceCard(node: nodes[index]);
+                    },
+                  );
+                },
+              ),
+            ],
+          ),
         ),
       ),
     );

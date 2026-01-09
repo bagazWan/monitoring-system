@@ -107,7 +107,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             value: stats.totalDevices.toString(),
                             icon: Icons.devices,
                             iconColor: Colors.blueAccent,
-                            subtitle: "All monitored devices",
+                            subtitle: "Registered devices",
                           ),
                           SummaryCard(
                             title: "Device Status",

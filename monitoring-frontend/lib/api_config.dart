@@ -18,4 +18,11 @@ class ApiConfig {
   static const String deviceList = '$baseUrl$apiVersion/devices/with-locations';
   static const String switchList =
       '$baseUrl$apiVersion/switches/with-locations';
+  static String get wsUrl {
+    return baseUrl
+        .replaceFirst('http://', 'ws://')
+        .replaceFirst('https://', 'wss://');
+  }
+
+  static String get wsStatusEndpoint => '$wsUrl$apiVersion/ws/status';
 }

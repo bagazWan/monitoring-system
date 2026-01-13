@@ -10,7 +10,7 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 600
     LIBRENMS_URL: str
     LIBRENMS_API_TOKEN: str
-    ALERT_POLL_INTERVAL: int = 30
+    POLL_INTERVAL: int = 5
 
     PROJECT_NAME: str = "Device Monitoring System"
     VERSION: str = "1.0"

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../widgets/side_menu.dart';
 import '../../services/auth_service.dart';
 import '../../services/device_service.dart';
+import '../../services/websocket_service.dart';
 import 'dashboard/dashboard_screen.dart';
 import 'devices/device_list_screen.dart';
 
@@ -23,7 +24,20 @@ class _MainLayoutState extends State<MainLayout> {
     const Center(child: Text("Profile Settings")),
   ];
 
+  @override
+  void initState() {
+    super.initState();
+    WebSocketService().connect();
+  }
+
+  @override
+  void dispose() {
+    WebSocketService().disconnect();
+    super.dispose();
+  }
+
   void _handleLogout() async {
+    WebSocketService().disconnect();
     await AuthService().logout();
     if (mounted) {
       Navigator.pushReplacementNamed(context, '/');

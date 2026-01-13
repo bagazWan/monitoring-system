@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'dart:async';
 import '../../widgets/summary_card.dart';
 import '../../services/device_service.dart';
+import '../../services/websocket_service.dart';
 import '../../models/dashboard_stats.dart';
 
 class DashboardScreen extends StatefulWidget {
@@ -14,6 +15,9 @@ class DashboardScreen extends StatefulWidget {
 class _DashboardScreenState extends State<DashboardScreen> {
   late Future<DashboardStats> _dashboardStatsFuture;
   Timer? _refreshTimer;
+  StreamSubscription<StatusChangeEvent>? _statusSubscription;
+  StreamSubscription<Map<String, dynamic>>? _heartbeatSubscription;
+  bool _wsConnected = false;
 
   @override
   void initState() {
@@ -22,6 +26,34 @@ class _DashboardScreenState extends State<DashboardScreen> {
     // polling every 30 seconds to refresh data
     _refreshTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
       _autoRefresh();
+    });
+    _initWebSocket();
+  }
+
+  void _initWebSocket() {
+    final wsService = WebSocketService();
+
+    wsService.connect();
+
+    // Listen for connection state
+    wsService.connectionState.listen((connected) {
+      if (mounted) {
+        setState(() {
+          _wsConnected = connected;
+        });
+      }
+    });
+
+    // Listen for status changes and refresh dashboard
+    _statusSubscription = wsService.statusChanges.listen((event) {
+      if (mounted) {
+        _autoRefresh();
+      }
+    });
+
+    // Listen for heartbeats with summary data
+    _heartbeatSubscription = wsService.heartbeats.listen((data) {
+      debugPrint('Heartbeat received: $data');
     });
   }
 
@@ -36,6 +68,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   void dispose() {
     _refreshTimer?.cancel();
+    _statusSubscription?.cancel();
+    _heartbeatSubscription?.cancel();
     super.dispose();
   }
 

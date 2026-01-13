@@ -109,12 +109,29 @@ async def _sync_device(
     )
 
     if existing and config.update_existing:
+        old_status = existing.status
         existing.librenms_hostname = lnms_device.get("hostname")
         existing.ip_address = lnms_device.get("ip", existing.ip_address)
         existing.mac_address = lnms_device.get("mac", existing.mac_address)
         existing.librenms_device_id = librenms_id
         existing.status = "online" if lnms_device.get("status") == 1 else "offline"
         existing.librenms_last_synced = datetime.now()
+
+        if old_status != existing.status:
+            try:
+                from app.notifications import notify_all_channels
+
+                await notify_all_channels(
+                    {
+                        "type": "status_update",
+                        "device_id": existing.device_id,
+                        "old_status": old_status,
+                        "new_status": existing.status,
+                        "timestamp": datetime.now().isoformat(),
+                    }
+                )
+            except Exception as e:
+                print(f"Failed to broadcast status update: {e}")
 
         return {
             "action": "updated",
@@ -177,11 +194,28 @@ async def _sync_switch(
     )
 
     if existing and config.update_existing:
+        old_status = existing.status
         existing.librenms_hostname = lnms_device.get("hostname")
         existing.ip_address = lnms_device.get("ip", existing.ip_address)
         existing.status = "online" if lnms_device.get("status") == 1 else "offline"
         existing.librenms_device_id = librenms_id
         existing.librenms_last_synced = datetime.now()
+
+        if old_status != existing.status:
+            try:
+                from app.notifications import notify_all_channels
+
+                await notify_all_channels(
+                    {
+                        "type": "status_update",
+                        "switch_id": existing.switch_id,
+                        "old_status": old_status,
+                        "new_status": existing.status,
+                        "timestamp": datetime.now().isoformat(),
+                    }
+                )
+            except Exception as e:
+                print(f"Failed to broadcast status update: {e}")
 
         return {
             "action": "updated",

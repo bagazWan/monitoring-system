@@ -40,100 +40,51 @@ def get_all_devices(
     return devices
 
 
-@router.get("/{device_id}/bandwidth/current")
-async def get_device_bandwidth(device_id: int, db: Session = Depends(get_db)):
-    """
-    Get real-time bandwidth from LibreNMS for a device
-    """
+@router.get("/{device_id}/live-details")
+async def get_device_live_details(device_id: int, db: Session = Depends(get_db)):
     device = db.query(Device).filter_by(device_id=device_id).first()
     if not device:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Device not found"
-        )
+        raise HTTPException(404, "Device not found")
 
-    if not device.librenms_device_id:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Device is not monitored by LibreNMS. Cannot fetch bandwidth.",
-        )
+    librenms = LibreNMSService()
+    current_status = device.status
+    in_mbps = 0.0
+    out_mbps = 0.0
 
     try:
-        librenms = LibreNMSService()
-        port_stats = await librenms.get_device_port_stats(device.librenms_device_id)
-
-        # Aggregate bandwidth from all ports
-        total_in = 0.0
-        total_out = 0.0
-
-        for port in port_stats.get("ports", []):
-            # Convert bytes/sec to Mbps
-            in_rate = port.get("ifInOctets_rate", 0) * 8 / 1_000_000
-            out_rate = port.get("ifOutOctets_rate", 0) * 8 / 1_000_000
-            total_in += in_rate
-            total_out += out_rate
-
-        return {
-            "device_id": device.device_id,
-            "device_name": device.name,
-            "timestamp": datetime.now(),
-            "in_mbps": round(total_in, 2),
-            "out_mbps": round(total_out, 2),
-            "total_mbps": round(total_in + total_out, 2),
-        }
-
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=f"Failed to fetch bandwidth from LibreNMS: {str(e)}",
-        )
-
-
-@router.get("/{device_id}/status")
-async def check_device_status(
-    device_id: int,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require_technician_or_admin),
-):
-    """
-    Check device status from LibreNMS
-    """
-    device = db.query(Device).filter_by(device_id=device_id).first()
-    if not device:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Device not found"
-        )
-
-    if not device.librenms_device_id:
-        return {
-            "device_id": device.device_id,
-            "status": device.status,
-            "monitored": False,
-            "message": "Device not linked to LibreNMS",
-        }
-
-    try:
-        librenms = LibreNMSService()
         lnms_device = await librenms.get_device_by_id(device.librenms_device_id)
 
         if lnms_device:
-            librenms_status = "online" if lnms_device.get("status") == 1 else "offline"
+            new_status = "online" if lnms_device.get("status") == 1 else "offline"
 
-            # Update database
-            device.status = librenms_status
-            device.librenms_last_synced = datetime.now()
-            db.commit()
+            if device.status != new_status:
+                device.status = new_status
+                device.librenms_last_synced = datetime.utcnow()
+                db.commit()
+                current_status = new_status
 
-            return {
-                "device_id": device.device_id,
-                "status": librenms_status,
-                "monitored": True,
-                "last_seen": lnms_device.get("last_polled"),
-            }
-    except Exception as e:
+        port_stats = await librenms.get_device_port_stats(device.librenms_device_id)
+        ports = port_stats.get("ports", [])
+
+        total_in_octets = sum(float(p.get("ifInOctets_rate", 0)) for p in ports)
+        total_out_octets = sum(float(p.get("ifOutOctets_rate", 0)) for p in ports)
+
+        in_mbps = (total_in_octets * 8) / 1000000
+        out_mbps = (total_out_octets * 8) / 1000000
+
         return {
             "device_id": device.device_id,
+            "status": current_status,
+            "in_mbps": round(in_mbps, 2),
+            "out_mbps": round(out_mbps, 2),
+            "last_seen": lnms_device.get("last_polled") if lnms_device else "N/A",
+        }
+
+    except Exception as e:
+        return {
             "status": device.status,
-            "monitored": True,
+            "in_mbps": 0.0,
+            "out_mbps": 0.0,
             "error": str(e),
         }
 

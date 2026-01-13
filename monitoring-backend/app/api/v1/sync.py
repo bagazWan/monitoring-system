@@ -7,6 +7,7 @@ from app.schemas.device import AllDevicesSyncConfig, AllDevicesSyncReport
 from app.services.alerts_service import sync_alerts_once
 from app.services.librenms_service import LibreNMSService
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 router = APIRouter(prefix="/sync", tags=["Sync"])
@@ -96,12 +97,22 @@ async def _sync_device(
     Sync a single device (non-switch/hub) to devices table
     """
     # Check if device already exists in database
-    existing = db.query(Device).filter_by(librenms_device_id=librenms_id).first()
+    existing = (
+        db.query(Device)
+        .filter(
+            or_(
+                Device.librenms_device_id == librenms_id,
+                Device.name == lnms_device.get("hostname"),
+            )
+        )
+        .first()
+    )
 
     if existing and config.update_existing:
         existing.librenms_hostname = lnms_device.get("hostname")
         existing.ip_address = lnms_device.get("ip", existing.ip_address)
         existing.mac_address = lnms_device.get("mac", existing.mac_address)
+        existing.librenms_device_id = librenms_id
         existing.status = "online" if lnms_device.get("status") == 1 else "offline"
         existing.librenms_last_synced = datetime.now()
 
@@ -160,12 +171,16 @@ async def _sync_switch(
     """
 
     # Check if switch already exists in database
-    existing = db.query(Switch).filter_by(librenms_device_id=librenms_id).first()
+    existing = (
+        db.query(Switch).filter_by(librenms_device_id=librenms_id)
+        | (Switch.name == lnms_device.get("hostname")).first()
+    )
 
     if existing and config.update_existing:
         existing.librenms_hostname = lnms_device.get("hostname")
         existing.ip_address = lnms_device.get("ip", existing.ip_address)
         existing.status = "online" if lnms_device.get("status") == 1 else "offline"
+        existing.librenms_device_id = librenms_id
         existing.librenms_last_synced = datetime.now()
 
         return {

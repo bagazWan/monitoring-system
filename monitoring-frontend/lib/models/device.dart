@@ -4,7 +4,7 @@ class BaseNode {
   final String ipAddress;
   final String? macAddress;
   final String? deviceType;
-  final String status;
+  String? status;
   final String? locationName;
   final int? locationId;
   final int? switchId;
@@ -18,7 +18,7 @@ class BaseNode {
     required this.ipAddress,
     this.macAddress,
     this.deviceType,
-    required this.status,
+    this.status,
     this.locationName,
     this.locationId,
     this.switchId,

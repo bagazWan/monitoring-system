@@ -37,97 +37,71 @@ def get_all_switches(
     return switches
 
 
-@router.get("/{switch_id}/bandwidth/current")
-async def get_switch_bandwidth(switch_id: int, db: Session = Depends(get_db)):
-    """
-    Get real-time bandwidth from LibreNMS for a device
-    """
-    switch = db.query(Switch).filter_by(device_id=switch_id).first()
-    if not switch:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Switch not found"
-        )
-
-    if not switch.librenms_device_id:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Switch is not monitored by LibreNMS. Cannot fetch bandwidth.",
-        )
-
-    try:
-        librenms = LibreNMSService()
-        port_stats = await librenms.get_device_port_stats(switch.librenms_device_id)
-
-        # Aggregate bandwidth from all ports
-        total_in = 0.0
-        total_out = 0.0
-
-        for port in port_stats.get("ports", []):
-            # Convert bytes/sec to Mbps
-            in_rate = port.get("ifInOctets_rate", 0) * 8 / 1_000_000
-            out_rate = port.get("ifOutOctets_rate", 0) * 8 / 1_000_000
-            total_in += in_rate
-            total_out += out_rate
-
-        return {
-            "device_id": switch.device_id,
-            "device_name": switch.name,
-            "timestamp": datetime.now(),
-            "in_mbps": round(total_in, 2),
-            "out_mbps": round(total_out, 2),
-            "total_mbps": round(total_in + total_out, 2),
-        }
-
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=f"Failed to fetch bandwidth from LibreNMS: {str(e)}",
-        )
-
-
-@router.get("/{switch_id}/status")
-async def check_device_status(switch_id: int, db: Session = Depends(get_db)):
-    """
-    Check switch status from LibreNMS
-    """
+@router.get("/{switch_id}/live-details")
+async def get_switch_live_details(switch_id: int, db: Session = Depends(get_db)):
     switch = db.query(Switch).filter_by(switch_id=switch_id).first()
     if not switch:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Device not found"
-        )
+        raise HTTPException(status_code=404, detail="Switch not found")
 
     if not switch.librenms_device_id:
         return {
-            "device_id": switch.switch_id,
+            "switch_id": switch.switch_id,
             "status": switch.status,
             "monitored": False,
-            "message": "Switch not linked to LibreNMS",
+            "message": "Switch not connected to LibreNMS",
         }
 
+    librenms = LibreNMSService()
+
     try:
-        librenms = LibreNMSService()
         lnms_device = await librenms.get_device_by_id(switch.librenms_device_id)
 
-        if lnms_device:
-            librenms_status = "online" if lnms_device.get("status") == 1 else "offline"
-
-            # Update database
-            switch.status = librenms_status
-            switch.librenms_last_synced = datetime.now()
-            db.commit()
-
+        if lnms_device is None:
             return {
                 "switch_id": switch.switch_id,
-                "status": librenms_status,
-                "monitored": True,
-                "last_seen": lnms_device.get("last_polled"),
+                "status": switch.status,
+                "in_mbps": 0.0,
+                "out_mbps": 0.0,
+                "error": f"ID {switch.librenms_device_id} not found in simulator",
             }
+
+        status = "online" if lnms_device.get("status") == 1 else "offline"
+
+        port_stats = await librenms.get_device_port_stats(switch.librenms_device_id)
+
+        total_in_octets = 0.0
+        total_out_octets = 0.0
+
+        ports = port_stats.get("ports", [])
+        for p in ports:
+            total_in_octets += float(p.get("ifInOctets_rate", 0))
+            total_out_octets += float(p.get("ifOutOctets_rate", 0))
+
+        in_mbps = (total_in_octets * 8) / 1000000
+        out_mbps = (total_out_octets * 8) / 1000000
+
+        switch.status = status
+        switch.librenms_last_synced = datetime.utcnow()
+        db.commit()
+
+        return {
+            "switch_id": switch.switch_id,
+            "name": switch.name,
+            "status": status,
+            "in_mbps": round(in_mbps, 2),
+            "out_mbps": round(out_mbps, 2),
+            "total_mbps": round(in_mbps + out_mbps, 2),
+            "last_seen": lnms_device.get("last_polled"),
+        }
+
     except Exception as e:
         return {
             "switch_id": switch.switch_id,
             "status": switch.status,
-            "monitored": True,
-            "error": str(e),
+            "in_mbps": 0.0,
+            "out_mbps": 0.0,
+            "error": "Simulator not responding",
+            "detail": str(e),
         }
 
 

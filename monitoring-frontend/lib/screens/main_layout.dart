@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../widgets/side_menu.dart';
 import '../../services/auth_service.dart';
+import '../../services/device_service.dart';
 import 'dashboard/dashboard_screen.dart';
 import 'devices/device_list_screen.dart';
 
@@ -26,6 +27,33 @@ class _MainLayoutState extends State<MainLayout> {
     await AuthService().logout();
     if (mounted) {
       Navigator.pushReplacementNamed(context, '/');
+    }
+  }
+
+  // method for testing
+  Future<void> _handleSync(BuildContext context) async {
+    // Show loading dialog
+    showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (c) => const Center(child: CircularProgressIndicator()));
+
+    try {
+      await DeviceService().syncFromLibreNMS();
+
+      if (context.mounted) {
+        Navigator.pop(context); // Close loading
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Sync Complete, Statuses updated.")),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Sync Failed: $e")),
+        );
+      }
     }
   }
 
@@ -65,6 +93,12 @@ class _MainLayoutState extends State<MainLayout> {
           ),
         ),
         actions: [
+          // sync button for testing only
+          IconButton(
+            icon: const Icon(Icons.sync, color: Colors.blue),
+            onPressed: () => _handleSync(context),
+            tooltip: "Sync with LibreNMS",
+          ),
           TextButton.icon(
             onPressed: _handleLogout,
             icon: const Icon(Icons.logout, color: Colors.black87),

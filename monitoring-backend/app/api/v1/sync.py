@@ -189,8 +189,14 @@ async def _sync_switch(
 
     # Check if switch already exists in database
     existing = (
-        db.query(Switch).filter_by(librenms_device_id=librenms_id)
-        | (Switch.name == lnms_device.get("hostname")).first()
+        db.query(Switch)
+        .filter(
+            or_(
+                Switch.librenms_device_id == librenms_id,
+                Switch.name == lnms_device.get("hostname"),
+            )
+        )
+        .first()
     )
 
     if existing and config.update_existing:

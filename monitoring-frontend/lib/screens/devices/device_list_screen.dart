@@ -1,9 +1,14 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../../models/device.dart';
 import '../../services/device_service.dart';
 import '../../services/websocket_service.dart';
 import '../../widgets/device_card.dart';
+import '../../widgets/error_boundary.dart';
+import '../../widgets/search_bar.dart';
+import '../../widgets/device_filter_bar.dart';
+import '../../widgets/pagination.dart';
 
 class DeviceListScreen extends StatefulWidget {
   const DeviceListScreen({super.key});
@@ -13,174 +18,350 @@ class DeviceListScreen extends StatefulWidget {
 }
 
 class _DeviceListScreenState extends State<DeviceListScreen> {
-  late Future<List<BaseNode>> _nodesFuture;
-  List<BaseNode> _nodes = [];
+  // Data
+  List<BaseNode> _allNodes = [];
+  List<BaseNode> _filteredNodes = [];
+  bool _isLoading = true;
+  String? _error;
+
+  // WebSocket
   StreamSubscription<StatusChangeEvent>? _statusSubscription;
-  StreamSubscription<bool>? _connectionSubscription;
-  bool _wsConnected = false;
+
+  // Search & Filters
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
+  String? _selectedType;
+  String? _selectedLocation;
+  String? _selectedStatus;
+
+  // Pagination
+  int _currentPage = 1;
+  int _itemsPerPage = 10;
+  final List<int> _itemsPerPageOptions = [10, 25, 50, 100];
+
+  // Filter options
+  List<String> _deviceTypes = [];
+  List<String> _locations = [];
 
   @override
   void initState() {
     super.initState();
-    _nodesFuture = _fetchNodes();
+    _fetchNodes();
     _initWebSocket();
+    _searchController.addListener(_onSearchChanged);
   }
 
-  Future<List<BaseNode>> _fetchNodes() async {
-    final nodes = await DeviceService().getAllNodes();
+  @override
+  void dispose() {
+    _searchController.dispose();
+    _statusSubscription?.cancel();
+    super.dispose();
+  }
+
+  void _onSearchChanged() {
     setState(() {
-      _nodes = nodes;
+      _searchQuery = _searchController.text.toLowerCase();
+      _currentPage = 1;
+      _applyFilters();
     });
-    return nodes;
+  }
+
+  Future<void> _fetchNodes() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+
+    try {
+      final nodes = await DeviceService().getAllNodes();
+      setState(() {
+        _allNodes = nodes;
+        _extractFilterOptions();
+        _applyFilters();
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _error = e.toString();
+        _isLoading = false;
+      });
+    }
+  }
+
+  void _extractFilterOptions() {
+    _deviceTypes = _allNodes
+        .map((n) => n.deviceType ?? 'Unknown')
+        .toSet()
+        .toList()
+      ..sort();
+
+    _locations = _allNodes
+        .map((n) => n.locationName ?? 'Unknown')
+        .toSet()
+        .toList()
+      ..sort();
+  }
+
+  void _applyFilters() {
+    _filteredNodes = _allNodes.where((node) {
+      if (_searchQuery.isNotEmpty) {
+        final matchesSearch = node.name.toLowerCase().contains(_searchQuery) ||
+            node.ipAddress.toLowerCase().contains(_searchQuery) ||
+            (node.macAddress?.toLowerCase().contains(_searchQuery) ?? false);
+        if (!matchesSearch) return false;
+      }
+
+      if (_selectedType != null &&
+          (node.deviceType ?? 'Unknown') != _selectedType) {
+        return false;
+      }
+
+      if (_selectedLocation != null &&
+          (node.locationName ?? 'Unknown') != _selectedLocation) {
+        return false;
+      }
+
+      if (_selectedStatus != null &&
+          node.status?.toLowerCase() != _selectedStatus) {
+        return false;
+      }
+
+      return true;
+    }).toList();
+  }
+
+  void _clearFilters() {
+    setState(() {
+      _searchController.clear();
+      _searchQuery = '';
+      _selectedType = null;
+      _selectedLocation = null;
+      _selectedStatus = null;
+      _currentPage = 1;
+      _applyFilters();
+    });
   }
 
   void _initWebSocket() {
     final wsService = WebSocketService();
-
-    // Connect to WebSocket
     wsService.connect();
 
-    // Listen for connection state changes
-    _connectionSubscription = wsService.connectionState.listen((connected) {
-      if (mounted) {
-        setState(() {
-          _wsConnected = connected;
-        });
-      }
-    });
-
-    // Listen for status change events
     _statusSubscription = wsService.statusChanges.listen((event) {
-      if (mounted) {
-        _handleStatusChange(event);
-      }
+      if (mounted) _handleStatusChange(event);
     });
   }
 
   void _handleStatusChange(StatusChangeEvent event) {
     setState(() {
-      // Find and update the node with matching id and type
-      for (int i = 0; i < _nodes.length; i++) {
-        final node = _nodes[i];
-        final isMatch = (event.nodeType == 'device' &&
-                node.deviceType?.toLowerCase() != 'switch' &&
-                node.id == event.id) ||
-            (event.nodeType == 'switch' &&
-                node.deviceType?.toLowerCase() == 'switch' &&
-                node.id == event.id);
-
+      for (int i = 0; i < _allNodes.length; i++) {
+        final node = _allNodes[i];
+        final isMatch = _isNodeMatch(node, event);
         if (isMatch) {
-          // Update the status
-          _nodes[i].status = event.newStatus;
-          debugPrint(
-            'Updated ${node.name} status to ${event.newStatus}',
-          );
+          _allNodes[i].status = event.newStatus;
+          _applyFilters();
           break;
         }
       }
     });
+    _showStatusNotification(event);
+  }
 
-    // Show snackbar notification for status changes
-    if (mounted) {
-      final color = event.newStatus == 'online' ? Colors.green : Colors.red;
-      final icon =
-          event.newStatus == 'online' ? Icons.check_circle : Icons.error;
+  bool _isNodeMatch(BaseNode node, StatusChangeEvent event) {
+    return (event.nodeType == 'device' &&
+            node.deviceType?.toLowerCase() != 'switch' &&
+            node.id == event.id) ||
+        (event.nodeType == 'switch' &&
+            node.deviceType?.toLowerCase() == 'switch' &&
+            node.id == event.id);
+  }
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Row(
-            children: [
-              Icon(icon, color: Colors.white),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  '${event.name} is now ${event.newStatus.toUpperCase()}',
-                ),
+  void _showStatusNotification(StatusChangeEvent event) {
+    final isOnline = event.newStatus == 'online';
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            Icon(
+              isOnline ? Icons.check_circle : Icons.error,
+              color: Colors.white,
+              size: 18,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                '${event.name} is now ${event.newStatus.toUpperCase()}',
+                style: const TextStyle(fontSize: 13),
               ),
-            ],
-          ),
-          backgroundColor: color,
-          duration: const Duration(seconds: 3),
-          behavior: SnackBarBehavior.floating,
+            ),
+          ],
         ),
-      );
-    }
+        backgroundColor: isOnline ? Colors.green : Colors.red,
+        duration: const Duration(seconds: 3),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
   }
 
-  @override
-  void dispose() {
-    _statusSubscription?.cancel();
-    _connectionSubscription?.cancel();
-    super.dispose();
-  }
-
-  Future<void> _refresh() async {
-    setState(() {
-      _nodesFuture = _fetchNodes();
-    });
-    await _nodesFuture;
-  }
+  int get _totalPages => (_filteredNodes.length / _itemsPerPage).ceil();
+  int get _startIndex => (_currentPage - 1) * _itemsPerPage;
+  int get _endIndex =>
+      math.min(_startIndex + _itemsPerPage, _filteredNodes.length);
+  List<BaseNode> get _paginatedNodes => _filteredNodes.isEmpty
+      ? []
+      : _filteredNodes.sublist(_startIndex, _endIndex);
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.transparent,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        surfaceTintColor: Colors.white,
-        toolbarHeight: 0,
-        elevation: 0,
-      ),
+      backgroundColor: Colors.grey[50],
       body: RefreshIndicator(
-        onRefresh: _refresh,
-        child: SingleChildScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          child: Padding(
-            padding: const EdgeInsets.all(24.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        onRefresh: _fetchNodes,
+        child: CustomScrollView(
+          slivers: [
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
+                    const Text(
                       "Device List",
                       style:
-                          TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                          TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
                     ),
+                    const SizedBox(height: 16),
+                    SearchBarWidget(
+                      controller: _searchController,
+                      hintText: 'Search by name or IP address',
+                    ),
+                    const SizedBox(height: 12),
+                    DeviceFilterBar(
+                      selectedType: _selectedType,
+                      selectedLocation: _selectedLocation,
+                      selectedStatus: _selectedStatus,
+                      deviceTypes: _deviceTypes,
+                      locations: _locations,
+                      onTypeChanged: (v) => _updateFilter(type: v),
+                      onLocationChanged: (v) => _updateFilter(location: v),
+                      onStatusChanged: (v) => _updateFilter(status: v),
+                      onClearFilters: _clearFilters,
+                    ),
+                    const SizedBox(height: 12),
+                    _buildResultsSummary(),
                   ],
                 ),
-                const SizedBox(height: 20),
-                FutureBuilder<List<BaseNode>>(
-                  future: _nodesFuture,
-                  builder: (context, snapshot) {
-                    if (snapshot.connectionState == ConnectionState.waiting &&
-                        _nodes.isEmpty) {
-                      return const Center(child: CircularProgressIndicator());
-                    }
-                    if (snapshot.hasError && _nodes.isEmpty) {
-                      return Center(child: Text("Error: ${snapshot.error}"));
-                    }
-                    if (_nodes.isEmpty) {
-                      return const Center(child: Text("No devices found"));
-                    }
-
-                    return ListView.builder(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      itemCount: _nodes.length,
-                      itemBuilder: (context, index) {
-                        return DeviceCard(
-                          key: ValueKey(_nodes[index].id),
-                          node: _nodes[index],
-                        );
-                      },
-                    );
-                  },
-                ),
-              ],
+              ),
             ),
+            _buildDeviceList(),
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: PaginationWidget(
+                  currentPage: _currentPage,
+                  totalPages: _totalPages,
+                  onPageChanged: (page) => setState(() => _currentPage = page),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _updateFilter({String? type, String? location, String? status}) {
+    setState(() {
+      if (type != null || _selectedType != null) _selectedType = type;
+      if (location != null || _selectedLocation != null) {
+        _selectedLocation = location;
+      }
+      if (status != null || _selectedStatus != null) _selectedStatus = status;
+      _currentPage = 1;
+      _applyFilters();
+    });
+  }
+
+  Widget _buildResultsSummary() {
+    final showing = _paginatedNodes.length;
+    final total = _filteredNodes.length;
+    final allTotal = _allNodes.length;
+
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          total == allTotal
+              ? 'Showing $showing of $total'
+              : 'Showing $showing of $total ($allTotal total)',
+          style: TextStyle(color: Colors.grey[600], fontSize: 12),
+        ),
+        Row(
+          children: [
+            Text('Show: ',
+                style: TextStyle(color: Colors.grey[600], fontSize: 12)),
+            DropdownButton<int>(
+              value: _itemsPerPage,
+              underline: const SizedBox(),
+              isDense: true,
+              style: const TextStyle(fontSize: 12, color: Colors.black87),
+              items: _itemsPerPageOptions
+                  .map((count) =>
+                      DropdownMenuItem(value: count, child: Text('$count')))
+                  .toList(),
+              onChanged: (value) {
+                if (value != null) {
+                  setState(() {
+                    _itemsPerPage = value;
+                    _currentPage = 1;
+                  });
+                }
+              },
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDeviceList() {
+    if (_isLoading) {
+      return const SliverFillRemaining(
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    if (_error != null) {
+      return SliverFillRemaining(
+        child: AsyncErrorWidget(
+          error: _error!,
+          onRetry: _fetchNodes,
+          message: 'Failed to load devices',
+        ),
+      );
+    }
+
+    if (_filteredNodes.isEmpty) {
+      return SliverFillRemaining(
+        child: EmptyStateWidget(
+          message: _allNodes.isEmpty
+              ? 'No devices found'
+              : 'No devices match your filters',
+          icon: Icons.devices_other,
+          onAction: _allNodes.isNotEmpty ? _clearFilters : null,
+          actionLabel: 'Clear Filters',
+        ),
+      );
+    }
+
+    return SliverPadding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      sliver: SliverList(
+        delegate: SliverChildBuilderDelegate(
+          (context, index) => DeviceCard(
+            key: ValueKey(_paginatedNodes[index].id),
+            node: _paginatedNodes[index],
           ),
+          childCount: _paginatedNodes.length,
         ),
       ),
     );

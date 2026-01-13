@@ -16,8 +16,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
   late Future<DashboardStats> _dashboardStatsFuture;
   Timer? _refreshTimer;
   StreamSubscription<StatusChangeEvent>? _statusSubscription;
-  StreamSubscription<Map<String, dynamic>>? _heartbeatSubscription;
-  bool _wsConnected = false;
+  StreamSubscription<WebSocketConnectionState>? _connectionSubscription;
+  WebSocketConnectionState _wsState = WebSocketConnectionState.disconnected;
 
   @override
   void initState() {
@@ -36,24 +36,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
     wsService.connect();
 
     // Listen for connection state
-    wsService.connectionState.listen((connected) {
+    _connectionSubscription = wsService.connectionState.listen((state) {
       if (mounted) {
         setState(() {
-          _wsConnected = connected;
+          _wsState = state;
         });
       }
     });
 
-    // Listen for status changes and refresh dashboard
     _statusSubscription = wsService.statusChanges.listen((event) {
       if (mounted) {
         _autoRefresh();
       }
-    });
-
-    // Listen for heartbeats with summary data
-    _heartbeatSubscription = wsService.heartbeats.listen((data) {
-      debugPrint('Heartbeat received: $data');
     });
   }
 
@@ -69,7 +63,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   void dispose() {
     _refreshTimer?.cancel();
     _statusSubscription?.cancel();
-    _heartbeatSubscription?.cancel();
+    _connectionSubscription?.cancel();
     super.dispose();
   }
 
@@ -94,7 +88,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 children: [
                   Text("Overview",
                       style:
-                          TextStyle(fontSize: 24, fontWeight: FontWeight.bold))
+                          TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+                  // ConnectionIndicator(state: _wsState),
                 ],
               ),
               const SizedBox(height: 20),

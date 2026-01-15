@@ -8,6 +8,8 @@ class AlertResponse(BaseModel):
     alert_id: int
     device_id: Optional[int] = None
     switch_id: Optional[int] = None
+    device_name: Optional[str] = None
+    location_name: Optional[str] = None
     librenms_alert_id: Optional[int]
     category_id: Optional[int]
     alert_type: str

@@ -2,7 +2,9 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
+import '../widgets/alert_notification.dart';
 import '../api_config.dart';
 
 /// Model for status change events
@@ -76,16 +78,15 @@ class WebSocketService {
       StreamController<WebSocketConnectionState>.broadcast();
   final _heartbeatController =
       StreamController<Map<String, dynamic>>.broadcast();
+  final _alertStreamController =
+      StreamController<Map<String, dynamic>>.broadcast();
 
-  /// Stream of status change events
+  /// Stream of status, connection state, heartbeat, and alert change events
   Stream<StatusChangeEvent> get statusChanges => _statusChangeController.stream;
-
-  /// Stream of connection state changes
   Stream<WebSocketConnectionState> get connectionState =>
       _connectionStateController.stream;
-
-  /// Stream of heartbeat events
   Stream<Map<String, dynamic>> get heartbeats => _heartbeatController.stream;
+  Stream<Map<String, dynamic>> get alertStream => _alertStreamController.stream;
 
   /// Current connection state
   WebSocketConnectionState get currentState => _connectionState;
@@ -185,6 +186,11 @@ class WebSocketService {
         case 'heartbeat':
           _heartbeatController.add(data);
           debugPrint('WebSocket: Heartbeat received');
+          break;
+
+        case 'alert':
+          debugPrint('WebSocket: Alert received - ${data['message']}');
+          _alertStreamController.add(data);
           break;
 
         case 'pong':
@@ -287,11 +293,11 @@ class WebSocketService {
     debugPrint('WebSocket: Disconnected');
   }
 
-  /// Dispose all resources
   void dispose() {
     disconnect();
     _statusChangeController.close();
     _connectionStateController.close();
     _heartbeatController.close();
+    _alertStreamController.close();
   }
 }

@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 from app.api.dependencies import (
@@ -10,6 +11,7 @@ from app.models import Alert, SwitchAlert, User
 from app.notifications import websocket_endpoint
 from app.schemas.alert import AlertResponse, AlertUpdate
 from fastapi import APIRouter, Depends, HTTPException, Query, WebSocket, status
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 router = APIRouter(prefix="/alerts", tags=["Alerts"])
@@ -20,16 +22,34 @@ def _alert_to_response_dict(alert_obj: Any) -> Dict[str, Any]:
     Convert Alert/SwitchAlert SQLAlchemy model into a dictionary that matches
     AlertResponse schema to avoid leaking SQLAlchemy internals
     """
+    dev_name = " - "
+    loc_name = " - "
+
+    # Check if it is a Device or a Switch and fetch relationships
+    if hasattr(alert_obj, "device") and alert_obj.device:
+        dev_name = alert_obj.device.name
+        if alert_obj.device.location:
+            loc_name = alert_obj.device.location.name
+    elif hasattr(alert_obj, "switch") and alert_obj.switch:
+        dev_name = alert_obj.switch.name
+        if alert_obj.switch.location:
+            loc_name = alert_obj.switch.location.name
+
+    raw_status = getattr(alert_obj, "status", "")
+    final_status = "active" if str(raw_status) == "1" else raw_status
+
     return {
         "alert_id": getattr(alert_obj, "alert_id", None),
         "device_id": getattr(alert_obj, "device_id", None),
         "switch_id": getattr(alert_obj, "switch_id", None),
+        "device_name": dev_name,
+        "location_name": loc_name,
         "librenms_alert_id": getattr(alert_obj, "librenms_alert_id", None),
         "category_id": getattr(alert_obj, "category_id", None),
         "alert_type": getattr(alert_obj, "alert_type", ""),
         "severity": getattr(alert_obj, "severity", ""),
         "message": getattr(alert_obj, "message", ""),
-        "status": getattr(alert_obj, "status", ""),
+        "status": final_status,
         "assigned_to_user_id": getattr(alert_obj, "assigned_to_user_id", None),
         "created_at": getattr(alert_obj, "created_at", None),
         "cleared_at": getattr(alert_obj, "cleared_at", None),
@@ -40,44 +60,56 @@ def _alert_to_response_dict(alert_obj: Any) -> Dict[str, Any]:
 def get_all_alerts(
     status_filter: Optional[str] = Query(None, description="Filter alerts by status"),
     severity: Optional[str] = Query(None, description="Filter by severity"),
+    start_date: Optional[datetime] = Query(None),
+    end_date: Optional[datetime] = Query(None),
     assigned_to: Optional[int] = Query(None, description="Filter by assigned user"),
     db: Session = Depends(get_db),
 ):
     """
     Return combined list of device and switch alerts
     """
-    # Query device alerts
+    # Query all alerts
     device_query = db.query(Alert)
+    switch_query = db.query(SwitchAlert)
+
     if status_filter:
-        device_query = device_query.filter(Alert.status == status_filter)
+        if status_filter == "active":
+            device_query = device_query.filter(
+                or_(Alert.status == "active", Alert.status == "1")
+            )
+            switch_query = switch_query.filter(
+                or_(SwitchAlert.status == "active", SwitchAlert.status == "1")
+            )
+        else:
+            device_query = device_query.filter(Alert.status == status_filter)
+            switch_query = switch_query.filter(SwitchAlert.status == status_filter)
+
     if severity:
         device_query = device_query.filter(Alert.severity == severity)
+        switch_query = switch_query.filter(SwitchAlert.severity == severity)
+
     if assigned_to:
         device_query = device_query.filter(Alert.assigned_to_user_id == assigned_to)
-
-    device_alerts = device_query.all()
-
-    # Query switch alerts
-    switch_query = db.query(SwitchAlert)
-    if status_filter:
-        switch_query = switch_query.filter(SwitchAlert.status == status_filter)
-    if severity:
-        switch_query = switch_query.filter(SwitchAlert.severity == severity)
-    if assigned_to:
         switch_query = switch_query.filter(
             SwitchAlert.assigned_to_user_id == assigned_to
         )
 
-    switch_alerts = switch_query.all()
+    if start_date:
+        device_query = device_query.filter(Alert.created_at >= start_date)
+        switch_query = switch_query.filter(SwitchAlert.created_at >= start_date)
+
+    if end_date:
+        device_query = device_query.filter(Alert.created_at <= end_date)
+        switch_query = switch_query.filter(SwitchAlert.created_at <= end_date)
 
     all_alerts = []
 
     # Normalize device alerts
-    for a in device_alerts:
+    for a in device_query:
         all_alerts.append(_alert_to_response_dict(a))
 
     # Normalize switch alerts
-    for a in switch_alerts:
+    for a in switch_query:
         all_alerts.append(_alert_to_response_dict(a))
 
     # Sort by newest first (created_at may none)
@@ -91,11 +123,17 @@ def get_active_alerts(db: Session = Depends(get_db)):
     """
     Get only active (unresolved) alerts
     """
-    device_alerts = db.query(Alert).filter(Alert.status == "active").all()
-    switch_alerts = db.query(SwitchAlert).filter(SwitchAlert.status == "active").all()
+    device_alerts = (
+        db.query(Alert).filter(or_(Alert.status == "active", Alert.status == "1")).all()
+    )
+
+    switch_alerts = (
+        db.query(SwitchAlert)
+        .filter(or_(SwitchAlert.status == "active", SwitchAlert.status == "1"))
+        .all()
+    )
 
     results = [_alert_to_response_dict(a) for a in device_alerts + switch_alerts]
-    # Keep newest first
     results.sort(key=lambda x: x.get("created_at") or "", reverse=True)
     return results
 
@@ -149,24 +187,15 @@ def update_alert(
 
     # Update fields
     update_data = alert_data.model_dump(exclude_unset=True)
-
-    # Auto-set cleared_at if status changed to a cleared-like state
-    if (
-        update_data.get("status")
-        and update_data.get("status") == "cleared"
-        and "cleared_at" not in update_data
-    ):
-        from datetime import datetime
-
+    if update_data.get("status") == "cleared" and "cleared_at" not in update_data:
         update_data["cleared_at"] = datetime.utcnow()
+        update_data["assigned_to_user_id"] = current_user.user_id
 
     for field, value in update_data.items():
         setattr(alert, field, value)
-
     db.add(alert)
     db.commit()
     db.refresh(alert)
-
     return _alert_to_response_dict(alert)
 
 

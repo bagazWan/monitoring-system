@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import '../../widgets/side_menu.dart';
+import '../../widgets/alert_notification.dart';
 import '../../services/auth_service.dart';
 import '../../services/device_service.dart';
 import '../../services/websocket_service.dart';
 import 'dashboard/dashboard_screen.dart';
 import 'devices/device_list_screen.dart';
+import 'alerts/alert_screen.dart';
 
 class MainLayout extends StatefulWidget {
   const MainLayout({super.key});
@@ -20,7 +22,7 @@ class _MainLayoutState extends State<MainLayout> {
     const DashboardScreen(),
     const DeviceListScreen(),
     const Center(child: Text("Map Visualization")),
-    const Center(child: Text("Notifications Center")),
+    const AlertScreen(),
     const Center(child: Text("Profile Settings")),
   ];
 
@@ -28,6 +30,27 @@ class _MainLayoutState extends State<MainLayout> {
   void initState() {
     super.initState();
     WebSocketService().connect();
+    WebSocketService().alertStream.listen((alertData) {
+      if (mounted) {
+        AlertNotification.show(
+          context,
+          message: alertData['message'] ?? 'New System Alert',
+          severity: alertData['severity'] ?? 'info',
+          deviceName:
+              'Device ID: ${alertData['device_id'] ?? alertData['switch_id']}',
+          onTap: () {
+            AlertNotification.dismiss();
+            // Navigate to the AlertScreen
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const AlertScreen(),
+              ),
+            );
+          },
+        );
+      }
+    });
   }
 
   @override

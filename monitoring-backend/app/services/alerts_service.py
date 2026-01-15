@@ -175,6 +175,14 @@ async def process_librenms_alerts(librenms_alerts: List[Dict[str, Any]]) -> int:
                 if existing:
                     # Update existing alert record
                     changed = False
+                    if existing.status != "cleared":
+                        if existing.status != status:
+                            existing.status = status
+                            changed = True
+                    if str(status).lower() in ("cleared", "ok", "closed"):
+                        if existing.status != status:
+                            existing.status = status
+                            changed = True
                     if existing.severity != severity:
                         existing.severity = severity
                         changed = True
@@ -267,6 +275,7 @@ async def process_librenms_alerts(librenms_alerts: List[Dict[str, Any]]) -> int:
                     try:
                         if notify_all_channels:
                             payload = {
+                                "type": "alert",
                                 "alert_id": getattr(new_alert, "alert_id", None),
                                 "librenms_alert_id": librenms_alert_id,
                                 "device_id": getattr(new_alert, "device_id", None),

@@ -1,8 +1,9 @@
 from app.core.database import get_db
 from app.models import Device, Switch
-from app.models.alert import Alert
+from app.models.alert import Alert, SwitchAlert
 from app.services.librenms_service import LibreNMSService
 from fastapi import APIRouter, Depends
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 router = APIRouter()
@@ -41,11 +42,18 @@ async def get_dashboard_summary(db: Session = Depends(get_db)):
         # If LibreNMS is down, data_found stays False
         pass
 
-    active_alerts = db.query(Alert).filter(Alert.severity != "cleared").count()
+    active_alerts_count = (
+        db.query(Alert)
+        .filter(or_(Alert.status == "active", Alert.status == "1"))
+        .count()
+        + db.query(SwitchAlert)
+        .filter(or_(SwitchAlert.status == "active", SwitchAlert.status == "1"))
+        .count()
+    )
 
     return {
         "total_all_devices": total_devices + total_switches,
         "all_online_devices": online_devices + online_switches,
-        "active_alerts": active_alerts,
+        "active_alerts": active_alerts_count,
         "total_bandwidth": round(total_bandwidth_mbps, 2) if data_found else None,
     }

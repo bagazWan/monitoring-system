@@ -74,13 +74,6 @@ class LibreNMSService:
         """
         Add a new device to LibreNMS
         API: POST /api/v0/devices
-        Args:
-            hostname: Hostname or IP address of the device
-            community: SNMP community string (default: "public")
-            snmp_version: SNMP version (v1, v2c, v3)
-            port: SNMP port (default: 161)
-            transport: Transport protocol (udp/tcp)
-            force_add: Force add even if device already exists
         """
         payload = {
             "hostname": hostname,
@@ -148,7 +141,7 @@ class LibreNMSService:
 
     async def get_device_graphs(self, device_id: int) -> Dict:
         """
-        Get available graphs for a device LibreNMS's internal device ID
+        Get available graphs for a device
         API: GET /api/v0/devices/{device_id}/graphs
         """
         async with httpx.AsyncClient() as client:
@@ -162,7 +155,7 @@ class LibreNMSService:
 
     async def get_alerts(self, device_id: Optional[int] = None) -> List[Dict]:
         """
-        Get alerts from LibreNMS device ID
+        Get alerts from LibreNMS
         API: GET /api/v0/alerts
         """
         params = {}

@@ -8,7 +8,8 @@ class Alert {
   final String severity;
   final String message;
   final String status;
-  final String? assignedToUserId;
+  final int? assignedToUserId;
+  final String? resolvedByFullName;
   final DateTime createdAt;
   final DateTime? clearedAt;
 
@@ -23,6 +24,7 @@ class Alert {
     required this.message,
     required this.status,
     this.assignedToUserId,
+    this.resolvedByFullName,
     required this.createdAt,
     this.clearedAt,
   });
@@ -39,6 +41,7 @@ class Alert {
       message: json['message'] ?? '',
       status: json['status'] ?? 'active',
       assignedToUserId: json['assigned_to_user_id'],
+      resolvedByFullName: json['resolved_by_full_name'],
       createdAt: DateTime.parse(json['created_at']),
       clearedAt: json['cleared_at'] != null
           ? DateTime.parse(json['cleared_at'])

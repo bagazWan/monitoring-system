@@ -19,8 +19,10 @@ class AlertService {
 
   Future<List<Alert>> getActiveAlerts() async {
     final headers = await _getHeaders();
-    final response = await http.get(Uri.parse('${ApiConfig.alerts}/active'),
-        headers: headers);
+    final response = await http.get(
+      Uri.parse('${ApiConfig.alerts}/active'),
+      headers: headers,
+    );
 
     if (response.statusCode == 200) {
       final List<dynamic> data = json.decode(response.body);
@@ -39,7 +41,22 @@ class AlertService {
     final headers = await _getHeaders();
 
     String query = 'status_filter=$status';
-    if (severity != null) query += '&severity=$severity';
+
+    if (severity != null && severity.isNotEmpty) {
+      query += '&severity=${Uri.encodeQueryComponent(severity)}';
+    }
+
+    if (startDate != null) {
+      query +=
+          '&start_date=${Uri.encodeQueryComponent(startDate.toIso8601String())}';
+    }
+
+    if (endDate != null) {
+      final endInclusive =
+          DateTime(endDate.year, endDate.month, endDate.day, 23, 59, 59, 999);
+      query +=
+          '&end_date=${Uri.encodeQueryComponent(endInclusive.toIso8601String())}';
+    }
 
     final response = await http.get(
       Uri.parse('${ApiConfig.alerts}/?$query'),

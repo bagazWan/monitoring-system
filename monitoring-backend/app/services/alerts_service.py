@@ -49,10 +49,14 @@ async def process_librenms_alerts(librenms_alerts: List[Dict[str, Any]]) -> int:
     """
     Process a list of raw alerts returned from LibreNMS.
     - Deduplicate using `librenms_alert_id` when present
-    - Map to either `Alert` (device) or `SwitchAlert` (switch) depending on whether the device exists in switches
+    - Map to either `Alert` (device) or `SwitchAlert` (switch)
     - Persist new alerts or update existing alert status/severity/message
     - Trigger notifications (if notify_all_channels exists)
-    Returns number of processed alerts (created + updated)
+
+    PS:
+    If a single librenms_device_id exists in both devices and switches tables,
+    this is an ambiguous mapping. It will log an error and skip processing the alert
+    to avoid storing incorrect device_name/location_name on the UI.
     """
     if not librenms_alerts:
         return 0
@@ -72,6 +76,7 @@ async def process_librenms_alerts(librenms_alerts: List[Dict[str, Any]]) -> int:
                     or raw.get("device")
                     or raw.get("hostname_device_id")
                 )
+
                 try:
                     if librenms_alert_id is not None:
                         librenms_alert_id = int(librenms_alert_id)
@@ -110,29 +115,39 @@ async def process_librenms_alerts(librenms_alerts: List[Dict[str, Any]]) -> int:
                 # Lookup whether this librenms device is stored as a Switch or a generic Device
                 target_switch = None
                 target_device = None
+
                 if librenms_device_id is not None:
-                    # prefer Switch first
+                    # Query both to detect ambiguity
                     target_switch = (
                         db.query(Switch)
-                        .filter(
-                            getattr(Switch, "librenms_device_id") == librenms_device_id
-                        )
+                        .filter(Switch.librenms_device_id == librenms_device_id)
                         .first()
                     )
-                    if not target_switch:
-                        target_device = (
-                            db.query(Device)
-                            .filter(
-                                getattr(Device, "librenms_device_id")
-                                == librenms_device_id
-                            )
-                            .first()
-                        )
+                    target_device = (
+                        db.query(Device)
+                        .filter(Device.librenms_device_id == librenms_device_id)
+                        .first()
+                    )
+
+                # If both exist => ambiguous mapping (data integrity problem)
+                if target_switch and target_device:
+                    logger.error(
+                        "Ambiguous librenms_device_id=%s exists in BOTH switches(switch_id=%s,name=%s) "
+                        "and devices(device_id=%s,name=%s). Skipping alert raw=%s",
+                        librenms_device_id,
+                        getattr(target_switch, "switch_id", None),
+                        getattr(target_switch, "name", None),
+                        getattr(target_device, "device_id", None),
+                        getattr(target_device, "name", None),
+                        raw,
+                    )
+                    continue
 
                 # If no DB object found, skip processing this alert
                 if not target_switch and not target_device:
                     logger.debug(
-                        "Skipping alert from LibreNMS because corresponding device not found in DB (librenms_device_id=%s). Raw: %s",
+                        "Skipping alert from LibreNMS because corresponding device not found in DB "
+                        "(librenms_device_id=%s). Raw: %s",
                         librenms_device_id,
                         raw,
                     )
@@ -146,9 +161,7 @@ async def process_librenms_alerts(librenms_alerts: List[Dict[str, Any]]) -> int:
                 if librenms_alert_id:
                     existing = (
                         db.query(Model)
-                        .filter(
-                            getattr(Model, "librenms_alert_id") == librenms_alert_id
-                        )
+                        .filter(Model.librenms_alert_id == librenms_alert_id)
                         .first()
                     )
                 else:
@@ -175,23 +188,26 @@ async def process_librenms_alerts(librenms_alerts: List[Dict[str, Any]]) -> int:
                 if existing:
                     # Update existing alert record
                     changed = False
-                    if existing.status != "cleared":
-                        if existing.status != status:
-                            existing.status = status
-                            changed = True
-                    if str(status).lower() in ("cleared", "ok", "closed"):
-                        if existing.status != status:
-                            existing.status = status
-                            changed = True
+
+                    # Normalize cleared statuses
+                    normalized_status = status
+                    if str(status) == "1":
+                        normalized_status = "active"
+                    elif str(status) == "0":
+                        normalized_status = "cleared"
+
+                    if existing.status != normalized_status:
+                        existing.status = normalized_status
+                        changed = True
+
                     if existing.severity != severity:
                         existing.severity = severity
                         changed = True
+
                     if existing.message != message:
                         existing.message = message
                         changed = True
-                    if existing.status != status:
-                        existing.status = status
-                        changed = True
+
                     if cleared_at and getattr(existing, "cleared_at", None) is None:
                         existing.cleared_at = cleared_at
                         changed = True
@@ -207,9 +223,9 @@ async def process_librenms_alerts(librenms_alerts: List[Dict[str, Any]]) -> int:
                         # notify update
                         try:
                             if notify_all_channels:
-                                # send minimal payload with DB id and new status
                                 await _maybe_notify(
                                     {
+                                        "type": "alert",
                                         "alert_id": getattr(existing, "alert_id", None),
                                         "librenms_alert_id": librenms_alert_id,
                                         "device_id": getattr(
@@ -229,8 +245,15 @@ async def process_librenms_alerts(librenms_alerts: List[Dict[str, Any]]) -> int:
                                 "Notification failed for updated alert librenms_id=%s",
                                 librenms_alert_id,
                             )
+
                 else:
                     # Create new alert
+                    normalized_status = status
+                    if str(status) == "1":
+                        normalized_status = "active"
+                    elif str(status) == "0":
+                        normalized_status = "cleared"
+
                     if target_switch:
                         new_alert = SwitchAlert(
                             switch_id=target_switch.switch_id,
@@ -244,7 +267,7 @@ async def process_librenms_alerts(librenms_alerts: List[Dict[str, Any]]) -> int:
                             assigned_to_user_id=None,
                             created_at=datetime.utcnow(),
                             cleared_at=cleared_at,
-                            status=status,
+                            status=normalized_status,
                         )
                     else:
                         new_alert = Alert(
@@ -259,7 +282,7 @@ async def process_librenms_alerts(librenms_alerts: List[Dict[str, Any]]) -> int:
                             assigned_to_user_id=None,
                             created_at=datetime.utcnow(),
                             cleared_at=cleared_at,
-                            status=status,
+                            status=normalized_status,
                         )
 
                     db.add(new_alert)

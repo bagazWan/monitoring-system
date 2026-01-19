@@ -2,12 +2,10 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
-import '../widgets/alert_notification.dart';
 import '../api_config.dart';
 
-/// Model for status change events
+// Model for status change events
 class StatusChangeEvent {
   final String nodeType;
   final int id;
@@ -40,7 +38,6 @@ class StatusChangeEvent {
   }
 }
 
-/// Connection state enum for better state management
 enum WebSocketConnectionState {
   disconnected,
   connecting,
@@ -48,7 +45,7 @@ enum WebSocketConnectionState {
   reconnecting,
 }
 
-/// Singleton WebSocket service with exponential backoff reconnection
+// Singleton WebSocket service with exponential backoff reconnection
 class WebSocketService {
   static final WebSocketService _instance = WebSocketService._internal();
   factory WebSocketService() => _instance;
@@ -81,31 +78,27 @@ class WebSocketService {
   final _alertStreamController =
       StreamController<Map<String, dynamic>>.broadcast();
 
-  /// Stream of status, connection state, heartbeat, and alert change events
+  // refresher for alerts list/logs when an alert event comes in
+  final _alertsRefreshController = StreamController<void>.broadcast();
+
   Stream<StatusChangeEvent> get statusChanges => _statusChangeController.stream;
   Stream<WebSocketConnectionState> get connectionState =>
       _connectionStateController.stream;
   Stream<Map<String, dynamic>> get heartbeats => _heartbeatController.stream;
   Stream<Map<String, dynamic>> get alertStream => _alertStreamController.stream;
+  Stream<void> get alertsRefresh => _alertsRefreshController.stream;
 
-  /// Current connection state
   WebSocketConnectionState get currentState => _connectionState;
 
-  /// Whether currently connected
   bool get isConnected =>
       _connectionState == WebSocketConnectionState.connected;
 
-  /// Calculate reconnect delay with exponential backoff and jitter
   Duration _calculateReconnectDelay() {
-    // Exponential backoff:  delay = initialDelay * (multiplier ^ attempts)
     final exponentialDelay = _initialReconnectDelay.inMilliseconds *
         pow(_backoffMultiplier, _reconnectAttempts);
-
-    // Cap at max delay
     final cappedDelay =
         min(exponentialDelay, _maxReconnectDelay.inMilliseconds);
 
-    // Add jitter to prevent thundering herd
     final random = Random();
     final jitter = cappedDelay * _jitterFactor * (random.nextDouble() * 2 - 1);
     final finalDelay = cappedDelay + jitter;
@@ -113,7 +106,6 @@ class WebSocketService {
     return Duration(milliseconds: finalDelay.toInt());
   }
 
-  /// Connect to WebSocket server
   Future<void> connect() async {
     if (_connectionState == WebSocketConnectionState.connected ||
         _connectionState == WebSocketConnectionState.connecting) {
@@ -132,14 +124,14 @@ class WebSocketService {
       final wsUrl = ApiConfig.baseUrl
           .replaceFirst('http://', 'ws://')
           .replaceFirst('https://', 'wss://');
-      final uri = Uri.parse('$wsUrl/api/v1/ws/status');
+
+      // Unified endpoint
+      final uri = Uri.parse('$wsUrl/api/v1/ws');
 
       debugPrint(
-          'WebSocket:  Connecting to $uri (attempt ${_reconnectAttempts + 1})');
+          'WebSocket: Connecting to $uri (attempt ${_reconnectAttempts + 1})');
 
       _channel = WebSocketChannel.connect(uri);
-
-      // Wait for connection to establish
       await _channel!.ready;
 
       _channel!.stream.listen(
@@ -150,7 +142,7 @@ class WebSocketService {
       );
 
       _updateConnectionState(WebSocketConnectionState.connected);
-      _reconnectAttempts = 0; // Reset on successful connection
+      _reconnectAttempts = 0;
       _startPingTimer();
 
       debugPrint('WebSocket: Connected successfully');
@@ -178,27 +170,23 @@ class WebSocketService {
         case 'status_change':
           final event = StatusChangeEvent.fromJson(data);
           _statusChangeController.add(event);
-          debugPrint(
-            'WebSocket: Status change - ${event.name}:  ${event.oldStatus} -> ${event.newStatus}',
-          );
           break;
 
         case 'heartbeat':
           _heartbeatController.add(data);
-          debugPrint('WebSocket: Heartbeat received');
           break;
 
         case 'alert':
-          debugPrint('WebSocket: Alert received - ${data['message']}');
           _alertStreamController.add(data);
+          // signal any listening screens to refresh from API
+          _alertsRefreshController.add(null);
           break;
 
         case 'pong':
-          // Ping response received - connection is healthy
           break;
 
         default:
-          debugPrint('WebSocket:  Unknown message type: $type');
+          debugPrint('WebSocket: Unknown message type: $type');
       }
     } catch (e) {
       debugPrint('WebSocket: Failed to parse message: $e');
@@ -236,7 +224,6 @@ class WebSocketService {
 
   void _scheduleReconnect() {
     _reconnectTimer?.cancel();
-
     _updateConnectionState(WebSocketConnectionState.reconnecting);
 
     final delay = _calculateReconnectDelay();
@@ -269,7 +256,6 @@ class WebSocketService {
     _pingTimer = null;
   }
 
-  /// Manually trigger a reconnection attempt
   void reconnect() {
     if (_connectionState != WebSocketConnectionState.connecting) {
       _reconnectAttempts = 0;
@@ -278,7 +264,6 @@ class WebSocketService {
     }
   }
 
-  /// Disconnect from WebSocket server
   Future<void> disconnect() async {
     _shouldReconnect = false;
     _reconnectTimer?.cancel();
@@ -299,5 +284,6 @@ class WebSocketService {
     _connectionStateController.close();
     _heartbeatController.close();
     _alertStreamController.close();
+    _alertsRefreshController.close();
   }
 }

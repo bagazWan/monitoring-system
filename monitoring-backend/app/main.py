@@ -22,7 +22,7 @@ from app.services.alerts_service import (
     stop_alerts_poller_task,
 )
 from app.services.librenms_service import LibreNMSService
-from app.services.status_poller import (  # Add these imports
+from app.services.status_poller import (
     start_status_poller_task,
     stop_status_poller_task,
 )

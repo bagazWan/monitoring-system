@@ -17,6 +17,7 @@ class AlertResponse(BaseModel):
     message: str
     status: str
     assigned_to_user_id: Optional[int] = None
+    resolved_by_full_name: Optional[str] = None
     created_at: datetime
     cleared_at: Optional[datetime] = None
 

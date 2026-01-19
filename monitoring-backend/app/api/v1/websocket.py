@@ -8,7 +8,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-@router.websocket("/ws/status")
+@router.websocket("/ws")
 async def websocket_status_endpoint(websocket: WebSocket):
     """
     WebSocket endpoint for device status updates.
@@ -36,7 +36,7 @@ async def websocket_status_endpoint(websocket: WebSocket):
         await ws_manager.send_personal_message(
             {
                 "type": "connected",
-                "message": "Connected to status updates",
+                "message": "Connected to realtime events",
             },
             websocket,
         )

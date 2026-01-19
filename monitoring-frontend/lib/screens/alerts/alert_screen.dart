@@ -1,8 +1,10 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../models/alert.dart';
 import '../../services/alert_service.dart';
 import '../../services/auth_service.dart';
+import '../../services/websocket_service.dart';
 import '../../widgets/alert_card.dart';
 
 class AlertScreen extends StatefulWidget {
@@ -27,7 +29,6 @@ class _AlertScreenState extends State<AlertScreen>
   Future<void> _checkRole() async {
     final user = await AuthService().getCurrentUser();
     setState(() {
-      // Admin or teknisi can edit
       _isTechnicianOrAdmin = (user.role == 'admin' || user.role == 'teknisi');
     });
   }
@@ -37,11 +38,11 @@ class _AlertScreenState extends State<AlertScreen>
     return Scaffold(
       backgroundColor: Colors.grey[50],
       appBar: AppBar(
-        title: const Text('Incident Log',
-            style: TextStyle(
-                color: Colors.black,
-                fontSize: 22,
-                fontWeight: FontWeight.bold)),
+        title: const Text(
+          'Incident Log',
+          style: TextStyle(
+              color: Colors.black, fontSize: 22, fontWeight: FontWeight.bold),
+        ),
         backgroundColor: Colors.white,
         elevation: 0.5,
         bottom: TabBar(
@@ -58,10 +59,7 @@ class _AlertScreenState extends State<AlertScreen>
       body: TabBarView(
         controller: _tabController,
         children: [
-          // TAB 1: Active List
           _ActiveAlertsList(isTechnicianOrAdmin: _isTechnicianOrAdmin),
-
-          // TAB 2: Filterable Log
           const _AlertsLogTab(),
         ],
       ),
@@ -79,11 +77,24 @@ class _ActiveAlertsList extends StatefulWidget {
 
 class _ActiveAlertsListState extends State<_ActiveAlertsList> {
   late Future<List<Alert>> _activeFuture;
+  StreamSubscription? _alertsRefreshSub;
 
   @override
   void initState() {
     super.initState();
     _refresh();
+
+    // Refresh active list whenever an alert event is pushed from websocket
+    _alertsRefreshSub = WebSocketService().alertsRefresh.listen((_) {
+      if (!mounted) return;
+      _refresh();
+    });
+  }
+
+  @override
+  void dispose() {
+    _alertsRefreshSub?.cancel();
+    super.dispose();
   }
 
   void _refresh() {
@@ -98,13 +109,15 @@ class _ActiveAlertsListState extends State<_ActiveAlertsList> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text("Resolve Incident"),
+        title: const Text("Acknowledge / Note"),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text("Root Cause / Resolution Note:",
-                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+            const Text(
+              "Resolution Note (will not clear the alert until LibreNMS clears it):",
+              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+            ),
             const SizedBox(height: 8),
             TextField(
               controller: noteController,
@@ -122,14 +135,16 @@ class _ActiveAlertsListState extends State<_ActiveAlertsList> {
           ElevatedButton(
             onPressed: () async {
               try {
+                // keep your existing API call for now
                 await AlertService()
                     .resolveAlert(alert.alertId, noteController.text);
                 Navigator.pop(context);
-                _refresh(); // Reload list
+                _refresh();
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
-                      content: Text("Incident Resolved"),
-                      backgroundColor: Colors.green),
+                    content: Text("Note saved"),
+                    backgroundColor: Colors.green,
+                  ),
                 );
               } catch (e) {
                 ScaffoldMessenger.of(context).showSnackBar(
@@ -138,7 +153,7 @@ class _ActiveAlertsListState extends State<_ActiveAlertsList> {
                 );
               }
             },
-            child: const Text("Mark Resolved"),
+            child: const Text("Save Note"),
           )
         ],
       ),
@@ -187,11 +202,24 @@ class _AlertsLogTabState extends State<_AlertsLogTab> {
   DateTimeRange? _selectedDateRange;
   List<Alert> _logs = [];
   bool _isLoading = false;
+  StreamSubscription? _alertsRefreshSub;
 
   @override
   void initState() {
     super.initState();
     _fetchLogs();
+
+    // Refresh logs when websocket gets alert events (optional but helpful)
+    _alertsRefreshSub = WebSocketService().alertsRefresh.listen((_) {
+      if (!mounted) return;
+      _fetchLogs();
+    });
+  }
+
+  @override
+  void dispose() {
+    _alertsRefreshSub?.cancel();
+    super.dispose();
   }
 
   Future<void> _fetchLogs() async {
@@ -214,7 +242,7 @@ class _AlertsLogTabState extends State<_AlertsLogTab> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // 1. FILTER BAR
+        // Filter
         Container(
           padding: const EdgeInsets.all(8),
           color: Colors.white,
@@ -247,7 +275,7 @@ class _AlertsLogTabState extends State<_AlertsLogTab> {
           ),
         ),
 
-        // 2. SCROLLABLE DATA TABLE
+        // Table
         Expanded(
           child: _isLoading
               ? const Center(child: CircularProgressIndicator())
@@ -259,68 +287,74 @@ class _AlertsLogTabState extends State<_AlertsLogTab> {
                         scrollDirection: Axis.vertical,
                         child: SingleChildScrollView(
                           scrollDirection: Axis.horizontal,
-                          child: DataTable(
-                            columnSpacing: 20,
-                            headingRowColor:
-                                MaterialStateProperty.all(Colors.grey[100]),
-                            columns: const [
-                              DataColumn(label: Text('Created At')),
-                              DataColumn(label: Text('Cleared At')),
-                              DataColumn(label: Text('Severity')),
-                              DataColumn(label: Text('Device')),
-                              DataColumn(label: Text('Location')),
-                              DataColumn(label: Text('Resolved By')),
-                              DataColumn(label: Text('Message')),
-                            ],
-                            rows: _logs.map((alert) {
-                              String duration = "-";
-                              if (alert.clearedAt != null) {
-                                final diff = alert.clearedAt!
-                                    .difference(alert.createdAt);
-                                duration = "${diff.inMinutes}m";
-                              }
-
-                              return DataRow(cells: [
-                                DataCell(Text(DateFormat('dd/MM HH:mm')
-                                    .format(alert.createdAt))),
-                                DataCell(Text(alert.clearedAt != null
-                                    ? DateFormat('dd/MM HH:mm')
-                                        .format(alert.clearedAt!)
-                                    : "-")),
-                                DataCell(Container(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 6, vertical: 2),
-                                  decoration: BoxDecoration(
-                                    color: alert.severity == 'critical'
-                                        ? Colors.red[100]
-                                        : Colors.orange[100],
-                                    borderRadius: BorderRadius.circular(4),
-                                  ),
-                                  child: Text(alert.severity.toUpperCase(),
-                                      style: const TextStyle(
-                                          fontSize: 10,
-                                          fontWeight: FontWeight.bold)),
-                                )),
-                                DataCell(Text(alert.deviceName,
-                                    style: const TextStyle(
-                                        fontWeight: FontWeight.bold))),
-                                DataCell(Text(alert.locationName)),
-                                DataCell(Row(
-                                  children: [
-                                    const Icon(Icons.person_outline,
-                                        size: 14, color: Colors.grey),
-                                    const SizedBox(width: 4),
-                                    Text(alert.assignedToUserId?.toString() ??
-                                        "-"),
+                          child: LayoutBuilder(
+                            builder: (context, constraints) {
+                              return ConstrainedBox(
+                                constraints: BoxConstraints(
+                                  minWidth: MediaQuery.of(context).size.width,
+                                ),
+                                child: DataTable(
+                                  columnSpacing: 24,
+                                  headingRowColor: MaterialStateProperty.all(
+                                      Colors.grey[100]),
+                                  columns: const [
+                                    DataColumn(label: Text('Created At')),
+                                    DataColumn(label: Text('Cleared At')),
+                                    DataColumn(label: Text('Severity')),
+                                    DataColumn(label: Text('Device')),
+                                    DataColumn(label: Text('Location')),
+                                    DataColumn(label: Text('Resolved By')),
+                                    DataColumn(label: Text('Message')),
                                   ],
-                                )),
-                                DataCell(SizedBox(
-                                  width: 200,
-                                  child: Text(alert.message,
-                                      overflow: TextOverflow.ellipsis),
-                                )),
-                              ]);
-                            }).toList(),
+                                  rows: _logs.map((alert) {
+                                    return DataRow(cells: [
+                                      DataCell(Text(DateFormat('dd/MM HH:mm')
+                                          .format(alert.createdAt))),
+                                      DataCell(Text(alert.clearedAt != null
+                                          ? DateFormat('dd/MM HH:mm')
+                                              .format(alert.clearedAt!)
+                                          : "-")),
+                                      DataCell(Container(
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 6, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: alert.severity == 'critical'
+                                              ? Colors.red[100]
+                                              : Colors.orange[100],
+                                          borderRadius:
+                                              BorderRadius.circular(4),
+                                        ),
+                                        child: Text(
+                                          alert.severity.toUpperCase(),
+                                          style: const TextStyle(
+                                              fontSize: 10,
+                                              fontWeight: FontWeight.bold),
+                                        ),
+                                      )),
+                                      DataCell(Text(alert.deviceName,
+                                          style: const TextStyle(
+                                              fontWeight: FontWeight.bold))),
+                                      DataCell(Text(alert.locationName)),
+                                      DataCell(Row(
+                                        children: [
+                                          const Icon(Icons.person_outline,
+                                              size: 14, color: Colors.grey),
+                                          const SizedBox(width: 4),
+                                          Text(alert.resolvedByFullName ?? "-"),
+                                        ],
+                                      )),
+                                      DataCell(SizedBox(
+                                        width: 520,
+                                        child: Text(
+                                          alert.message,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      )),
+                                    ]);
+                                  }).toList(),
+                                ),
+                              );
+                            },
                           ),
                         ),
                       ),

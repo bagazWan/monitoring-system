@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../widgets/side_menu.dart';
 import '../../widgets/alert_notification.dart';
@@ -17,6 +18,7 @@ class MainLayout extends StatefulWidget {
 
 class _MainLayoutState extends State<MainLayout> {
   int _currentPageIndex = 0;
+  StreamSubscription? _alertSub;
 
   final List<Widget> _pages = [
     const DashboardScreen(),
@@ -30,31 +32,34 @@ class _MainLayoutState extends State<MainLayout> {
   void initState() {
     super.initState();
     WebSocketService().connect();
-    WebSocketService().alertStream.listen((alertData) {
-      if (mounted) {
-        AlertNotification.show(
-          context,
-          message: alertData['message'] ?? 'New System Alert',
-          severity: alertData['severity'] ?? 'info',
-          deviceName:
-              'Device ID: ${alertData['device_id'] ?? alertData['switch_id']}',
-          onTap: () {
-            AlertNotification.dismiss();
-            // Navigate to the AlertScreen
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => const AlertScreen(),
-              ),
-            );
-          },
-        );
-      }
+
+    _alertSub = WebSocketService().alertStream.listen((alertData) {
+      if (!mounted) return;
+
+      final severity = (alertData['severity'] ?? 'info').toString();
+      final message = (alertData['message'] ?? 'New System Alert').toString();
+
+      final deviceId = alertData['device_id'];
+      final switchId = alertData['switch_id'];
+
+      AlertNotification.show(
+        context,
+        message: message,
+        severity: severity,
+        deviceName: deviceId != null
+            ? 'Device ID: $deviceId'
+            : (switchId != null ? 'Switch ID: $switchId' : null),
+        onTap: () {
+          AlertNotification.dismiss();
+          setState(() => _currentPageIndex = 3);
+        },
+      );
     });
   }
 
   @override
   void dispose() {
+    _alertSub?.cancel();
     WebSocketService().disconnect();
     super.dispose();
   }
@@ -67,19 +72,18 @@ class _MainLayoutState extends State<MainLayout> {
     }
   }
 
-  // method for testing
   Future<void> _handleSync(BuildContext context) async {
-    // Show loading dialog
     showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (c) => const Center(child: CircularProgressIndicator()));
+      context: context,
+      barrierDismissible: false,
+      builder: (c) => const Center(child: CircularProgressIndicator()),
+    );
 
     try {
       await DeviceService().syncFromLibreNMS();
 
       if (context.mounted) {
-        Navigator.pop(context); // Close loading
+        Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text("Sync Complete, Statuses updated.")),
         );
@@ -113,8 +117,7 @@ class _MainLayoutState extends State<MainLayout> {
         title: Padding(
           padding: const EdgeInsets.symmetric(vertical: 12.0, horizontal: 2.0),
           child: GestureDetector(
-            onTap: () =>
-                setState(() => _currentPageIndex = 0), // Go to Dashboard
+            onTap: () => setState(() => _currentPageIndex = 0),
             child: MouseRegion(
               cursor: SystemMouseCursors.click,
               child: Row(
@@ -130,7 +133,6 @@ class _MainLayoutState extends State<MainLayout> {
           ),
         ),
         actions: [
-          // sync button for testing only
           IconButton(
             icon: const Icon(Icons.sync, color: Colors.blue),
             onPressed: () => _handleSync(context),
@@ -145,7 +147,6 @@ class _MainLayoutState extends State<MainLayout> {
           const SizedBox(width: 16),
         ],
       ),
-      // Bottom navigation for mobile, Sidebar for web
       bottomNavigationBar: isMobile
           ? BottomNavigationBar(
               currentIndex: _currentPageIndex,

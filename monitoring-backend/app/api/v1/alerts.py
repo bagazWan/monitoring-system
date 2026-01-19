@@ -8,9 +8,8 @@ from app.api.dependencies import (
 )
 from app.core.database import get_db
 from app.models import Alert, SwitchAlert, User
-from app.notifications import websocket_endpoint
 from app.schemas.alert import AlertResponse, AlertUpdate
-from fastapi import APIRouter, Depends, HTTPException, Query, WebSocket, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
@@ -38,6 +37,10 @@ def _alert_to_response_dict(alert_obj: Any) -> Dict[str, Any]:
     raw_status = getattr(alert_obj, "status", "")
     final_status = "active" if str(raw_status) == "1" else raw_status
 
+    resolved_by_full_name = None
+    if getattr(alert_obj, "assigned_user", None):
+        resolved_by_full_name = getattr(alert_obj.assigned_user, "full_name", None)
+
     return {
         "alert_id": getattr(alert_obj, "alert_id", None),
         "device_id": getattr(alert_obj, "device_id", None),
@@ -51,6 +54,7 @@ def _alert_to_response_dict(alert_obj: Any) -> Dict[str, Any]:
         "message": getattr(alert_obj, "message", ""),
         "status": final_status,
         "assigned_to_user_id": getattr(alert_obj, "assigned_to_user_id", None),
+        "resolved_by_full_name": resolved_by_full_name,
         "created_at": getattr(alert_obj, "created_at", None),
         "cleared_at": getattr(alert_obj, "cleared_at", None),
     }
@@ -187,8 +191,9 @@ def update_alert(
 
     # Update fields
     update_data = alert_data.model_dump(exclude_unset=True)
-    if update_data.get("status") == "cleared" and "cleared_at" not in update_data:
-        update_data["cleared_at"] = datetime.utcnow()
+    if update_data.get("status") == "cleared":
+        if "cleared_at" not in update_data or update_data["cleared_at"] is None:
+            update_data["cleared_at"] = datetime.utcnow()
         update_data["assigned_to_user_id"] = current_user.user_id
 
     for field, value in update_data.items():
@@ -222,11 +227,3 @@ def delete_alert(
     db.commit()
 
     return None
-
-
-@router.websocket("/ws/alerts")
-async def alerts_websocket(websocket: WebSocket):
-    """
-    WebSocket endpoint that forwards the connection to the shared notifications websocket handler.
-    """
-    await websocket_endpoint(websocket)

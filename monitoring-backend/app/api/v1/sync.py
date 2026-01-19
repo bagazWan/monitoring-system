@@ -96,17 +96,19 @@ async def _sync_device(
     """
     Sync a single device (non-switch/hub) to devices table
     """
-    # Check if device already exists in database
-    existing = (
-        db.query(Device)
-        .filter(
-            or_(
-                Device.librenms_device_id == librenms_id,
-                Device.name == lnms_device.get("hostname"),
-            )
-        )
-        .first()
+
+    conflict_switch = (
+        db.query(Switch).filter(Switch.librenms_device_id == librenms_id).first()
     )
+    if conflict_switch:
+        raise Exception(
+            f"librenms_device_id {librenms_id} already exists in switches "
+            f"(switch_id={conflict_switch.switch_id}, name={conflict_switch.name}). "
+            f"Cannot sync into devices."
+        )
+
+    # Check if device already exists in database
+    existing = db.query(Device).filter(Device.librenms_device_id == librenms_id).first()
 
     if existing and config.update_existing:
         old_status = existing.status
@@ -187,17 +189,18 @@ async def _sync_switch(
     Sync a single switch/hub to switches table
     """
 
-    # Check if switch already exists in database
-    existing = (
-        db.query(Switch)
-        .filter(
-            or_(
-                Switch.librenms_device_id == librenms_id,
-                Switch.name == lnms_device.get("hostname"),
-            )
-        )
-        .first()
+    conflict_device = (
+        db.query(Device).filter(Device.librenms_device_id == librenms_id).first()
     )
+    if conflict_device:
+        raise Exception(
+            f"librenms_device_id {librenms_id} already exists in devices "
+            f"(device_id={conflict_device.device_id}, name={conflict_device.name}). "
+            f"Cannot sync into switches."
+        )
+
+    # Check if switch already exists in database
+    existing = db.query(Switch).filter(Switch.librenms_device_id == librenms_id).first()
 
     if existing and config.update_existing:
         old_status = existing.status

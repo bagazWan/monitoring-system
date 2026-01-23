@@ -26,8 +26,8 @@ class _DeviceCardState extends State<DeviceCard> {
       _isExpanded = expanded;
       if (_isExpanded) {
         // Start polling every 5 seconds when expanded
-        _pollingTimer = Timer.periodic(const Duration(seconds: 3), (timer) {
-          setState(() {}); // Rebuild to trigger FutureBuilder again
+        _pollingTimer = Timer.periodic(const Duration(seconds: 5), (timer) {
+          setState(() {});
         });
       } else {
         _pollingTimer?.cancel(); // Stop polling when card is closed
@@ -106,16 +106,6 @@ class _DeviceCardState extends State<DeviceCard> {
                           : "${inMbps.toStringAsFixed(2)} Mbps In / ${outMbps.toStringAsFixed(2)} Mbps Out",
                       isLive: true,
                     ),
-                    // Padding(
-                    //   padding: const EdgeInsets.only(left: 100),
-                    //   child: Text(
-                    //     "Last Polled: $lastPolled",
-                    //     style: TextStyle(
-                    //         fontSize: 11,
-                    //         color: Colors.grey[500],
-                    //         fontStyle: FontStyle.italic),
-                    //   ),
-                    // ),
                   ],
                 );
               }

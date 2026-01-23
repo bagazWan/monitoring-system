@@ -8,10 +8,12 @@ class Alert {
   final String severity;
   final String message;
   final String status;
-  final int? assignedToUserId;
+  final int? assignedToUserId; //this act as acknowledged by for now
   final String? resolvedByFullName;
   final DateTime createdAt;
   final DateTime? clearedAt;
+  final DateTime? acknowledgedAt;
+  final String? resolutionNote;
 
   Alert({
     required this.alertId,
@@ -27,6 +29,8 @@ class Alert {
     this.resolvedByFullName,
     required this.createdAt,
     this.clearedAt,
+    this.acknowledgedAt,
+    this.resolutionNote,
   });
 
   factory Alert.fromJson(Map<String, dynamic> json) {
@@ -46,6 +50,10 @@ class Alert {
       clearedAt: json['cleared_at'] != null
           ? DateTime.parse(json['cleared_at'])
           : null,
+      acknowledgedAt: json['acknowledged_at'] != null
+          ? DateTime.parse(json['acknowledged_at'])
+          : null,
+      resolutionNote: json['resolution_note'],
     );
   }
 }

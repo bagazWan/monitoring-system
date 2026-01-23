@@ -1,4 +1,4 @@
-from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, func
+from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, Text, func
 from sqlalchemy.orm import relationship
 
 from app.core.database import Base
@@ -21,6 +21,8 @@ class SwitchAlert(Base):
     assigned_to_user_id = Column(
         Integer, ForeignKey("users.user_id", ondelete="SET NULL")
     )
+    acknowledged_at = Column(DateTime(timezone=True), nullable=True)
+    resolution_note = Column(Text, nullable=True)
     created_at = Column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -52,6 +54,8 @@ class Alert(Base):
     assigned_to_user_id = Column(
         Integer, ForeignKey("users.user_id", ondelete="SET NULL")
     )
+    acknowledged_at = Column(DateTime(timezone=True), nullable=True)
+    resolution_note = Column(Text, nullable=True)
     created_at = Column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

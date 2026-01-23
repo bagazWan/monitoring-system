@@ -71,15 +71,13 @@ class AlertService {
     }
   }
 
-  Future<void> resolveAlert(int alertId, String resolutionNote) async {
+  Future<void> acknowledgeAlert(int alertId, String resolutionNote) async {
     final headers = await _getHeaders();
     final response = await http.patch(
       Uri.parse('${ApiConfig.alerts}/$alertId'),
       headers: headers,
       body: json.encode({
-        'status': 'cleared',
-        'message': resolutionNote,
-        'cleared_at': DateTime.now().toIso8601String(),
+        'resolution_note': resolutionNote,
       }),
     );
 

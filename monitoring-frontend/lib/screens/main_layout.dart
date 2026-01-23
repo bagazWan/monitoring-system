@@ -161,8 +161,8 @@ class _MainLayoutState extends State<MainLayout> {
                     icon: Icon(Icons.location_on), label: "Map"),
                 BottomNavigationBarItem(
                     icon: Icon(Icons.notifications), label: "Alerts"),
-                BottomNavigationBarItem(
-                    icon: Icon(Icons.person), label: "Profile"),
+                // BottomNavigationBarItem(
+                //     icon: Icon(Icons.person), label: "Profile"),
               ],
             )
           : null,

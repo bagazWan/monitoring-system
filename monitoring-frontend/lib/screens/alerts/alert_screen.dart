@@ -115,7 +115,7 @@ class _ActiveAlertsListState extends State<_ActiveAlertsList> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              "Resolution Note (will not clear the alert until LibreNMS clears it):",
+              "Resolution Note :",
               style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
@@ -135,9 +135,8 @@ class _ActiveAlertsListState extends State<_ActiveAlertsList> {
           ElevatedButton(
             onPressed: () async {
               try {
-                // keep your existing API call for now
                 await AlertService()
-                    .resolveAlert(alert.alertId, noteController.text);
+                    .acknowledgeAlert(alert.alertId, noteController.text);
                 Navigator.pop(context);
                 _refresh();
                 ScaffoldMessenger.of(context).showSnackBar(
@@ -204,12 +203,15 @@ class _AlertsLogTabState extends State<_AlertsLogTab> {
   bool _isLoading = false;
   StreamSubscription? _alertsRefreshSub;
 
+  final ScrollController _vController = ScrollController();
+  final ScrollController _hController = ScrollController();
+
   @override
   void initState() {
     super.initState();
     _fetchLogs();
 
-    // Refresh logs when websocket gets alert events (optional but helpful)
+    // Refresh logs when websocket gets alert events
     _alertsRefreshSub = WebSocketService().alertsRefresh.listen((_) {
       if (!mounted) return;
       _fetchLogs();
@@ -219,6 +221,8 @@ class _AlertsLogTabState extends State<_AlertsLogTab> {
   @override
   void dispose() {
     _alertsRefreshSub?.cancel();
+    _vController.dispose();
+    _hController.dispose();
     super.dispose();
   }
 
@@ -282,79 +286,78 @@ class _AlertsLogTabState extends State<_AlertsLogTab> {
               : _logs.isEmpty
                   ? const Center(child: Text("No logs found"))
                   : Scrollbar(
+                      controller: _vController,
                       thumbVisibility: true,
                       child: SingleChildScrollView(
+                        controller: _vController,
                         scrollDirection: Axis.vertical,
-                        child: SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-                          child: LayoutBuilder(
-                            builder: (context, constraints) {
-                              return ConstrainedBox(
-                                constraints: BoxConstraints(
-                                  minWidth: MediaQuery.of(context).size.width,
-                                ),
-                                child: DataTable(
-                                  columnSpacing: 24,
-                                  headingRowColor: MaterialStateProperty.all(
-                                      Colors.grey[100]),
-                                  columns: const [
-                                    DataColumn(label: Text('Created At')),
-                                    DataColumn(label: Text('Cleared At')),
-                                    DataColumn(label: Text('Severity')),
-                                    DataColumn(label: Text('Device')),
-                                    DataColumn(label: Text('Location')),
-                                    DataColumn(label: Text('Resolved By')),
-                                    DataColumn(label: Text('Message')),
-                                  ],
-                                  rows: _logs.map((alert) {
-                                    return DataRow(cells: [
-                                      DataCell(Text(DateFormat('dd/MM HH:mm')
-                                          .format(alert.createdAt))),
-                                      DataCell(Text(alert.clearedAt != null
-                                          ? DateFormat('dd/MM HH:mm')
-                                              .format(alert.clearedAt!)
-                                          : "-")),
-                                      DataCell(Container(
-                                        padding: const EdgeInsets.symmetric(
-                                            horizontal: 6, vertical: 2),
-                                        decoration: BoxDecoration(
-                                          color: alert.severity == 'critical'
-                                              ? Colors.red[100]
-                                              : Colors.orange[100],
-                                          borderRadius:
-                                              BorderRadius.circular(4),
-                                        ),
-                                        child: Text(
-                                          alert.severity.toUpperCase(),
+                        child: Scrollbar(
+                          controller: _hController,
+                          thumbVisibility: true,
+                          child: SingleChildScrollView(
+                            controller: _hController,
+                            scrollDirection: Axis.horizontal,
+                            child: ConstrainedBox(
+                              constraints: BoxConstraints(
+                                minWidth: MediaQuery.of(context).size.width,
+                              ),
+                              child: DataTable(
+                                columnSpacing: 24,
+                                headingRowColor:
+                                    MaterialStateProperty.all(Colors.grey[100]),
+                                columns: const [
+                                  DataColumn(label: Text('Created At')),
+                                  DataColumn(label: Text('Cleared At')),
+                                  DataColumn(label: Text('Severity')),
+                                  DataColumn(label: Text('Device')),
+                                  DataColumn(label: Text('Location')),
+                                  DataColumn(label: Text('Acknowledged By')),
+                                  DataColumn(label: Text('Message')),
+                                ],
+                                rows: _logs.map((alert) {
+                                  return DataRow(cells: [
+                                    DataCell(Text(DateFormat('dd/MM HH:mm')
+                                        .format(alert.createdAt.toLocal()))),
+                                    DataCell(Text(alert.clearedAt != null
+                                        ? DateFormat('dd/MM HH:mm')
+                                            .format(alert.clearedAt!.toLocal())
+                                        : "-")),
+                                    DataCell(Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 6, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: alert.severity.toLowerCase() ==
+                                                'critical'
+                                            ? Colors.red[100]
+                                            : Colors.orange[100],
+                                        borderRadius: BorderRadius.circular(4),
+                                      ),
+                                      child: Text(alert.severity.toUpperCase(),
                                           style: const TextStyle(
                                               fontSize: 10,
-                                              fontWeight: FontWeight.bold),
-                                        ),
-                                      )),
-                                      DataCell(Text(alert.deviceName,
-                                          style: const TextStyle(
-                                              fontWeight: FontWeight.bold))),
-                                      DataCell(Text(alert.locationName)),
-                                      DataCell(Row(
-                                        children: [
-                                          const Icon(Icons.person_outline,
-                                              size: 14, color: Colors.grey),
-                                          const SizedBox(width: 4),
-                                          Text(alert.resolvedByFullName ?? "-"),
-                                        ],
-                                      )),
-                                      DataCell(SizedBox(
-                                        width: 520,
-                                        child: Text(
-                                          alert.message,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      )),
-                                    ]);
-                                  }).toList(),
-                                ),
-                              );
-                            },
+                                              fontWeight: FontWeight.bold)),
+                                    )),
+                                    DataCell(Text(alert.deviceName,
+                                        style: const TextStyle(
+                                            fontWeight: FontWeight.bold))),
+                                    DataCell(Text(alert.locationName)),
+                                    DataCell(Row(
+                                      children: [
+                                        const Icon(Icons.person_outline,
+                                            size: 14, color: Colors.grey),
+                                        const SizedBox(width: 4),
+                                        Text(alert.resolvedByFullName ?? "-"),
+                                      ],
+                                    )),
+                                    DataCell(SizedBox(
+                                      width: 200,
+                                      child: Text(alert.message,
+                                          overflow: TextOverflow.ellipsis),
+                                    )),
+                                  ]);
+                                }).toList(),
+                              ),
+                            ),
                           ),
                         ),
                       ),

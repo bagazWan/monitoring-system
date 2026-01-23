@@ -57,8 +57,8 @@ class _SideMenuState extends State<SideMenu> {
               icon: Icon(Icons.location_on), label: Text('Map')),
           NavigationRailDestination(
               icon: Icon(Icons.notifications), label: Text('Alerts')),
-          NavigationRailDestination(
-              icon: Icon(Icons.person), label: Text('Profile')),
+          // NavigationRailDestination(
+          //     icon: Icon(Icons.person), label: Text('Profile')),
         ],
       ),
     );

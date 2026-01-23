@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 from app.api.dependencies import (
@@ -191,13 +191,11 @@ def update_alert(
 
     # Update fields
     update_data = alert_data.model_dump(exclude_unset=True)
-    if update_data.get("status") == "cleared":
-        if "cleared_at" not in update_data or update_data["cleared_at"] is None:
-            update_data["cleared_at"] = datetime.utcnow()
-        update_data["assigned_to_user_id"] = current_user.user_id
+    alert.assigned_to_user_id = current_user.user_id
+    alert.acknowledged_at = datetime.now(timezone.utc)
 
-    for field, value in update_data.items():
-        setattr(alert, field, value)
+    if "resolution_note" in update_data:
+        alert.resolution_note = update_data["resolution_note"]
     db.add(alert)
     db.commit()
     db.refresh(alert)

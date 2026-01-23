@@ -18,6 +18,8 @@ class AlertResponse(BaseModel):
     status: str
     assigned_to_user_id: Optional[int] = None
     resolved_by_full_name: Optional[str] = None
+    acknowledged_at: Optional[datetime] = None
+    resolution_note: Optional[str] = None
     created_at: datetime
     cleared_at: Optional[datetime] = None
 
@@ -26,11 +28,8 @@ class AlertResponse(BaseModel):
 
 
 class AlertUpdate(BaseModel):
-    message: Optional[str] = Field(None, max_length=500)
-    severity: Optional[str] = None
-    status: Optional[str] = None
+    resolution_note: Optional[str] = Field(None, max_length=2000)
     assigned_to_user_id: Optional[int] = None
-    cleared_at: Optional[datetime] = None
 
 
 class AlertFilters(BaseModel):

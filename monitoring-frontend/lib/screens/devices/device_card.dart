@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
-import '../models/device.dart';
-import '../services/device_service.dart';
+import '../../models/device.dart';
+import '../../services/device_service.dart';
 
 class DeviceCard extends StatefulWidget {
   final BaseNode node;
@@ -68,11 +68,8 @@ class _DeviceCardState extends State<DeviceCard> {
             child: Divider(height: 1),
           ),
           FutureBuilder<Map<String, dynamic>>(
-            future: DeviceService().getLiveDetails(
-                widget.node.id!,
-                widget.node.deviceType?.toLowerCase() == 'switch'
-                    ? 'switches'
-                    : 'devices'),
+            future: DeviceService().getLiveDetails(widget.node.id!,
+                widget.node.nodeKind == 'switch' ? 'switches' : 'devices'),
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting &&
                   !_isExpanded) {

@@ -1,13 +1,13 @@
 import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'device_filter_bar.dart';
+import 'device_card.dart';
 import '../../models/device.dart';
 import '../../services/device_service.dart';
 import '../../services/websocket_service.dart';
-import '../../widgets/device_card.dart';
 import '../../widgets/error_boundary.dart';
 import '../../widgets/search_bar.dart';
-import '../../widgets/device_filter_bar.dart';
 import '../../widgets/pagination.dart';
 
 class DeviceListScreen extends StatefulWidget {

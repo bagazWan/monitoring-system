@@ -85,7 +85,8 @@ class DeviceService {
   Future<Map<String, dynamic>> getLiveDetails(int id, String nodeType) async {
     // nodeType will be 'devices' or 'switches'
 
-    final String base = nodeType.toLowerCase() == 'switch'
+    final t = nodeType.toLowerCase();
+    final String base = (t == 'switch' || t == 'switches')
         ? ApiConfig.switches
         : ApiConfig.devices;
 

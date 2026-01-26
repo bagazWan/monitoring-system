@@ -4,6 +4,7 @@ class BaseNode {
   final String ipAddress;
   final String? macAddress;
   final String? deviceType;
+  final String nodeKind;
   String? status;
   final String? locationName;
   final int? locationId;
@@ -18,6 +19,7 @@ class BaseNode {
     required this.ipAddress,
     this.macAddress,
     this.deviceType,
+    required this.nodeKind,
     this.status,
     this.locationName,
     this.locationId,
@@ -34,6 +36,7 @@ class BaseNode {
         ipAddress: json['ip_address'],
         macAddress: json['mac_address'],
         deviceType: json['device_type'],
+        nodeKind: 'device',
         status: json['status'],
         locationName: json['location_name'],
         description: json['description'],
@@ -46,6 +49,7 @@ class BaseNode {
       'ip_address': ipAddress,
       'mac_address': macAddress,
       'device_type': deviceType,
+      'node_kind': nodeKind,
       'status': status,
       'location_id': locationId,
       'switch_id': switchId,
@@ -60,6 +64,7 @@ class BaseNode {
         name: json['name'],
         ipAddress: json['ip_address'],
         status: json['status'],
+        nodeKind: 'switch',
         deviceType: 'Switch',
         locationName: json['location_name'],
         description: json['description'],
@@ -73,6 +78,7 @@ class BaseNode {
       'status': status,
       'location_id': locationId,
       'node_id': nodeId,
+      'node_kind': nodeKind,
       'description': description
     };
   }

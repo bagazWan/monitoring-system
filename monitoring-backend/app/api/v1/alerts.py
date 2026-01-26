@@ -55,6 +55,8 @@ def _alert_to_response_dict(alert_obj: Any) -> Dict[str, Any]:
         "status": final_status,
         "assigned_to_user_id": getattr(alert_obj, "assigned_to_user_id", None),
         "resolved_by_full_name": resolved_by_full_name,
+        "acknowledged_at": getattr(alert_obj, "acknowledged_at", None),
+        "resolution_note": getattr(alert_obj, "resolution_note", None),
         "created_at": getattr(alert_obj, "created_at", None),
         "cleared_at": getattr(alert_obj, "cleared_at", None),
     }

@@ -47,42 +47,60 @@ async def get_switch_live_details(switch_id: int, db: Session = Depends(get_db))
         return {
             "switch_id": switch.switch_id,
             "status": switch.status,
+            "in_mbps": 0.0,
+            "out_mbps": 0.0,
             "monitored": False,
             "message": "Switch not connected to LibreNMS",
         }
 
     librenms = LibreNMSService()
+    current_status = switch.status
 
     try:
         lnms_device = await librenms.get_device_by_id(switch.librenms_device_id)
+        if lnms_device:
+            new_status = "online" if lnms_device.get("status") == 1 else "offline"
+            if switch.status != new_status:
+                switch.status = new_status
+                switch.librenms_last_synced = datetime.utcnow()
+                db.commit()
+                current_status = new_status
 
-        if lnms_device is None:
-            return {
-                "switch_id": switch.switch_id,
-                "status": switch.status,
-                "in_mbps": 0.0,
-                "out_mbps": 0.0,
-                "error": f"ID {switch.librenms_device_id} not found in simulator",
-            }
+        ports_payload = await librenms.get_ports(device_id=switch.librenms_device_id)
+        ports = ports_payload.get("ports", [])
 
-        status = "online" if lnms_device.get("status") == 1 else "offline"
+        if not ports:
+            all_ports_payload = await librenms.get_ports()
+            ports = [
+                p
+                for p in all_ports_payload.get("ports", [])
+                if int(p.get("switch_id", -1)) == int(switch.librenms_device_id)
+            ]
 
-        port_stats = await librenms.get_device_port_stats(switch.librenms_device_id)
+        total_in_octets_rate = 0.0
+        total_out_octets_rate = 0.0
 
-        total_in_octets = 0.0
-        total_out_octets = 0.0
-
-        ports = port_stats.get("ports", [])
         for p in ports:
-            total_in_octets += float(p.get("ifInOctets_rate", 0))
-            total_out_octets += float(p.get("ifOutOctets_rate", 0))
+            port_id = p.get("port_id")
+            if not port_id:
+                continue
 
-        in_mbps = (total_in_octets * 8) / 1000000
-        out_mbps = (total_out_octets * 8) / 1000000
+            port_detail = await librenms.get_port_by_id(int(port_id))
+            port_list = port_detail.get("port", [])
+            if not port_list:
+                continue
 
-        switch.status = status
-        switch.librenms_last_synced = datetime.utcnow()
-        db.commit()
+            pd = port_list[0]
+
+            # Optional: skip disabled/ignored ports
+            if int(pd.get("disabled", 0)) == 1 or int(pd.get("ignore", 0)) == 1:
+                continue
+
+            total_in_octets_rate += float(pd.get("ifInOctets_rate", 0) or 0)
+            total_out_octets_rate += float(pd.get("ifOutOctets_rate", 0) or 0)
+
+        in_mbps = (total_in_octets_rate * 8) / 1_000_000
+        out_mbps = (total_out_octets_rate * 8) / 1_000_000
 
         return {
             "switch_id": switch.switch_id,
@@ -91,7 +109,7 @@ async def get_switch_live_details(switch_id: int, db: Session = Depends(get_db))
             "in_mbps": round(in_mbps, 2),
             "out_mbps": round(out_mbps, 2),
             "total_mbps": round(in_mbps + out_mbps, 2),
-            "last_seen": lnms_device.get("last_polled"),
+            "last_seen": lnms_device.get("last_polled") if lnms_device else "N/A",
         }
 
     except Exception as e:
@@ -100,8 +118,7 @@ async def get_switch_live_details(switch_id: int, db: Session = Depends(get_db))
             "status": switch.status,
             "in_mbps": 0.0,
             "out_mbps": 0.0,
-            "error": "Simulator not responding",
-            "detail": str(e),
+            "error": str(e),
         }
 
 

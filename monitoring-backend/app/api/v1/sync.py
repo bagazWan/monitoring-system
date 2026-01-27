@@ -7,10 +7,27 @@ from app.schemas.device import AllDevicesSyncConfig, AllDevicesSyncReport
 from app.services.alerts_service import sync_alerts_once
 from app.services.librenms_service import LibreNMSService
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 router = APIRouter(prefix="/sync", tags=["Sync"])
+
+
+def _pick_display_name(lnms_device: dict) -> str:
+    """
+    Display name from LibreNMS payload.
+    Priority: sysName -> hostname -> ip
+    """
+    sys_name = (lnms_device.get("sysName") or "").strip()
+    hostname = (lnms_device.get("hostname") or "").strip()
+    ip = (lnms_device.get("ip") or "").strip()
+
+    if sys_name:
+        return sys_name
+
+    if hostname:
+        return hostname
+
+    return ip or "Unknown"
 
 
 @router.post("/from-librenms", response_model=AllDevicesSyncReport)
@@ -35,7 +52,7 @@ async def sync_all_from_librenms(
         "errors": [],
         "summary": {"total_created": 0, "total_updated": 0, "total_errors": 0},
     }
-    # Get all from LibreNMS
+
     try:
         librenms_devices = await librenms.get_devices()
 
@@ -43,6 +60,7 @@ async def sync_all_from_librenms(
             try:
                 sys_descr = lnms_device.get("sysDescr", "").lower()
                 librenms_id = lnms_device["device_id"]
+
                 if "switch" in sys_descr:
                     result = await _sync_switch(
                         db=db,
@@ -58,7 +76,6 @@ async def sync_all_from_librenms(
                         config=config,
                     )
 
-                # Add result to report
                 if result["action"] == "created":
                     report["created"].append(result["info"])
                     report["summary"]["total_created"] += 1
@@ -96,7 +113,6 @@ async def _sync_device(
     """
     Sync a single device (non-switch/hub) to devices table
     """
-
     conflict_switch = (
         db.query(Switch).filter(Switch.librenms_device_id == librenms_id).first()
     )
@@ -107,11 +123,13 @@ async def _sync_device(
             f"Cannot sync into devices."
         )
 
-    # Check if device already exists in database
     existing = db.query(Device).filter(Device.librenms_device_id == librenms_id).first()
+    display_name = _pick_display_name(lnms_device)
 
     if existing and config.update_existing:
         old_status = existing.status
+
+        existing.name = display_name
         existing.librenms_hostname = lnms_device.get("hostname")
         existing.ip_address = lnms_device.get("ip", existing.ip_address)
         existing.mac_address = lnms_device.get("mac", existing.mac_address)
@@ -147,18 +165,18 @@ async def _sync_device(
 
     elif not existing:
         new_device = Device(
-            name=lnms_device.get("hostname", lnms_device.get("ip")),
+            name=display_name,
             ip_address=lnms_device.get("ip"),
             mac_address=lnms_device.get("mac"),
-            device_type="unknown",  # Corrected manually via admin panel later
-            location_id=config.default_location_id,  # Default location
+            device_type="unknown",  # will improve later
+            location_id=config.default_location_id,
             librenms_device_id=librenms_id,
             librenms_hostname=lnms_device.get("hostname"),
             status="online" if lnms_device.get("status") == 1 else "offline",
             librenms_last_synced=datetime.now(),
         )
         db.add(new_device)
-        db.flush()  # Get device_id without committing
+        db.flush()
 
         return {
             "action": "created",
@@ -171,7 +189,6 @@ async def _sync_device(
         }
 
     else:
-        # Device exists but update_existing=False, so skip
         return {
             "action": "skipped",
             "info": {
@@ -188,7 +205,6 @@ async def _sync_switch(
     """
     Sync a single switch/hub to switches table
     """
-
     conflict_device = (
         db.query(Device).filter(Device.librenms_device_id == librenms_id).first()
     )
@@ -199,11 +215,13 @@ async def _sync_switch(
             f"Cannot sync into switches."
         )
 
-    # Check if switch already exists in database
     existing = db.query(Switch).filter(Switch.librenms_device_id == librenms_id).first()
+    display_name = _pick_display_name(lnms_device)
 
     if existing and config.update_existing:
         old_status = existing.status
+
+        existing.name = display_name
         existing.librenms_hostname = lnms_device.get("hostname")
         existing.ip_address = lnms_device.get("ip", existing.ip_address)
         existing.status = "online" if lnms_device.get("status") == 1 else "offline"
@@ -238,16 +256,16 @@ async def _sync_switch(
 
     elif not existing:
         new_switch = Switch(
-            name=lnms_device.get("hostname", lnms_device.get("ip")),
+            name=display_name,
             ip_address=lnms_device.get("ip"),
-            location_id=config.default_location_id,  # Default location
+            location_id=config.default_location_id,
             librenms_device_id=librenms_id,
             librenms_hostname=lnms_device.get("hostname"),
             status="online" if lnms_device.get("status") == 1 else "offline",
             librenms_last_synced=datetime.now(),
         )
         db.add(new_switch)
-        db.flush()  # Get switch_id without committing
+        db.flush()
 
         return {
             "action": "created",
@@ -260,7 +278,6 @@ async def _sync_switch(
         }
 
     else:
-        # Switch exists but update_existing=False, so skip
         return {
             "action": "skipped",
             "info": {
@@ -277,7 +294,6 @@ async def sync_alerts_now(
 ):
     """
     Manual trigger to immediately fetch alerts from LibreNMS and process them.
-    For testing, admin-triggered scans, or to force a sync.
     Returns:
         {"processed": <number_of_alerts_processed>}
     """
@@ -285,7 +301,6 @@ async def sync_alerts_now(
     try:
         processed = await sync_alerts_once(librenms)
     except Exception as exc:
-        # Surface a 502 Bad Gateway if LibreNMS cannot be contacted or processing fails
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail=f"Failed to sync alerts from LibreNMS: {str(exc)}",

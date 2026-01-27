@@ -1,3 +1,9 @@
+import sys
+from pathlib import Path
+
+project_root = Path(__file__).parent.parent
+sys.path.insert(0, str(project_root))
+
 from app.core.database import SessionLocal
 from app.models import (
     Alert,
@@ -19,7 +25,7 @@ from app.models import (
 def clear_data():
     db = SessionLocal()
 
-    confirm = input("\nCOnfirm with 'y' to continue: ")
+    confirm = input("\nConfirm with 'y' to continue: ")
 
     if confirm == "y":
         try:

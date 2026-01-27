@@ -12,10 +12,6 @@ class LibreNMSService:
         self.headers = {"X-Auth-Token": self.api_token}
 
     async def get_devices(self) -> List[Dict]:
-        """
-        Get all devices from LibreNMS
-        API: GET /api/v0/devices
-        """
         async with httpx.AsyncClient() as client:
             response = await client.get(
                 f"{self.base_url}/api/v0/devices", headers=self.headers, timeout=30.0
@@ -25,39 +21,27 @@ class LibreNMSService:
             return data.get("devices", [])
 
     async def get_device_by_id(self, device_id: int) -> Optional[Dict]:
-        """
-        Get specific device from LibreNMS's internal device ID
-        API: GET /api/v0/devices/{device_id}
-        """
         async with httpx.AsyncClient() as client:
             response = await client.get(
                 f"{self.base_url}/api/v0/devices/{device_id}",
                 headers=self.headers,
                 timeout=30.0,
             )
-
             if response.status_code == 404:
                 return None
-
             response.raise_for_status()
             data = response.json()
             return data.get("devices", [None])[0]
 
     async def get_device_by_hostname(self, hostname: str) -> Optional[Dict]:
-        """
-        Get specific device from LibreNMS by hostname
-        API: GET /api/v0/devices/{hostname}
-        """
         async with httpx.AsyncClient() as client:
             response = await client.get(
                 f"{self.base_url}/api/v0/devices/{hostname}",
                 headers=self.headers,
                 timeout=30.0,
             )
-
             if response.status_code == 404:
                 return None
-
             response.raise_for_status()
             data = response.json()
             return data.get("devices", [None])[0]
@@ -71,10 +55,6 @@ class LibreNMSService:
         transport: str = "udp",
         force_add: bool = False,
     ) -> Optional[Dict]:
-        """
-        Add a new device to LibreNMS
-        API: POST /api/v0/devices
-        """
         payload = {
             "hostname": hostname,
             "community": community,
@@ -99,10 +79,6 @@ class LibreNMSService:
             return None
 
     async def delete_device(self, device_id: int) -> bool:
-        """
-        Delete a device from LibreNMS's internal device ID
-        API: DELETE /api/v0/devices/{device_id}
-        """
         async with httpx.AsyncClient() as client:
             response = await client.delete(
                 f"{self.base_url}/api/v0/devices/{device_id}",
@@ -112,10 +88,6 @@ class LibreNMSService:
             return response.status_code in [200, 204]
 
     async def get_device_port_stats(self, device_id: int) -> Dict:
-        """
-        Get port statistics (bandwidth) for a device
-        API: GET /api/v0/devices/{device_id}/ports
-        """
         async with httpx.AsyncClient() as client:
             response = await client.get(
                 f"{self.base_url}/api/v0/devices/{device_id}/ports",
@@ -125,11 +97,32 @@ class LibreNMSService:
             response.raise_for_status()
             return response.json()
 
+    async def get_ports(self, device_id: Optional[int] = None) -> Dict:
+        params = {}
+        if device_id is not None:
+            params["device_id"] = device_id
+
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                f"{self.base_url}/api/v0/ports",
+                headers=self.headers,
+                params=params,
+                timeout=30.0,
+            )
+            response.raise_for_status()
+            return response.json()
+
+    async def get_port_by_id(self, port_id: int) -> Dict:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                f"{self.base_url}/api/v0/ports/{port_id}",
+                headers=self.headers,
+                timeout=30.0,
+            )
+            response.raise_for_status()
+            return response.json()
+
     async def get_device_health(self, device_id: int) -> Dict:
-        """
-        Get device health metrics
-        API: GET /api/v0/devices/{device_id}/health
-        """
         async with httpx.AsyncClient() as client:
             response = await client.get(
                 f"{self.base_url}/api/v0/devices/{device_id}/health",
@@ -140,10 +133,6 @@ class LibreNMSService:
             return response.json()
 
     async def get_device_graphs(self, device_id: int) -> Dict:
-        """
-        Get available graphs for a device
-        API: GET /api/v0/devices/{device_id}/graphs
-        """
         async with httpx.AsyncClient() as client:
             response = await client.get(
                 f"{self.base_url}/api/v0/devices/{device_id}/graphs",
@@ -154,10 +143,6 @@ class LibreNMSService:
             return response.json()
 
     async def get_alerts(self, device_id: Optional[int] = None) -> List[Dict]:
-        """
-        Get alerts from LibreNMS
-        API: GET /api/v0/alerts
-        """
         params = {}
         if device_id:
             params["device_id"] = device_id

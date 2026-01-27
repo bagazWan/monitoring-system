@@ -46,31 +46,65 @@ async def get_device_live_details(device_id: int, db: Session = Depends(get_db))
     if not device:
         raise HTTPException(404, "Device not found")
 
+    if not device.librenms_device_id:
+        return {
+            "device_id": device.device_id,
+            "status": device.status,
+            "in_mbps": 0.0,
+            "out_mbps": 0.0,
+            "monitored": False,
+            "message": "Device not connected to LibreNMS",
+        }
+
     librenms = LibreNMSService()
     current_status = device.status
-    in_mbps = 0.0
-    out_mbps = 0.0
 
     try:
         lnms_device = await librenms.get_device_by_id(device.librenms_device_id)
-
         if lnms_device:
             new_status = "online" if lnms_device.get("status") == 1 else "offline"
-
             if device.status != new_status:
                 device.status = new_status
                 device.librenms_last_synced = datetime.utcnow()
                 db.commit()
                 current_status = new_status
 
-        port_stats = await librenms.get_device_port_stats(device.librenms_device_id)
-        ports = port_stats.get("ports", [])
+        ports_payload = await librenms.get_ports(device_id=device.librenms_device_id)
+        ports = ports_payload.get("ports", [])
 
-        total_in_octets = sum(float(p.get("ifInOctets_rate", 0)) for p in ports)
-        total_out_octets = sum(float(p.get("ifOutOctets_rate", 0)) for p in ports)
+        # Fallback: if LibreNMS doesn't support ?device_id filter
+        if not ports:
+            all_ports_payload = await librenms.get_ports()
+            ports = [
+                p
+                for p in all_ports_payload.get("ports", [])
+                if int(p.get("device_id", -1)) == int(device.librenms_device_id)
+            ]
 
-        in_mbps = (total_in_octets * 8) / 1000000
-        out_mbps = (total_out_octets * 8) / 1000000
+        total_in_octets_rate = 0.0
+        total_out_octets_rate = 0.0
+
+        for p in ports:
+            port_id = p.get("port_id")
+            if not port_id:
+                continue
+
+            port_detail = await librenms.get_port_by_id(int(port_id))
+            port_list = port_detail.get("port", [])
+            if not port_list:
+                continue
+
+            pd = port_list[0]
+
+            # Optional: skip disabled/ignored ports
+            if int(pd.get("disabled", 0)) == 1 or int(pd.get("ignore", 0)) == 1:
+                continue
+
+            total_in_octets_rate += float(pd.get("ifInOctets_rate", 0) or 0)
+            total_out_octets_rate += float(pd.get("ifOutOctets_rate", 0) or 0)
+
+        in_mbps = (total_in_octets_rate * 8) / 1_000_000
+        out_mbps = (total_out_octets_rate * 8) / 1_000_000
 
         return {
             "device_id": device.device_id,

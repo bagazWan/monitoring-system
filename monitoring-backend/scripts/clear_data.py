@@ -1,6 +1,8 @@
 import sys
 from pathlib import Path
 
+from sqlalchemy import text
+
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
@@ -30,22 +32,27 @@ def clear_data():
     if confirm == "y":
         try:
             print("\nDeleting data...")
+            # delete in correct order
+            tables = [
+                "device_bandwidth",
+                "switch_bandwidth",
+                "alerts",
+                "switch_alerts",
+                "device_replacement",
+                "switch_replacement",
+                "devices",
+                "switches",
+                "fo_routes",
+                "network_nodes",
+                "locations",
+                "problem_categories",
+                "users",
+            ]
 
-            # Delete in correct order
-            db.query(DeviceBandwidth).delete()
-            db.query(SwitchBandwidth).delete()
-            db.query(Alert).delete()
-            db.query(SwitchAlert).delete()
-            db.query(DeviceReplacement).delete()
-            db.query(SwitchReplacement).delete()
-            db.query(Device).delete()
-            db.query(Switch).delete()
-            db.query(FORoute).delete()
-            db.query(NetworkNode).delete()
-            db.query(Location).delete()
-            db.query(ProblemCategory).delete()
-            db.query(User).delete()
+            tables_string = ", ".join(tables)
+            sql_command = f"TRUNCATE TABLE {tables_string} RESTART IDENTITY CASCADE;"
 
+            db.execute(text(sql_command))
             db.commit()
             print("All data deleted successfully")
 

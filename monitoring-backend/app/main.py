@@ -10,7 +10,9 @@ from app.api.v1 import (
     auth,
     dashboard,
     devices,
+    librenms_ports,
     locations,
+    register,
     switches,
     sync,
     users,
@@ -94,3 +96,5 @@ app.include_router(auth.router, prefix="/api/v1")
 app.include_router(sync.router, prefix="/api/v1")
 app.include_router(dashboard.router, prefix="/api/v1")
 app.include_router(websocket.router, prefix="/api/v1")
+app.include_router(librenms_ports.router, prefix="/api/v1")
+app.include_router(register.router, prefix="/api/v1")

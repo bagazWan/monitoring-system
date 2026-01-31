@@ -1,6 +1,5 @@
 from app.core.database import get_db
-from app.models import Device, Switch
-from app.models.alert import Alert, SwitchAlert
+from app.models import Alert, Device, Switch, SwitchAlert
 from app.services.librenms_service import LibreNMSService
 from fastapi import APIRouter, Depends
 from sqlalchemy import or_

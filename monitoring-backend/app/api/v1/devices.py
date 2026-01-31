@@ -3,7 +3,7 @@ from typing import List, Optional
 
 from app.api.dependencies import require_admin, require_technician_or_admin
 from app.core.database import get_db
-from app.models import Device, Location, User
+from app.models import Device, LibreNMSPort, Location, User
 from app.schemas.device import (
     DeviceCreate,
     DeviceResponse,
@@ -69,39 +69,46 @@ async def get_device_live_details(device_id: int, db: Session = Depends(get_db))
                 db.commit()
                 current_status = new_status
 
-        ports_payload = await librenms.get_ports(device_id=device.librenms_device_id)
-        ports = ports_payload.get("ports", [])
+        enabled_ports = (
+            db.query(LibreNMSPort)
+            .filter(
+                LibreNMSPort.device_id == device.device_id,
+                LibreNMSPort.enabled.is_(True),
+            )
+            .all()
+        )
 
-        # Fallback: if LibreNMS doesn't support ?device_id filter
-        if not ports:
-            all_ports_payload = await librenms.get_ports()
-            ports = [
-                p
-                for p in all_ports_payload.get("ports", [])
-                if int(p.get("device_id", -1)) == int(device.librenms_device_id)
-            ]
+        if not enabled_ports:
+            return {
+                "device_id": device.device_id,
+                "status": current_status,
+                "in_mbps": 0.0,
+                "out_mbps": 0.0,
+                "monitored": True,
+                "warning": "No enabled ports configured for this device (run sync or enable a port).",
+                "last_seen": lnms_device.get("last_polled") if lnms_device else "N/A",
+            }
 
         total_in_octets_rate = 0.0
         total_out_octets_rate = 0.0
 
-        for p in ports:
-            port_id = p.get("port_id")
-            if not port_id:
-                continue
-
-            port_detail = await librenms.get_port_by_id(int(port_id))
+        for port_row in enabled_ports:
+            port_detail = await librenms.get_port_by_id(int(port_row.port_id))
             port_list = port_detail.get("port", [])
             if not port_list:
                 continue
 
-            pd = port_list[0]
+            port_data = port_list[0]
 
-            # Optional: skip disabled/ignored ports
-            if int(pd.get("disabled", 0)) == 1 or int(pd.get("ignore", 0)) == 1:
+            # Skip disabled/ignored ports just in case (defensive)
+            if (
+                int(port_data.get("disabled", 0) or 0) == 1
+                or int(port_data.get("ignore", 0) or 0) == 1
+            ):
                 continue
 
-            total_in_octets_rate += float(pd.get("ifInOctets_rate", 0) or 0)
-            total_out_octets_rate += float(pd.get("ifOutOctets_rate", 0) or 0)
+            total_in_octets_rate += float(port_data.get("ifInOctets_rate", 0) or 0)
+            total_out_octets_rate += float(port_data.get("ifOutOctets_rate", 0) or 0)
 
         in_mbps = (total_in_octets_rate * 8) / 1_000_000
         out_mbps = (total_out_octets_rate * 8) / 1_000_000
@@ -116,6 +123,7 @@ async def get_device_live_details(device_id: int, db: Session = Depends(get_db))
 
     except Exception as e:
         return {
+            "device_id": device.device_id,
             "status": device.status,
             "in_mbps": 0.0,
             "out_mbps": 0.0,

@@ -1,10 +1,12 @@
 from datetime import datetime
+from typing import Optional, Tuple
 
 from app.api.dependencies import require_admin
 from app.core.database import get_db
-from app.models import Device, Switch, User
+from app.models import Device, LibreNMSPort, Switch, User
 from app.schemas.device import AllDevicesSyncConfig, AllDevicesSyncReport
 from app.services.alerts_service import sync_alerts_once
+from app.services.librenms_ports_service import discover_and_store_ports_for
 from app.services.librenms_service import LibreNMSService
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
@@ -20,14 +22,103 @@ def _pick_display_name(lnms_device: dict) -> str:
     sys_name = (lnms_device.get("sysName") or "").strip()
     hostname = (lnms_device.get("hostname") or "").strip()
     ip = (lnms_device.get("ip") or "").strip()
+    return sys_name or hostname or ip or "Unknown"
 
-    if sys_name:
-        return sys_name
+
+def _safe_set_device_ip(
+    db: Session, device: Device, new_ip: Optional[str]
+) -> Optional[str]:
+    """
+    Update device.ip_address from LibreNMS if it does not conflict with another device. If it conflicts, do not update
+    """
+    if not new_ip:
+        return None
+    new_ip = str(new_ip).strip()
+    if not new_ip or device.ip_address == new_ip:
+        return None
+
+    conflict = db.query(Device).filter(Device.ip_address == new_ip).first()
+    if conflict and conflict.device_id != device.device_id:
+        return f"ip_address conflict: {new_ip} already used by device_id={conflict.device_id}; kept old ip {device.ip_address}"
+
+    device.ip_address = new_ip
+    return None
+
+
+def _safe_set_switch_ip(
+    db: Session, switch: Switch, new_ip: Optional[str]
+) -> Optional[str]:
+    """
+    Same idea as devices, but for switches.
+    """
+    if not new_ip:
+        return None
+    new_ip = str(new_ip).strip()
+    if not new_ip or switch.ip_address == new_ip:
+        return None
+
+    conflict = db.query(Switch).filter(Switch.ip_address == new_ip).first()
+    if conflict and conflict.switch_id != switch.switch_id:
+        return f"ip_address conflict: {new_ip} already used by switch_id={conflict.switch_id}; kept old ip {switch.ip_address}"
+
+    switch.ip_address = new_ip
+    return None
+
+
+def _find_existing_device(
+    db: Session,
+    librenms_id: int,
+    ip: Optional[str],
+    hostname: Optional[str],
+) -> Tuple[Optional[Device], Optional[str]]:
+    """
+    Idempotent matching order:
+    1. librenms_device_id
+    2. ip_address
+    3. librenms_hostname
+    Returns: (device or None, match_reason)
+    """
+    existing = db.query(Device).filter(Device.librenms_device_id == librenms_id).first()
+    if existing:
+        return existing, "librenms_device_id"
+
+    if ip:
+        existing = db.query(Device).filter(Device.ip_address == ip).first()
+        if existing:
+            return existing, "ip_address"
 
     if hostname:
-        return hostname
+        existing = db.query(Device).filter(Device.librenms_hostname == hostname).first()
+        if existing:
+            return existing, "librenms_hostname"
 
-    return ip or "Unknown"
+    return None, None
+
+
+def _find_existing_switch(
+    db: Session,
+    librenms_id: int,
+    ip: Optional[str],
+    hostname: Optional[str],
+) -> Tuple[Optional[Switch], Optional[str]]:
+    """
+    Same matching for switches.
+    """
+    existing = db.query(Switch).filter(Switch.librenms_device_id == librenms_id).first()
+    if existing:
+        return existing, "librenms_device_id"
+
+    if ip:
+        existing = db.query(Switch).filter(Switch.ip_address == ip).first()
+        if existing:
+            return existing, "ip_address"
+
+    if hostname:
+        existing = db.query(Switch).filter(Switch.librenms_hostname == hostname).first()
+        if existing:
+            return existing, "librenms_hostname"
+
+    return None, None
 
 
 @router.post("/from-librenms", response_model=AllDevicesSyncReport)
@@ -36,17 +127,8 @@ async def sync_all_from_librenms(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_admin),
 ):
-    """
-    Import/sync all devices (include switch/hub) from LibreNMS into database
-
-    This endpoint:
-    1. Fetches all devices from LibreNMS API
-    2. Creates new devices in database
-    3. Updates existing devices
-    4. Returns the report
-    """
     librenms = LibreNMSService()
-    report = {
+    report: dict = {
         "created": [],
         "updated": [],
         "errors": [],
@@ -58,12 +140,20 @@ async def sync_all_from_librenms(
 
         for lnms_device in librenms_devices:
             try:
-                sys_descr = lnms_device.get("sysDescr", "").lower()
-                librenms_id = lnms_device["device_id"]
+                sys_descr = (lnms_device.get("sysDescr") or "").lower()
+                librenms_id = int(lnms_device["device_id"])
+                hostname = lnms_device.get("hostname")
+                ip = lnms_device.get("ip")
 
-                if "switch" in sys_descr:
+                # Less aggressive splitting:
+                should_sync_as_switch = ("switch" in sys_descr) and (
+                    "routeros" not in sys_descr
+                )
+
+                if should_sync_as_switch:
                     result = await _sync_switch(
                         db=db,
+                        librenms=librenms,
                         lnms_device=lnms_device,
                         librenms_id=librenms_id,
                         config=config,
@@ -71,6 +161,7 @@ async def sync_all_from_librenms(
                 else:
                     result = await _sync_device(
                         db=db,
+                        librenms=librenms,
                         lnms_device=lnms_device,
                         librenms_id=librenms_id,
                         config=config,
@@ -84,7 +175,6 @@ async def sync_all_from_librenms(
                     report["summary"]["total_updated"] += 1
 
             except Exception as e:
-                # If error processing this specific device, log it and continue
                 report["errors"].append(
                     {
                         "librenms_device_id": lnms_device.get("device_id"),
@@ -97,7 +187,6 @@ async def sync_all_from_librenms(
         db.commit()
 
     except Exception as e:
-        # If overall sync fails, rollback everything
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -108,11 +197,13 @@ async def sync_all_from_librenms(
 
 
 async def _sync_device(
-    db: Session, lnms_device: dict, librenms_id: int, config: AllDevicesSyncConfig
+    *,
+    db: Session,
+    librenms: LibreNMSService,
+    lnms_device: dict,
+    librenms_id: int,
+    config: AllDevicesSyncConfig,
 ) -> dict:
-    """
-    Sync a single device (non-switch/hub) to devices table
-    """
     conflict_switch = (
         db.query(Switch).filter(Switch.librenms_device_id == librenms_id).first()
     )
@@ -123,60 +214,64 @@ async def _sync_device(
             f"Cannot sync into devices."
         )
 
-    existing = db.query(Device).filter(Device.librenms_device_id == librenms_id).first()
     display_name = _pick_display_name(lnms_device)
+    hostname = lnms_device.get("hostname")
+    ip = lnms_device.get("ip")
+
+    existing, match_reason = _find_existing_device(db, librenms_id, ip, hostname)
 
     if existing and config.update_existing:
         old_status = existing.status
 
         existing.name = display_name
-        existing.librenms_hostname = lnms_device.get("hostname")
-        existing.ip_address = lnms_device.get("ip", existing.ip_address)
+        existing.librenms_hostname = hostname
+        ip_warning = _safe_set_device_ip(db, existing, ip)
         existing.mac_address = lnms_device.get("mac", existing.mac_address)
         existing.librenms_device_id = librenms_id
         existing.status = "online" if lnms_device.get("status") == 1 else "offline"
         existing.librenms_last_synced = datetime.now()
 
-        if old_status != existing.status:
-            try:
-                from app.notifications import notify_all_channels
+        await discover_and_store_ports_for(
+            db=db,
+            librenms=librenms,
+            librenms_device_id=librenms_id,
+            device=existing,
+        )
 
-                await notify_all_channels(
-                    {
-                        "type": "status_update",
-                        "device_id": existing.device_id,
-                        "old_status": old_status,
-                        "new_status": existing.status,
-                        "timestamp": datetime.now().isoformat(),
-                    }
-                )
-            except Exception as e:
-                print(f"Failed to broadcast status update: {e}")
-
-        return {
-            "action": "updated",
-            "info": {
-                "device_id": existing.device_id,
-                "name": existing.name,
-                "ip_address": existing.ip_address,
-                "type": "device",
-            },
+        info = {
+            "device_id": existing.device_id,
+            "name": existing.name,
+            "ip_address": existing.ip_address,
+            "type": "device",
         }
+        if ip_warning:
+            info["warning"] = ip_warning
+        if match_reason and match_reason != "librenms_device_id":
+            info["matched_by"] = match_reason
 
-    elif not existing:
+        return {"action": "updated", "info": info}
+
+    if not existing:
         new_device = Device(
             name=display_name,
-            ip_address=lnms_device.get("ip"),
+            ip_address=ip,
             mac_address=lnms_device.get("mac"),
-            device_type="unknown",  # will improve later
+            device_type="unknown",
             location_id=config.default_location_id,
             librenms_device_id=librenms_id,
-            librenms_hostname=lnms_device.get("hostname"),
+            librenms_hostname=hostname,
             status="online" if lnms_device.get("status") == 1 else "offline",
             librenms_last_synced=datetime.now(),
         )
         db.add(new_device)
         db.flush()
+
+        await discover_and_store_ports_for(
+            db=db,
+            librenms=librenms,
+            librenms_device_id=librenms_id,
+            device=new_device,
+        )
 
         return {
             "action": "created",
@@ -188,23 +283,24 @@ async def _sync_device(
             },
         }
 
-    else:
-        return {
-            "action": "skipped",
-            "info": {
-                "device_id": existing.device_id,
-                "name": existing.name,
-                "reason": "update_existing is false",
-            },
-        }
+    return {
+        "action": "skipped",
+        "info": {
+            "device_id": existing.device_id,
+            "name": existing.name,
+            "reason": "update_existing is false",
+        },
+    }
 
 
 async def _sync_switch(
-    db: Session, lnms_device: dict, librenms_id: int, config: AllDevicesSyncConfig
+    *,
+    db: Session,
+    librenms: LibreNMSService,
+    lnms_device: dict,
+    librenms_id: int,
+    config: AllDevicesSyncConfig,
 ) -> dict:
-    """
-    Sync a single switch/hub to switches table
-    """
     conflict_device = (
         db.query(Device).filter(Device.librenms_device_id == librenms_id).first()
     )
@@ -215,57 +311,60 @@ async def _sync_switch(
             f"Cannot sync into switches."
         )
 
-    existing = db.query(Switch).filter(Switch.librenms_device_id == librenms_id).first()
     display_name = _pick_display_name(lnms_device)
+    hostname = lnms_device.get("hostname")
+    ip = lnms_device.get("ip")
+
+    existing, match_reason = _find_existing_switch(db, librenms_id, ip, hostname)
 
     if existing and config.update_existing:
         old_status = existing.status
-
         existing.name = display_name
-        existing.librenms_hostname = lnms_device.get("hostname")
-        existing.ip_address = lnms_device.get("ip", existing.ip_address)
-        existing.status = "online" if lnms_device.get("status") == 1 else "offline"
+        existing.librenms_hostname = hostname
+        ip_warning = _safe_set_switch_ip(db, existing, ip)
         existing.librenms_device_id = librenms_id
+        existing.status = "online" if lnms_device.get("status") == 1 else "offline"
         existing.librenms_last_synced = datetime.now()
 
-        if old_status != existing.status:
-            try:
-                from app.notifications import notify_all_channels
+        await discover_and_store_ports_for(
+            db=db,
+            librenms=librenms,
+            librenms_device_id=librenms_id,
+            switch=existing,
+        )
 
-                await notify_all_channels(
-                    {
-                        "type": "status_update",
-                        "switch_id": existing.switch_id,
-                        "old_status": old_status,
-                        "new_status": existing.status,
-                        "timestamp": datetime.now().isoformat(),
-                    }
-                )
-            except Exception as e:
-                print(f"Failed to broadcast status update: {e}")
-
-        return {
-            "action": "updated",
-            "info": {
-                "switch_id": existing.switch_id,
-                "name": existing.name,
-                "ip_address": existing.ip_address,
-                "type": "switch",
-            },
+        info = {
+            "switch_id": existing.switch_id,
+            "name": existing.name,
+            "ip_address": existing.ip_address,
+            "type": "switch",
         }
+        if ip_warning:
+            info["warning"] = ip_warning
+        if match_reason and match_reason != "librenms_device_id":
+            info["matched_by"] = match_reason
 
-    elif not existing:
+        return {"action": "updated", "info": info}
+
+    if not existing:
         new_switch = Switch(
             name=display_name,
-            ip_address=lnms_device.get("ip"),
+            ip_address=ip,
             location_id=config.default_location_id,
             librenms_device_id=librenms_id,
-            librenms_hostname=lnms_device.get("hostname"),
+            librenms_hostname=hostname,
             status="online" if lnms_device.get("status") == 1 else "offline",
             librenms_last_synced=datetime.now(),
         )
         db.add(new_switch)
         db.flush()
+
+        await discover_and_store_ports_for(
+            db=db,
+            librenms=librenms,
+            librenms_device_id=librenms_id,
+            switch=new_switch,
+        )
 
         return {
             "action": "created",
@@ -277,26 +376,18 @@ async def _sync_switch(
             },
         }
 
-    else:
-        return {
-            "action": "skipped",
-            "info": {
-                "switch_id": existing.switch_id,
-                "name": existing.name,
-                "reason": "update_existing is false",
-            },
-        }
+    return {
+        "action": "skipped",
+        "info": {
+            "switch_id": existing.switch_id,
+            "name": existing.name,
+            "reason": "update_existing is false",
+        },
+    }
 
 
 @router.post("/alerts", status_code=status.HTTP_200_OK)
-async def sync_alerts_now(
-    current_user: User = Depends(require_admin),
-):
-    """
-    Manual trigger to immediately fetch alerts from LibreNMS and process them.
-    Returns:
-        {"processed": <number_of_alerts_processed>}
-    """
+async def sync_alerts_now(current_user: User = Depends(require_admin)):
     librenms = LibreNMSService()
     try:
         processed = await sync_alerts_once(librenms)
@@ -305,5 +396,4 @@ async def sync_alerts_now(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail=f"Failed to sync alerts from LibreNMS: {str(exc)}",
         )
-
     return {"processed": processed}

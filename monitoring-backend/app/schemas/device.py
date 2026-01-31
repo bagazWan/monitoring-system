@@ -18,6 +18,27 @@ class DeviceCreate(BaseModel):
     description: Optional[str] = Field(None, max_length=500)
 
 
+class LibreNMSRegisterRequest(BaseModel):
+    hostname: str = Field(..., description="IP or hostname to add into LibreNMS")
+    community: str = Field(default="public")
+    snmp_version: str = Field(default="v2c")
+    port: int = Field(default=161)
+    transport: str = Field(default="udp")
+    force_add: bool = Field(default=False)
+
+    node_type: Optional[str] = Field(
+        default=None, description='Either "device" or "switch"'
+    )
+
+    # Optional info for DB record
+    name: Optional[str] = None
+    device_type: Optional[str] = None
+    location_id: Optional[int] = None
+    switch_id: Optional[int] = None
+    node_id: Optional[int] = None
+    description: Optional[str] = None
+
+
 # Syncing all devices (include switch) from LibreNMS
 class AllDevicesSyncConfig(BaseModel):
     default_location_id: int = Field(1, description="Default location for new devices")

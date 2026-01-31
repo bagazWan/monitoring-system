@@ -4,6 +4,7 @@ from typing import List, Optional
 from app.api.dependencies import require_admin, require_technician_or_admin
 from app.core.database import get_db
 from app.models import Location, Switch, User
+from app.models.librenms_port import LibreNMSPort
 from app.schemas.switch import (
     SwitchCreate,
     SwitchResponse,
@@ -66,51 +67,71 @@ async def get_switch_live_details(switch_id: int, db: Session = Depends(get_db))
                 db.commit()
                 current_status = new_status
 
-        ports_payload = await librenms.get_ports(device_id=switch.librenms_device_id)
-        ports = ports_payload.get("ports", [])
+        # Prefer uplink ports if configured
+        uplink_ports = (
+            db.query(LibreNMSPort)
+            .filter(
+                LibreNMSPort.switch_id == switch.switch_id,
+                LibreNMSPort.enabled.is_(True),
+                LibreNMSPort.is_uplink.is_(True),
+            )
+            .all()
+        )
 
-        if not ports:
-            all_ports_payload = await librenms.get_ports()
-            ports = [
-                p
-                for p in all_ports_payload.get("ports", [])
-                if int(p.get("switch_id", -1)) == int(switch.librenms_device_id)
-            ]
+        used_ports = uplink_ports
+        warning = None
+
+        if not used_ports:
+            used_ports = (
+                db.query(LibreNMSPort)
+                .filter(
+                    LibreNMSPort.switch_id == switch.switch_id,
+                    LibreNMSPort.enabled.is_(True),
+                )
+                .all()
+            )
+            if used_ports:
+                warning = "No uplink ports configured; using all enabled ports (may be misleading/double-count)."
+            else:
+                warning = "No enabled ports configured for this switch (run sync or enable a port)."
 
         total_in_octets_rate = 0.0
         total_out_octets_rate = 0.0
 
-        for p in ports:
-            port_id = p.get("port_id")
-            if not port_id:
-                continue
-
-            port_detail = await librenms.get_port_by_id(int(port_id))
+        for port_row in used_ports:
+            port_detail = await librenms.get_port_by_id(int(port_row.port_id))
             port_list = port_detail.get("port", [])
             if not port_list:
                 continue
 
-            pd = port_list[0]
+            port_data = port_list[0]
 
-            # Optional: skip disabled/ignored ports
-            if int(pd.get("disabled", 0)) == 1 or int(pd.get("ignore", 0)) == 1:
+            if (
+                int(port_data.get("disabled", 0) or 0) == 1
+                or int(port_data.get("ignore", 0) or 0) == 1
+            ):
                 continue
 
-            total_in_octets_rate += float(pd.get("ifInOctets_rate", 0) or 0)
-            total_out_octets_rate += float(pd.get("ifOutOctets_rate", 0) or 0)
+            total_in_octets_rate += float(port_data.get("ifInOctets_rate", 0) or 0)
+            total_out_octets_rate += float(port_data.get("ifOutOctets_rate", 0) or 0)
 
         in_mbps = (total_in_octets_rate * 8) / 1_000_000
         out_mbps = (total_out_octets_rate * 8) / 1_000_000
 
-        return {
+        response = {
             "switch_id": switch.switch_id,
             "name": switch.name,
-            "status": status,
+            "status": current_status,
             "in_mbps": round(in_mbps, 2),
             "out_mbps": round(out_mbps, 2),
             "total_mbps": round(in_mbps + out_mbps, 2),
             "last_seen": lnms_device.get("last_polled") if lnms_device else "N/A",
+            "uplink_mode": bool(uplink_ports),
+            "ports_used": len(used_ports),
         }
+        if warning:
+            response["warning"] = warning
+        return response
 
     except Exception as e:
         return {

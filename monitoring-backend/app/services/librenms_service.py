@@ -35,16 +35,24 @@ class LibreNMSService:
 
     async def get_device_by_hostname(self, hostname: str) -> Optional[Dict]:
         async with httpx.AsyncClient() as client:
-            response = await client.get(
-                f"{self.base_url}/api/v0/devices/{hostname}",
-                headers=self.headers,
-                timeout=30.0,
-            )
-            if response.status_code == 404:
-                return None
-            response.raise_for_status()
-            data = response.json()
-            return data.get("devices", [None])[0]
+            for path in (
+                f"/api/v0/devices/{hostname}",
+                f"/api/v0/devices/hostname/{hostname}",
+            ):
+                response = await client.get(
+                    f"{self.base_url}{path}",
+                    headers=self.headers,
+                    timeout=30.0,
+                )
+                if response.status_code == 404:
+                    continue
+                if response.status_code >= 400:
+                    continue
+
+                data = response.json()
+                return data.get("devices", [None])[0]
+
+        return None
 
     async def add_device(
         self,
@@ -54,7 +62,7 @@ class LibreNMSService:
         port: int = 161,
         transport: str = "udp",
         force_add: bool = False,
-    ) -> Optional[Dict]:
+    ) -> Optional[int]:
         payload = {
             "hostname": hostname,
             "community": community,
@@ -72,9 +80,21 @@ class LibreNMSService:
                 timeout=30.0,
             )
 
-            if response.status_code in [200, 201]:
+            if response.status_code in (200, 201):
                 data = response.json()
-                return data.get("devices", [None])[0]
+
+                if data.get("device_id") is not None:
+                    return int(data["device_id"])
+
+                devices = data.get("devices") or []
+                if devices:
+                    dev0 = devices[0]
+                    if dev0 and dev0.get("device_id") is not None:
+                        return int(dev0["device_id"])
+
+            existing = await self.get_device_by_hostname(hostname)
+            if existing and existing.get("device_id") is not None:
+                return int(existing["device_id"])
 
             return None
 

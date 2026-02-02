@@ -67,9 +67,6 @@ class _MainLayoutState extends State<MainLayout> {
   void _handleLogout() async {
     WebSocketService().disconnect();
     await AuthService().logout();
-    if (mounted) {
-      Navigator.pushReplacementNamed(context, '/');
-    }
   }
 
   Future<void> _handleSync(BuildContext context) async {

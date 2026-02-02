@@ -1,6 +1,7 @@
 class ApiConfig {
   static const String baseUrl = 'http://localhost:8000';
   static const String apiVersion = '/api/v1';
+  static const String url = '$baseUrl$apiVersion';
 
   // Endpoints
   static const String login = '$baseUrl$apiVersion/auth/login';
@@ -18,6 +19,8 @@ class ApiConfig {
   static const String deviceList = '$baseUrl$apiVersion/devices/with-locations';
   static const String switchList =
       '$baseUrl$apiVersion/switches/with-locations';
+  static const String registerLibreNMS =
+      '$baseUrl$apiVersion/register/librenms';
   static String get wsUrl {
     return baseUrl
         .replaceFirst('http://', 'ws://')

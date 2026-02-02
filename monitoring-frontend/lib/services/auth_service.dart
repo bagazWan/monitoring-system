@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -5,7 +6,13 @@ import '/api_config.dart';
 import '../models/user.dart';
 
 class AuthService {
-  final storage = FlutterSecureStorage();
+  static final AuthService _instance = AuthService._internal();
+  factory AuthService() => _instance;
+  AuthService._internal();
+  final storage = const FlutterSecureStorage();
+
+  final _authStateController = StreamController<bool>.broadcast();
+  Stream<bool> get authStateChanges => _authStateController.stream;
 
   Future<Map<String, dynamic>> login(String username, String password) async {
     final response = await http.post(
@@ -22,6 +29,7 @@ class AuthService {
 
       // Store token
       await storage.write(key: 'auth_token', value: data['access_token']);
+      _authStateController.add(true);
 
       return data;
     } else {
@@ -78,6 +86,7 @@ class AuthService {
 
   Future<void> logout() async {
     await storage.delete(key: 'auth_token');
+    _authStateController.add(false);
   }
 
   // Check if logged in
@@ -89,5 +98,18 @@ class AuthService {
   // Get token (for other services)
   Future<String?> getToken() async {
     return await storage.read(key: 'auth_token');
+  }
+
+  Future<bool> hasValidSession() async {
+    final token = await storage.read(key: 'auth_token');
+    if (token == null) return false;
+
+    try {
+      await getCurrentUser();
+      return true;
+    } catch (_) {
+      await logout(); // clear invalid token
+      return false;
+    }
   }
 }

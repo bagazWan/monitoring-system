@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../services/auth_service.dart';
 import '../../widgets/hover_link.dart';
-import '../main_layout.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -21,20 +20,15 @@ class _LoginScreenState extends State<LoginScreen> {
     if (_formKey.currentState!.validate()) {
       setState(() => _isLoading = true);
       try {
-        // Call existing login service logic
         await _authService.login(
             _usernameController.text, _passwordController.text);
         if (mounted) {
-          // Success
-          // Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const HomeScreen()));
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text("Login Successful"),
               backgroundColor: Colors.green,
             ),
           );
-          Navigator.pushReplacement(context,
-              MaterialPageRoute(builder: (context) => const MainLayout()));
         }
       } catch (e) {
         if (mounted) {

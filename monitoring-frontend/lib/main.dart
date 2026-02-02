@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_web_plugins/url_strategy.dart';
-import 'screens/auth/login_screen.dart';
 import 'screens/auth/register_screen.dart';
-import 'screens/main_layout.dart';
+import 'screens/auth/auth_gate.dart';
+import 'screens/devices/register_node_screen.dart';
 
 void main() {
   usePathUrlStrategy();
@@ -24,11 +24,10 @@ class MyApp extends StatelessWidget {
           brightness: Brightness.light,
         ),
       ),
-      initialRoute: '/',
+      home: const AuthGate(),
       routes: {
-        '/': (context) => const LoginScreen(),
         '/register': (context) => const RegisterScreen(),
-        '/dashboard': (context) => const MainLayout(),
+        '/register-node': (context) => const RegisterNodeScreen(),
       },
     );
   }

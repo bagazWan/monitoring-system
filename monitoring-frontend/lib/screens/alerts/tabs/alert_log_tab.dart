@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'alert_log_filter_bar.dart';
+import '../alert_filter_bar.dart';
 import '../dialogs/alert_details_dialog.dart';
 import '../../../models/alert.dart';
 import '../../../services/alert_service.dart';
@@ -15,12 +15,19 @@ class AlertLogTab extends StatefulWidget {
 
 class _AlertLogTabState extends State<AlertLogTab> {
   DateTimeRange? _selectedDateRange;
-  List<Alert> _logs = [];
+  List<Alert> _allLogs = [];
+  List<Alert> _filteredLogs = [];
+
   bool _isLoading = false;
   StreamSubscription? _alertsRefreshSub;
 
   final ScrollController _vController = ScrollController();
   final ScrollController _hController = ScrollController();
+
+  String? _selectedSeverity;
+  String? _selectedStatus;
+  String? _selectedLocation;
+  List<String> _locations = [];
 
   bool get _isMobile => MediaQuery.of(context).size.width < 600;
 
@@ -28,10 +35,8 @@ class _AlertLogTabState extends State<AlertLogTab> {
   void initState() {
     super.initState();
     _fetchLogs();
-
     _alertsRefreshSub = WebSocketService().alertsRefresh.listen((_) {
-      if (!mounted) return;
-      _fetchLogs();
+      if (mounted) _fetchLogs();
     });
   }
 
@@ -50,13 +55,40 @@ class _AlertLogTabState extends State<AlertLogTab> {
         startDate: _selectedDateRange?.start,
         endDate: _selectedDateRange?.end,
       );
+
       if (!mounted) return;
-      setState(() => _logs = logs);
+      setState(() {
+        _allLogs = logs;
+        _extractLocations();
+        _applyFilters();
+      });
     } catch (e) {
       debugPrint("Error: $e");
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  void _extractLocations() {
+    _locations = _allLogs
+        .map((a) => a.locationName)
+        .where((loc) => loc.isNotEmpty && loc != ' - ')
+        .toSet()
+        .toList()
+      ..sort();
+  }
+
+  void _applyFilters() {
+    final filtered = _allLogs.where((l) {
+      if (_selectedSeverity != null && l.severity != _selectedSeverity)
+        return false;
+      if (_selectedStatus != null && l.status != _selectedStatus) return false;
+      if (_selectedLocation != null && l.locationName != _selectedLocation)
+        return false;
+      return true;
+    }).toList();
+
+    setState(() => _filteredLogs = filtered);
   }
 
   Future<void> _openDetails(Alert alert) async {
@@ -71,26 +103,40 @@ class _AlertLogTabState extends State<AlertLogTab> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        AlertLogFilterBar(
+        AlertFilterBar(
+          onRefresh: _fetchLogs,
           selectedDateRange: _selectedDateRange,
           onDateRangeChanged: (range) {
             setState(() => _selectedDateRange = range);
             _fetchLogs();
           },
-          onRefresh: _fetchLogs,
+          selectedSeverity: _selectedSeverity,
+          onSeverityChanged: (v) {
+            setState(() => _selectedSeverity = v);
+            _applyFilters();
+          },
+          selectedStatus: _selectedStatus,
+          onStatusChanged: (v) {
+            setState(() => _selectedStatus = v);
+            _applyFilters();
+          },
+          selectedLocation: _selectedLocation,
+          locations: _locations,
+          onLocationChanged: (v) {
+            setState(() => _selectedLocation = v);
+            _applyFilters();
+          },
         ),
         Expanded(
           child: _isLoading
               ? const Center(child: CircularProgressIndicator())
-              : _logs.isEmpty
+              : _filteredLogs.isEmpty
                   ? const Center(child: Text("No logs found"))
                   : _isMobile
                       ? _AlertLogMobileList(
-                          logs: _logs,
-                          onOpenDetails: _openDetails,
-                        )
+                          logs: _filteredLogs, onOpenDetails: _openDetails)
                       : _AlertLogTable(
-                          logs: _logs,
+                          logs: _filteredLogs,
                           vController: _vController,
                           hController: _hController,
                           onOpenDetails: _openDetails,

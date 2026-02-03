@@ -5,6 +5,7 @@ import '../../../services/alert_service.dart';
 import '../../../services/websocket_service.dart';
 import '../../../widgets/alert_card.dart';
 import '../dialogs/alert_acknowledge_dialog.dart';
+import '../alert_filter_bar.dart';
 
 class ActiveAlertsTab extends StatefulWidget {
   final bool isTechnicianOrAdmin;
@@ -15,17 +16,23 @@ class ActiveAlertsTab extends StatefulWidget {
 }
 
 class _ActiveAlertsTabState extends State<ActiveAlertsTab> {
-  late Future<List<Alert>> _activeFuture;
   StreamSubscription? _alertsRefreshSub;
+
+  List<Alert> _allAlerts = [];
+  List<Alert> _filteredAlerts = [];
+  bool _isLoading = true;
+  String? _error;
+
+  String? _selectedSeverity;
+  String? _selectedLocation;
+  List<String> _locations = [];
 
   @override
   void initState() {
     super.initState();
-    _refresh();
-
+    _fetchAlerts();
     _alertsRefreshSub = WebSocketService().alertsRefresh.listen((_) {
-      if (!mounted) return;
-      _refresh();
+      if (mounted) _fetchAlerts();
     });
   }
 
@@ -35,10 +42,53 @@ class _ActiveAlertsTabState extends State<ActiveAlertsTab> {
     super.dispose();
   }
 
-  void _refresh() {
+  Future<void> _fetchAlerts() async {
     setState(() {
-      _activeFuture = AlertService().getActiveAlerts();
+      _isLoading = true;
+      _error = null;
     });
+    try {
+      final alerts = await AlertService().getActiveAlerts();
+      if (mounted) {
+        setState(() {
+          _allAlerts = alerts;
+          _allAlerts.sort((a, b) {
+            if (a.severity == 'critical' && b.severity != 'critical') return -1;
+            if (a.severity != 'critical' && b.severity == 'critical') return 1;
+            return b.createdAt.compareTo(a.createdAt);
+          });
+          _extractLocations();
+          _applyFilters();
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _error = e.toString();
+        });
+      }
+    }
+  }
+
+  void _extractLocations() {
+    _locations = _allAlerts
+        .map((a) => a.locationName)
+        .where((loc) => loc.isNotEmpty && loc != ' - ')
+        .toSet()
+        .toList()
+      ..sort();
+  }
+
+  void _applyFilters() {
+    _filteredAlerts = _allAlerts.where((alert) {
+      if (_selectedSeverity != null && alert.severity != _selectedSeverity)
+        return false;
+      if (_selectedLocation != null && alert.locationName != _selectedLocation)
+        return false;
+      return true;
+    }).toList();
   }
 
   Future<void> _openAcknowledgeDialog(Alert alert) async {
@@ -46,40 +96,51 @@ class _ActiveAlertsTabState extends State<ActiveAlertsTab> {
       context: context,
       builder: (_) => AlertAcknowledgeDialog(alert: alert),
     );
-
-    if (!mounted) return;
-    if (saved == true) _refresh();
+    if (mounted && saved == true) _fetchAlerts();
   }
 
   @override
   Widget build(BuildContext context) {
-    return RefreshIndicator(
-      onRefresh: () async => _refresh(),
-      child: FutureBuilder<List<Alert>>(
-        future: _activeFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (!snapshot.hasData || snapshot.data!.isEmpty) {
-            return const Center(child: Text("No active alert"));
-          }
+    if (_isLoading) return const Center(child: CircularProgressIndicator());
+    if (_error != null) return Center(child: Text("Error: $_error"));
 
-          final alerts = snapshot.data!;
-          return ListView.builder(
-            padding: const EdgeInsets.all(16),
-            itemCount: alerts.length,
-            itemBuilder: (context, index) {
-              final alert = alerts[index];
-              return AlertCard(
-                alert: alert,
-                isTechnicianOrAdmin: widget.isTechnicianOrAdmin,
-                onResolve: () => _openAcknowledgeDialog(alert),
-              );
-            },
-          );
-        },
-      ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        AlertFilterBar(
+          selectedSeverity: _selectedSeverity,
+          onSeverityChanged: (val) => setState(() {
+            _selectedSeverity = val;
+            _applyFilters();
+          }),
+          selectedLocation: _selectedLocation,
+          locations: _locations,
+          onLocationChanged: (val) => setState(() {
+            _selectedLocation = val;
+            _applyFilters();
+          }),
+        ),
+        Expanded(
+          child: _filteredAlerts.isEmpty
+              ? const Center(child: Text("No active alerts match filters"))
+              : RefreshIndicator(
+                  onRefresh: _fetchAlerts,
+                  child: ListView.builder(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    itemCount: _filteredAlerts.length,
+                    itemBuilder: (context, index) {
+                      final alert = _filteredAlerts[index];
+                      return AlertCard(
+                        alert: alert,
+                        isTechnicianOrAdmin: widget.isTechnicianOrAdmin,
+                        onResolve: () => _openAcknowledgeDialog(alert),
+                      );
+                    },
+                  ),
+                ),
+        ),
+      ],
     );
   }
 }

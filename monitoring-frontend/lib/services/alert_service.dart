@@ -36,30 +36,36 @@ class AlertService {
     DateTime? startDate,
     DateTime? endDate,
     String? severity,
-    String? status = 'cleared',
+    String? status, // null = all
   }) async {
     final headers = await _getHeaders();
 
-    String query = 'status_filter=$status';
+    final queryParams = <String>[];
 
-    if (severity != null && severity.isNotEmpty) {
-      query += '&severity=${Uri.encodeQueryComponent(severity)}';
+    if (status != null && status.isNotEmpty) {
+      queryParams.add('status_filter=${Uri.encodeQueryComponent(status)}');
+    }
+
+    if (severity != null && severity.isNotEmpty && severity != 'all') {
+      queryParams.add('severity=${Uri.encodeQueryComponent(severity)}');
     }
 
     if (startDate != null) {
-      query +=
-          '&start_date=${Uri.encodeQueryComponent(startDate.toIso8601String())}';
+      queryParams.add(
+          'start_date=${Uri.encodeQueryComponent(startDate.toIso8601String())}');
     }
 
     if (endDate != null) {
       final endInclusive =
           DateTime(endDate.year, endDate.month, endDate.day, 23, 59, 59, 999);
-      query +=
-          '&end_date=${Uri.encodeQueryComponent(endInclusive.toIso8601String())}';
+      queryParams.add(
+          'end_date=${Uri.encodeQueryComponent(endInclusive.toIso8601String())}');
     }
 
+    final query = queryParams.isEmpty ? '' : '?${queryParams.join('&')}';
+
     final response = await http.get(
-      Uri.parse('${ApiConfig.alerts}/?$query'),
+      Uri.parse('${ApiConfig.alerts}/$query'),
       headers: headers,
     );
 

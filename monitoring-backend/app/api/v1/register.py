@@ -85,9 +85,16 @@ async def register_in_librenms(
 
     # 3) Upsert into correct table
     if node_type == "switch":
-        existing = db.query(Switch).filter(Switch.ip_address == ip).first()
+        existing = (
+            db.query(Switch)
+            .filter(Switch.librenms_device_id == int(librenms_device_id))
+            .first()
+        )
+        if not existing:
+            existing = db.query(Switch).filter(Switch.ip_address == ip).first()
 
         if existing:
+            existing.ip_address = ip
             existing.name = display_name
             existing.location_id = (
                 payload.location_id
@@ -157,8 +164,16 @@ async def register_in_librenms(
         }
 
     # node_type == "device"
-    existing = db.query(Device).filter(Device.ip_address == ip).first()
+    existing = (
+        db.query(Device)
+        .filter(Device.librenms_device_id == int(librenms_device_id))
+        .first()
+    )
+    if not existing:
+        existing = db.query(Device).filter(Device.ip_address == ip).first()
+
     if existing:
+        existing.ip_address = ip
         existing.name = display_name
         existing.location_id = (
             payload.location_id

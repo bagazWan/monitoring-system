@@ -5,7 +5,6 @@ from app.api.dependencies import require_admin, require_technician_or_admin
 from app.core.database import get_db
 from app.models import Device, LibreNMSPort, Location, User
 from app.schemas.device import (
-    DeviceCreate,
     DeviceResponse,
     DeviceUpdate,
     DeviceWithLocation,
@@ -177,46 +176,6 @@ def get_device(device_id: int, db: Session = Depends(get_db)):
     return device
 
 
-# Create new device by manual input
-@router.post("", response_model=DeviceResponse, status_code=status.HTTP_201_CREATED)
-def create_device(
-    device_data: DeviceCreate,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require_technician_or_admin),
-):
-    # Check if IP address already exists
-    existing_device = (
-        db.query(Device).filter(Device.ip_address == device_data.ip_address).first()
-    )
-
-    if existing_device:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Device with IP address {device_data.ip_address} already exists",
-        )
-
-    if device_data.location_id is not None:
-        location = (
-            db.query(Location)
-            .filter(Location.location_id == device_data.location_id)
-            .first()
-        )
-        if not location:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Location with id {device_data.location_id} not found",
-            )
-
-    # Create new device
-    new_device = Device(**device_data.model_dump())
-
-    db.add(new_device)
-    db.commit()
-    db.refresh(new_device)
-
-    return new_device
-
-
 # Update device
 @router.patch("/{device_id}", response_model=DeviceResponse)
 def update_device(
@@ -248,7 +207,7 @@ def update_device(
 
 # Delete device
 @router.delete("/{device_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_device(
+async def delete_device(
     device_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_admin),
@@ -260,6 +219,14 @@ def delete_device(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Device with id {device_id} not found",
         )
+
+    if device.librenms_device_id:
+        try:
+            librenms = LibreNMSService()
+            await librenms.delete_device(int(device.librenms_device_id))
+        except Exception as e:
+            # Log error but proceed with DB deletion
+            print(f"Warning: Failed to delete from LibreNMS: {e}")
 
     db.delete(device)
     db.commit()

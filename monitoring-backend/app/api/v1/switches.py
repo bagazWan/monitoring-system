@@ -6,7 +6,6 @@ from app.core.database import get_db
 from app.models import Location, Switch, User
 from app.models.librenms_port import LibreNMSPort
 from app.schemas.switch import (
-    SwitchCreate,
     SwitchResponse,
     SwitchUpdate,
     SwitchWithLocation,
@@ -185,46 +184,6 @@ def get_switch(switch_id: int, db: Session = Depends(get_db)):
     return switch
 
 
-# Create new switch by manual input
-@router.post("", response_model=SwitchResponse, status_code=status.HTTP_201_CREATED)
-def create_switch(
-    switch_data: SwitchCreate,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require_technician_or_admin),
-):
-    # Check if IP address already exists
-    existing_switch = (
-        db.query(Switch).filter(Switch.ip_address == switch_data.ip_address).first()
-    )
-
-    if existing_switch:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Switch with IP address {switch_data.ip_address} already exists",
-        )
-
-    if switch_data.location_id is not None:
-        location = (
-            db.query(Location)
-            .filter(Location.location_id == switch_data.location_id)
-            .first()
-        )
-        if not location:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Location with id {switch_data.location_id} not found",
-            )
-
-    # Create new switch
-    new_switch = Switch(**switch_data.model_dump())
-
-    db.add(new_switch)
-    db.commit()
-    db.refresh(new_switch)
-
-    return new_switch
-
-
 # Update switch
 @router.patch("/{switch_id}", response_model=SwitchResponse)
 def update_switch(
@@ -256,7 +215,7 @@ def update_switch(
 
 # Delete switch
 @router.delete("/{switch_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_switch(
+async def delete_switch(
     switch_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_admin),
@@ -268,6 +227,14 @@ def delete_switch(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Switch with id {switch_id} not found",
         )
+
+    if switch.librenms_device_id:
+        try:
+            librenms = LibreNMSService()
+            await librenms.delete_device(int(switch.librenms_device_id))
+        except Exception as e:
+            # Log error but proceed with DB deletion
+            print(f"Warning: Failed to delete from LibreNMS: {e}")
 
     db.delete(switch)
     db.commit()

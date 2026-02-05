@@ -4,16 +4,6 @@ from typing import Optional
 from pydantic import BaseModel, Field
 
 
-# Create switch with manual input
-class SwitchCreate(BaseModel):
-    name: str = Field(..., min_length=1, max_length=255, description="Switch name")
-    ip_address: str = Field(..., description="Switch IP address")
-    location_id: Optional[int] = Field(None, description="Switch location")
-    node_id: Optional[int] = Field(None, description="Network node is connected to")
-    status: str = Field(default="offline", description="Switch status")
-    description: Optional[str] = Field(None, max_length=500)
-
-
 class SwitchUpdate(BaseModel):
     name: Optional[str] = Field(None, min_length=1, max_length=255)
     location_id: Optional[int] = None
@@ -21,6 +11,7 @@ class SwitchUpdate(BaseModel):
     status: Optional[str] = None
     node_id: Optional[int] = None
     description: Optional[str] = Field(None, max_length=500)
+    librenms_device_id: Optional[int] = None
 
 
 class SwitchResponse(BaseModel):

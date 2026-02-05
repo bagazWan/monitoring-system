@@ -4,20 +4,6 @@ from typing import Optional
 from pydantic import BaseModel, Field
 
 
-# Creating new device with manual input
-class DeviceCreate(BaseModel):
-    name: str = Field(..., min_length=1, max_length=255, description="Device name")
-    ip_address: str = Field(..., description="Device IP address")
-    mac_address: Optional[str] = Field(None, description="Device MAC address")
-    device_type: str = Field(..., description="Device type (CCTV, Router, etc.)")
-    location_id: Optional[int] = Field(
-        None, description="Location where device is installed"
-    )
-    switch_id: Optional[int] = Field(None, description="Switch device is connected to")
-    status: str = Field(default="offline", description="Device status")
-    description: Optional[str] = Field(None, max_length=500)
-
-
 class LibreNMSRegisterRequest(BaseModel):
     hostname: str = Field(..., description="IP or hostname to add into LibreNMS")
     community: str = Field(default="public")
@@ -63,6 +49,7 @@ class DeviceUpdate(BaseModel):
     status: Optional[str] = None
     switch_id: Optional[int] = None
     description: Optional[str] = Field(None, max_length=500)
+    librenms_device_id: Optional[int] = None
 
 
 class DeviceResponse(BaseModel):

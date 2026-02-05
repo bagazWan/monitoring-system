@@ -2,10 +2,19 @@ import 'package:flutter/material.dart';
 import 'dart:async';
 import '../../models/device.dart';
 import '../../services/device_service.dart';
+import 'node_config_screen.dart';
 
 class DeviceCard extends StatefulWidget {
   final BaseNode node;
-  const DeviceCard({super.key, required this.node});
+  final bool isAdmin;
+  final VoidCallback? onRefresh;
+
+  const DeviceCard({
+    super.key,
+    required this.node,
+    this.isAdmin = false,
+    this.onRefresh,
+  });
 
   @override
   State<DeviceCard> createState() => _DeviceCardState();
@@ -25,12 +34,11 @@ class _DeviceCardState extends State<DeviceCard> {
     setState(() {
       _isExpanded = expanded;
       if (_isExpanded) {
-        // Start polling every 5 seconds when expanded
         _pollingTimer = Timer.periodic(const Duration(seconds: 5), (timer) {
-          setState(() {});
+          if (mounted) setState(() {});
         });
       } else {
-        _pollingTimer?.cancel(); // Stop polling when card is closed
+        _pollingTimer?.cancel();
       }
     });
   }
@@ -53,7 +61,7 @@ class _DeviceCardState extends State<DeviceCard> {
         tilePadding: const EdgeInsets.symmetric(horizontal: 16),
         childrenPadding:
             const EdgeInsets.only(left: 16, right: 16, bottom: 16, top: 0),
-        leading: _buildStatusDot(widget.node.status!),
+        leading: _buildStatusDot(widget.node.status ?? 'offline'),
         title: Text(
           widget.node.name,
           style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
@@ -73,8 +81,14 @@ class _DeviceCardState extends State<DeviceCard> {
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting &&
                   !_isExpanded) {
-                return const LinearProgressIndicator(minHeight: 2);
+                return const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 8.0),
+                  child: LinearProgressIndicator(minHeight: 2),
+                );
               }
+
+              String trafficText = "Unavailable";
+              bool isLive = false;
 
               if (snapshot.hasData) {
                 final data = snapshot.data!;
@@ -83,37 +97,84 @@ class _DeviceCardState extends State<DeviceCard> {
                 if (widget.node.status != liveStatus) {
                   Future.microtask(() {
                     if (mounted) {
-                      setState(() {
-                        widget.node.status = liveStatus;
-                      });
+                      setState(() => widget.node.status = liveStatus);
                     }
                   });
                 }
+
                 double inMbps = (data['in_mbps'] ?? 0).toDouble();
                 double outMbps = (data['out_mbps'] ?? 0).toDouble();
-                // String lastPolled = data['last_seen'] ?? "N/A";
 
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildInfoRow(
-                      "Live Traffic",
-                      liveStatus == 'offline'
-                          ? "Offline"
-                          : "${inMbps.toStringAsFixed(2)} Mbps In / ${outMbps.toStringAsFixed(2)} Mbps Out",
-                      isLive: true,
-                    ),
-                  ],
-                );
+                if (liveStatus == 'offline') {
+                  trafficText = "Device is Offline";
+                } else {
+                  trafficText =
+                      "${inMbps.toStringAsFixed(2)} Mbps In  •  ${outMbps.toStringAsFixed(2)} Mbps Out";
+                  isLive = true;
+                }
               }
-              return _buildInfoRow("Live Traffic", "Unavailable");
+              return Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Row(
+                        children: [
+                          SizedBox(
+                            width: 100,
+                            child: Text("Live Traffic:",
+                                style: TextStyle(
+                                    color: Colors.grey[600], fontSize: 13)),
+                          ),
+                          Expanded(
+                            child: Text(
+                              trafficText,
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: isLive
+                                    ? FontWeight.bold
+                                    : FontWeight.normal,
+                                color:
+                                    isLive ? Colors.blue[700] : Colors.black87,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (widget.isAdmin)
+                      SizedBox(
+                        height: 32,
+                        width: 32,
+                        child: IconButton(
+                          padding: EdgeInsets.zero,
+                          icon: const Icon(Icons.settings,
+                              size: 20, color: Colors.grey),
+                          tooltip: "Configure Device",
+                          onPressed: () async {
+                            final shouldRefresh = await Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) =>
+                                    DeviceConfigScreen(node: widget.node),
+                              ),
+                            );
+                            if (shouldRefresh == true) {
+                              widget.onRefresh?.call();
+                            }
+                          },
+                        ),
+                      ),
+                  ],
+                ),
+              );
             },
           ),
           _buildInfoRow("MAC Address", widget.node.macAddress ?? "N/A"),
           _buildInfoRow("Location", widget.node.locationName ?? "Not Set"),
-          _buildInfoRow(
-              "Description", widget.node.description ?? "No description"),
-          _buildInfoRow("Last Replaced", widget.node.lastReplacedAt ?? "N/A"),
+          _buildInfoRow("Description", widget.node.description ?? "-"),
+          _buildInfoRow("Last Replaced", widget.node.lastReplacedAt ?? "-"),
         ],
       ),
     );
@@ -145,7 +206,7 @@ class _DeviceCardState extends State<DeviceCard> {
     );
   }
 
-  Widget _buildInfoRow(String label, String value, {bool isLive = false}) {
+  Widget _buildInfoRow(String label, String value) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
@@ -156,12 +217,9 @@ class _DeviceCardState extends State<DeviceCard> {
                 style: TextStyle(color: Colors.grey[600], fontSize: 13)),
           ),
           Expanded(
-              child: Text(value,
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: isLive ? FontWeight.bold : FontWeight.normal,
-                    color: isLive ? Colors.blue : Colors.black87,
-                  ))),
+            child: Text(value,
+                style: const TextStyle(fontSize: 13, color: Colors.black87)),
+          ),
         ],
       ),
     );

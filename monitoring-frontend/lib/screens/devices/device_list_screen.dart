@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import '../../models/user.dart';
+import '../../services/auth_service.dart';
 import 'device_filter_bar.dart';
 import 'device_card.dart';
 import '../../models/device.dart';
@@ -18,13 +20,12 @@ class DeviceListScreen extends StatefulWidget {
 }
 
 class _DeviceListScreenState extends State<DeviceListScreen> {
-  // Data
   List<BaseNode> _allNodes = [];
   List<BaseNode> _filteredNodes = [];
   bool _isLoading = true;
   String? _error;
-
-  // WebSocket
+  User? _currentUser;
+  bool get _isAdmin => _currentUser?.role == 'admin';
   StreamSubscription<StatusChangeEvent>? _statusSubscription;
 
   // Search & Filters
@@ -33,22 +34,30 @@ class _DeviceListScreenState extends State<DeviceListScreen> {
   String? _selectedType;
   String? _selectedLocation;
   String? _selectedStatus;
+  List<String> _deviceTypes = [];
+  List<String> _locations = [];
 
   // Pagination
   int _currentPage = 1;
   int _itemsPerPage = 10;
   final List<int> _itemsPerPageOptions = [10, 25, 50, 100];
 
-  // Filter options
-  List<String> _deviceTypes = [];
-  List<String> _locations = [];
-
   @override
   void initState() {
     super.initState();
+    _checkUserRole();
     _fetchNodes();
     _initWebSocket();
     _searchController.addListener(_onSearchChanged);
+  }
+
+  Future<void> _checkUserRole() async {
+    try {
+      final user = await AuthService().getCurrentUser();
+      if (mounted) setState(() => _currentUser = user);
+    } catch (e) {
+      debugPrint("Failed to load user role: $e");
+    }
   }
 
   @override
@@ -74,6 +83,19 @@ class _DeviceListScreenState extends State<DeviceListScreen> {
 
     try {
       final nodes = await DeviceService().getAllNodes();
+
+      nodes.sort((a, b) {
+        final isSwitchA = a.nodeKind == 'switch';
+        final isSwitchB = b.nodeKind == 'switch';
+
+        if (isSwitchA && !isSwitchB) return -1;
+        if (!isSwitchA && isSwitchB) return 1;
+
+        final idA = a.id ?? 0;
+        final idB = b.id ?? 0;
+        return idA.compareTo(idB);
+      });
+
       setState(() {
         _allNodes = nodes;
         _extractFilterOptions();
@@ -128,6 +150,18 @@ class _DeviceListScreenState extends State<DeviceListScreen> {
 
       return true;
     }).toList();
+  }
+
+  void _updateFilter({String? type, String? location, String? status}) {
+    setState(() {
+      if (type != null || _selectedType != null) _selectedType = type;
+      if (location != null || _selectedLocation != null) {
+        _selectedLocation = location;
+      }
+      if (status != null || _selectedStatus != null) _selectedStatus = status;
+      _currentPage = 1;
+      _applyFilters();
+    });
   }
 
   void _clearFilters() {
@@ -235,16 +269,42 @@ class _DeviceListScreenState extends State<DeviceListScreen> {
                       hintText: 'Search by name or IP address',
                     ),
                     const SizedBox(height: 12),
-                    DeviceFilterBar(
-                      selectedType: _selectedType,
-                      selectedLocation: _selectedLocation,
-                      selectedStatus: _selectedStatus,
-                      deviceTypes: _deviceTypes,
-                      locations: _locations,
-                      onTypeChanged: (v) => _updateFilter(type: v),
-                      onLocationChanged: (v) => _updateFilter(location: v),
-                      onStatusChanged: (v) => _updateFilter(status: v),
-                      onClearFilters: _clearFilters,
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: DeviceFilterBar(
+                            selectedType: _selectedType,
+                            selectedLocation: _selectedLocation,
+                            selectedStatus: _selectedStatus,
+                            deviceTypes: _deviceTypes,
+                            locations: _locations,
+                            onTypeChanged: (v) => _updateFilter(type: v),
+                            onLocationChanged: (v) =>
+                                _updateFilter(location: v),
+                            onStatusChanged: (v) => _updateFilter(status: v),
+                            onClearFilters: _clearFilters,
+                          ),
+                        ),
+                        if (_isAdmin) ...[
+                          const SizedBox(width: 8),
+                          ElevatedButton.icon(
+                            onPressed: () async {
+                              final refresh = await Navigator.pushNamed(
+                                  context, '/register-node');
+                              if (refresh == true) _fetchNodes();
+                            },
+                            icon: const Icon(Icons.add, size: 18),
+                            label: const Text("Register"),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.blueAccent,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 16, vertical: 12),
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                     const SizedBox(height: 12),
                     _buildResultsSummary(),
@@ -267,18 +327,6 @@ class _DeviceListScreenState extends State<DeviceListScreen> {
         ),
       ),
     );
-  }
-
-  void _updateFilter({String? type, String? location, String? status}) {
-    setState(() {
-      if (type != null || _selectedType != null) _selectedType = type;
-      if (location != null || _selectedLocation != null) {
-        _selectedLocation = location;
-      }
-      if (status != null || _selectedStatus != null) _selectedStatus = status;
-      _currentPage = 1;
-      _applyFilters();
-    });
   }
 
   Widget _buildResultsSummary() {
@@ -360,6 +408,8 @@ class _DeviceListScreenState extends State<DeviceListScreen> {
           (context, index) => DeviceCard(
             key: ValueKey(_paginatedNodes[index].id),
             node: _paginatedNodes[index],
+            isAdmin: _isAdmin,
+            onRefresh: _fetchNodes,
           ),
           childCount: _paginatedNodes.length,
         ),

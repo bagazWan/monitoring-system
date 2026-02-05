@@ -12,6 +12,7 @@ class BaseNode {
   final int? nodeId;
   final String? description;
   final String? lastReplacedAt;
+  final int? librenmsId;
 
   BaseNode({
     required this.id,
@@ -27,6 +28,7 @@ class BaseNode {
     this.nodeId,
     this.description,
     this.lastReplacedAt,
+    this.librenmsId,
   });
   // Factory to create from Device JSON
   factory BaseNode.fromDeviceJson(Map<String, dynamic> json) {
@@ -38,9 +40,11 @@ class BaseNode {
         deviceType: json['device_type'],
         nodeKind: 'device',
         status: json['status'],
+        locationId: json['location_id'],
         locationName: json['location_name'],
         description: json['description'],
-        lastReplacedAt: json['last_replaced_at']);
+        lastReplacedAt: json['last_replaced_at'],
+        librenmsId: json['librenms_device_id']);
   }
 
   Map<String, dynamic> toDeviceCreateJson() {
@@ -67,8 +71,10 @@ class BaseNode {
         nodeKind: 'switch',
         deviceType: 'Switch',
         locationName: json['location_name'],
+        locationId: json['location_id'],
         description: json['description'],
-        lastReplacedAt: json['last_replaced_at']);
+        lastReplacedAt: json['last_replaced_at'],
+        librenmsId: json['librenms_device_id']);
   }
 
   Map<String, dynamic> toSwitchCreateJson() {

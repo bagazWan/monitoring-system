@@ -38,6 +38,9 @@ class Switch(Base):
     alerts = relationship(
         "SwitchAlert", back_populates="switch", cascade="all, delete-orphan"
     )
+    librenms_ports = relationship(
+        "LibreNMSPort", back_populates="switch", cascade="all, delete-orphan"
+    )
 
     def __repr__(self):
         return f"<Switch(id={self.switch_id}, name='{self.name}', ip='{self.ip_address}', status='{self.status}')>"

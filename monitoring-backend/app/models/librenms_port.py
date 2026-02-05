@@ -46,8 +46,8 @@ class LibreNMSPort(Base):
         onupdate=func.now(),
         nullable=False,
     )
-    device = relationship("Device", backref="librenms_ports")
-    switch = relationship("Switch", backref="librenms_ports")
+    device = relationship("Device", back_populates="librenms_ports")
+    switch = relationship("Switch", back_populates="librenms_ports")
 
     __table_args__ = (UniqueConstraint("port_id", name="uq_librenms_ports_port_id"),)
 

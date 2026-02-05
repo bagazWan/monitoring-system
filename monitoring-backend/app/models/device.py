@@ -39,6 +39,9 @@ class Device(Base):
     alerts = relationship(
         "Alert", back_populates="device", cascade="all, delete-orphan"
     )
+    librenms_ports = relationship(
+        "LibreNMSPort", back_populates="device", cascade="all, delete-orphan"
+    )
 
     def __repr__(self):
         return f"<Device(id={self.device_id}, name='{self.name}', type='{self.device_type}', status='{self.status}')>"

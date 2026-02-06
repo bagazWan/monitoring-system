@@ -27,6 +27,8 @@ class _DeviceListScreenState extends State<DeviceListScreen> {
   User? _currentUser;
   bool get _isAdmin => _currentUser?.role == 'admin';
   StreamSubscription<StatusChangeEvent>? _statusSubscription;
+  Map<String, Map<String, dynamic>> _liveStats = {};
+  Timer? _batchTimer;
 
   // Search & Filters
   final TextEditingController _searchController = TextEditingController();
@@ -49,6 +51,7 @@ class _DeviceListScreenState extends State<DeviceListScreen> {
     _fetchNodes();
     _initWebSocket();
     _searchController.addListener(_onSearchChanged);
+    _startBatchPolling();
   }
 
   Future<void> _checkUserRole() async {
@@ -60,10 +63,36 @@ class _DeviceListScreenState extends State<DeviceListScreen> {
     }
   }
 
+  void _startBatchPolling() {
+    _batchTimer?.cancel();
+    _batchTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+      if (mounted && _filteredNodes.isNotEmpty) {
+        _fetchBatchLiveStats();
+      }
+    });
+  }
+
+  Future<void> _fetchBatchLiveStats() async {
+    final visibleNodes = _paginatedNodes;
+    if (visibleNodes.isEmpty) return;
+
+    try {
+      final stats = await DeviceService().getBulkLiveDetails(visibleNodes);
+      if (mounted) {
+        setState(() {
+          _liveStats = stats;
+        });
+      }
+    } catch (e) {
+      debugPrint("Batch fetch error: $e");
+    }
+  }
+
   @override
   void dispose() {
     _searchController.dispose();
     _statusSubscription?.cancel();
+    _batchTimer?.cancel();
     super.dispose();
   }
 
@@ -96,12 +125,15 @@ class _DeviceListScreenState extends State<DeviceListScreen> {
         return idA.compareTo(idB);
       });
 
-      setState(() {
-        _allNodes = nodes;
-        _extractFilterOptions();
-        _applyFilters();
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _allNodes = nodes;
+          _extractFilterOptions();
+          _applyFilters();
+          _isLoading = false;
+        });
+        _fetchBatchLiveStats();
+      }
     } catch (e) {
       setState(() {
         _error = e.toString();
@@ -405,12 +437,17 @@ class _DeviceListScreenState extends State<DeviceListScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 16),
       sliver: SliverList(
         delegate: SliverChildBuilderDelegate(
-          (context, index) => DeviceCard(
-            key: ValueKey(_paginatedNodes[index].id),
-            node: _paginatedNodes[index],
-            isAdmin: _isAdmin,
-            onRefresh: _fetchNodes,
-          ),
+          (context, index) {
+            final node = _paginatedNodes[index];
+            final key = '${node.nodeKind}_${node.id}';
+            return DeviceCard(
+              key: ValueKey(node.id),
+              node: node,
+              isAdmin: _isAdmin,
+              onRefresh: _fetchNodes,
+              liveStats: _liveStats[key],
+            );
+          },
           childCount: _paginatedNodes.length,
         ),
       ),

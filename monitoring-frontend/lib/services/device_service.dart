@@ -118,6 +118,60 @@ class DeviceService {
     }
   }
 
+  Future<Map<String, Map<String, dynamic>>> getBulkLiveDetails(
+      List<BaseNode> nodes) async {
+    if (nodes.isEmpty) return {};
+
+    final headers = await _getHeaders();
+    final Map<String, Map<String, dynamic>> results = {};
+    final deviceIds = nodes
+        .where((n) => n.nodeKind == 'device' && n.id != null)
+        .map((n) => n.id!)
+        .toList();
+    final switchIds = nodes
+        .where((n) => n.nodeKind == 'switch' && n.id != null)
+        .map((n) => n.id!)
+        .toList();
+    final futures = <Future<http.Response>>[];
+
+    if (deviceIds.isNotEmpty) {
+      futures.add(http.post(
+        Uri.parse('${ApiConfig.devices}/bulk-live-details'),
+        headers: headers,
+        body: jsonEncode({'device_ids': deviceIds}),
+      ));
+    } else {
+      futures.add(Future.value(http.Response('[]', 200)));
+    }
+
+    if (switchIds.isNotEmpty) {
+      futures.add(http.post(
+        Uri.parse('${ApiConfig.switches}/bulk-live-details'),
+        headers: headers,
+        body: jsonEncode({'switch_ids': switchIds}),
+      ));
+    } else {
+      futures.add(Future.value(http.Response('[]', 200)));
+    }
+
+    final responses = await Future.wait(futures);
+
+    if (deviceIds.isNotEmpty && responses[0].statusCode == 200) {
+      final List<dynamic> data = jsonDecode(responses[0].body);
+      for (var item in data) {
+        results['device_${item['device_id']}'] = item;
+      }
+    }
+
+    if (switchIds.isNotEmpty && responses[1].statusCode == 200) {
+      final List<dynamic> data = jsonDecode(responses[1].body);
+      for (var item in data) {
+        results['switch_${item['switch_id']}'] = item;
+      }
+    }
+    return results;
+  }
+
   Future<List<Location>> getLocations() async {
     final response = await http.get(Uri.parse(ApiConfig.locations));
     if (response.statusCode == 200) {

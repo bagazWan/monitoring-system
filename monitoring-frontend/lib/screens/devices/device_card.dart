@@ -1,50 +1,50 @@
 import 'package:flutter/material.dart';
-import 'dart:async';
 import '../../models/device.dart';
-import '../../services/device_service.dart';
 import 'node_config_screen.dart';
 
-class DeviceCard extends StatefulWidget {
+class DeviceCard extends StatelessWidget {
   final BaseNode node;
   final bool isAdmin;
   final VoidCallback? onRefresh;
+  final Map<String, dynamic>? liveStats;
 
   const DeviceCard({
     super.key,
     required this.node,
     this.isAdmin = false,
     this.onRefresh,
+    this.liveStats,
   });
 
   @override
-  State<DeviceCard> createState() => _DeviceCardState();
-}
-
-class _DeviceCardState extends State<DeviceCard> {
-  Timer? _pollingTimer;
-  bool _isExpanded = false;
-
-  @override
-  void dispose() {
-    _pollingTimer?.cancel();
-    super.dispose();
-  }
-
-  void _toggleTimer(bool expanded) {
-    setState(() {
-      _isExpanded = expanded;
-      if (_isExpanded) {
-        _pollingTimer = Timer.periodic(const Duration(seconds: 5), (timer) {
-          if (mounted) setState(() {});
-        });
-      } else {
-        _pollingTimer?.cancel();
-      }
-    });
-  }
-
-  @override
   Widget build(BuildContext context) {
+    String trafficText = "Loading...";
+    bool isIdle = false;
+    bool isLive = false;
+    Color statusColor =
+        (node.status?.toLowerCase() == 'online') ? Colors.green : Colors.red;
+
+    if (liveStats != null) {
+      final double inMbps = (liveStats!['in_mbps'] ?? 0).toDouble();
+      final double outMbps = (liveStats!['out_mbps'] ?? 0).toDouble();
+      final String liveStatus = liveStats!['status'] ?? 'unknown';
+
+      if (liveStatus == 'offline') {
+        trafficText = "Device is Offline";
+        statusColor = Colors.red;
+      } else {
+        statusColor = Colors.green;
+        if (inMbps == 0 && outMbps == 0) {
+          trafficText = "No Traffic (Idle or Disabled)";
+          isIdle = true;
+        } else {
+          trafficText =
+              "${inMbps.toStringAsFixed(2)} Mbps In • ${outMbps.toStringAsFixed(2)} Mbps Out";
+          isLive = true;
+        }
+      }
+    }
+
     return Card(
       margin: const EdgeInsets.only(bottom: 10),
       elevation: 0,
@@ -55,139 +55,97 @@ class _DeviceCardState extends State<DeviceCard> {
         side: BorderSide(color: Colors.grey[200]!, width: 1),
       ),
       child: ExpansionTile(
-        onExpansionChanged: _toggleTimer,
         shape: const Border(),
         collapsedShape: const Border(),
         tilePadding: const EdgeInsets.symmetric(horizontal: 16),
         childrenPadding:
             const EdgeInsets.only(left: 16, right: 16, bottom: 16, top: 0),
-        leading: _buildStatusDot(widget.node.status ?? 'offline'),
+        leading: _buildStatusDot(statusColor),
         title: Text(
-          widget.node.name,
+          node.name,
           style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
         ),
-        subtitle: Text(widget.node.ipAddress,
-            style: TextStyle(color: Colors.grey[600])),
-        trailing: _buildTypeBadge(widget.node.deviceType ?? 'Device'),
-        expandedCrossAxisAlignment: CrossAxisAlignment.start,
+        subtitle:
+            Text(node.ipAddress, style: TextStyle(color: Colors.grey[600])),
+        trailing: _buildTypeBadge(node.deviceType ?? 'Device'),
         children: [
           const Padding(
             padding: EdgeInsets.only(bottom: 4.0),
             child: Divider(height: 1),
           ),
-          FutureBuilder<Map<String, dynamic>>(
-            future: DeviceService().getLiveDetails(widget.node.id!,
-                widget.node.nodeKind == 'switch' ? 'switches' : 'devices'),
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting &&
-                  !_isExpanded) {
-                return const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 8.0),
-                  child: LinearProgressIndicator(minHeight: 2),
-                );
-              }
-
-              String trafficText = "Unavailable";
-              bool isLive = false;
-
-              if (snapshot.hasData) {
-                final data = snapshot.data!;
-                final String liveStatus = data['status'] ?? 'unknown';
-
-                if (widget.node.status != liveStatus) {
-                  Future.microtask(() {
-                    if (mounted) {
-                      setState(() => widget.node.status = liveStatus);
-                    }
-                  });
-                }
-
-                double inMbps = (data['in_mbps'] ?? 0).toDouble();
-                double outMbps = (data['out_mbps'] ?? 0).toDouble();
-
-                if (liveStatus == 'offline') {
-                  trafficText = "Device is Offline";
-                } else {
-                  trafficText =
-                      "${inMbps.toStringAsFixed(2)} Mbps In  •  ${outMbps.toStringAsFixed(2)} Mbps Out";
-                  isLive = true;
-                }
-              }
-              return Padding(
-                padding: const EdgeInsets.symmetric(vertical: 4),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Expanded(
-                      child: Row(
-                        children: [
-                          SizedBox(
-                            width: 100,
-                            child: Text("Live Traffic:",
-                                style: TextStyle(
-                                    color: Colors.grey[600], fontSize: 13)),
-                          ),
-                          Expanded(
-                            child: Text(
-                              trafficText,
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: isLive
-                                    ? FontWeight.bold
-                                    : FontWeight.normal,
-                                color:
-                                    isLive ? Colors.blue[700] : Colors.black87,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    if (widget.isAdmin)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Row(
+                    children: [
                       SizedBox(
-                        height: 32,
-                        width: 32,
-                        child: IconButton(
-                          padding: EdgeInsets.zero,
-                          icon: const Icon(Icons.settings,
-                              size: 20, color: Colors.grey),
-                          tooltip: "Configure Device",
-                          onPressed: () async {
-                            final shouldRefresh = await Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) =>
-                                    DeviceConfigScreen(node: widget.node),
-                              ),
-                            );
-                            if (shouldRefresh == true) {
-                              widget.onRefresh?.call();
-                            }
-                          },
+                        width: 100,
+                        child: Text("Live Traffic:",
+                            style: TextStyle(
+                                color: Colors.grey[600], fontSize: 13)),
+                      ),
+                      Expanded(
+                        child: Text(
+                          trafficText,
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight:
+                                isLive ? FontWeight.bold : FontWeight.normal,
+                            color: isLive
+                                ? Colors.blue[700]
+                                : isIdle
+                                    ? Colors.grey[400]
+                                    : Colors.black87,
+                            fontStyle:
+                                isIdle ? FontStyle.italic : FontStyle.normal,
+                          ),
                         ),
                       ),
-                  ],
+                    ],
+                  ),
                 ),
-              );
-            },
+                if (isAdmin)
+                  SizedBox(
+                    height: 32,
+                    width: 32,
+                    child: IconButton(
+                      padding: EdgeInsets.zero,
+                      icon: const Icon(Icons.settings,
+                          size: 20, color: Colors.grey),
+                      tooltip: "Configure Device",
+                      onPressed: () async {
+                        final shouldRefresh = await Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => DeviceConfigScreen(node: node),
+                          ),
+                        );
+                        if (shouldRefresh == true) {
+                          onRefresh?.call();
+                        }
+                      },
+                    ),
+                  ),
+              ],
+            ),
           ),
-          _buildInfoRow("MAC Address", widget.node.macAddress ?? "N/A"),
-          _buildInfoRow("Location", widget.node.locationName ?? "Not Set"),
-          _buildInfoRow("Description", widget.node.description ?? "-"),
-          _buildInfoRow("Last Replaced", widget.node.lastReplacedAt ?? "-"),
+          _buildInfoRow("MAC Address", node.macAddress ?? "N/A"),
+          _buildInfoRow("Location", node.locationName ?? "Not Set"),
+          _buildInfoRow("Description", node.description ?? "-"),
+          _buildInfoRow("Last Replaced", node.lastReplacedAt ?? "-"),
         ],
       ),
     );
   }
 
-  Widget _buildStatusDot(String status) {
+  Widget _buildStatusDot(Color color) {
     return Container(
       width: 12,
       height: 12,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: status.toLowerCase() == 'online' ? Colors.green : Colors.red,
-      ),
+      decoration: BoxDecoration(shape: BoxShape.circle, color: color),
     );
   }
 

@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Optional
+from typing import List, Optional
 
 from pydantic import BaseModel, Field
 
@@ -31,6 +31,10 @@ class SwitchResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class BulkSwitchDetailsRequest(BaseModel):
+    switch_ids: List[int]
 
 
 class SwitchWithLocation(BaseModel):

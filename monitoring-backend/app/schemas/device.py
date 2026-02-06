@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Optional
+from typing import List, Optional
 
 from pydantic import BaseModel, Field
 
@@ -71,6 +71,10 @@ class DeviceResponse(BaseModel):
 
     class Config:
         from_attributes = True  # Allows conversion from SQLAlchemy model
+
+
+class BulkLiveDetailsRequest(BaseModel):
+    device_ids: List[int]
 
 
 # Schema for device with location info for map display

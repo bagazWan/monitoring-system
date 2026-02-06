@@ -1,10 +1,10 @@
-from datetime import datetime
 from typing import List, Optional
 
 from app.api.dependencies import require_admin, require_technician_or_admin
 from app.core.database import get_db
 from app.models import Device, LibreNMSPort, Location, User
 from app.schemas.device import (
+    BulkLiveDetailsRequest,
     DeviceResponse,
     DeviceUpdate,
     DeviceWithLocation,
@@ -16,7 +16,64 @@ from sqlalchemy.orm import Session
 router = APIRouter(prefix="/devices", tags=["Devices"])
 
 
-# get all registered device
+async def _calculate_device_metrics(
+    device: Device, db: Session, librenms: LibreNMSService
+) -> dict:
+    default_response = {
+        "device_id": device.device_id,
+        "status": device.status or "offline",
+        "in_mbps": 0.0,
+        "out_mbps": 0.0,
+        "monitored": False,
+    }
+
+    if not device.librenms_device_id:
+        return default_response
+
+    try:
+        enabled_ports = (
+            db.query(LibreNMSPort)
+            .filter(
+                LibreNMSPort.device_id == device.device_id,
+                LibreNMSPort.enabled.is_(True),
+            )
+            .all()
+        )
+
+        total_in = 0.0
+        total_out = 0.0
+
+        if enabled_ports:
+            for port_row in enabled_ports:
+                try:
+                    port_detail = await librenms.get_port_by_id(int(port_row.port_id))
+                    p_list = port_detail.get("port", [])
+                    if p_list:
+                        p_data = p_list[0]
+                        if (
+                            int(p_data.get("disabled", 0) or 0) == 1
+                            or int(p_data.get("ignore", 0) or 0) == 1
+                        ):
+                            continue
+
+                        total_in += float(p_data.get("ifInOctets_rate", 0) or 0)
+                        total_out += float(p_data.get("ifOutOctets_rate", 0) or 0)
+                except Exception:
+                    continue
+
+        return {
+            "device_id": device.device_id,
+            "status": device.status,
+            "in_mbps": round((total_in * 8) / 1_000_000, 2),
+            "out_mbps": round((total_out * 8) / 1_000_000, 2),
+            "monitored": True,
+        }
+
+    except Exception as e:
+        print(f"Error calculating metrics for device {device.device_id}: {e}")
+        return default_response
+
+
 @router.get("", response_model=List[DeviceResponse])
 def get_all_devices(
     skip: int = Query(0, ge=0, description="Number of records to skip"),
@@ -41,93 +98,33 @@ def get_all_devices(
 
 @router.get("/{device_id}/live-details")
 async def get_device_live_details(device_id: int, db: Session = Depends(get_db)):
-    device = db.query(Device).filter_by(device_id=device_id).first()
+    device = db.query(Device).filter(Device.device_id == device_id).first()
     if not device:
-        raise HTTPException(404, "Device not found")
-
-    if not device.librenms_device_id:
-        return {
-            "device_id": device.device_id,
-            "status": device.status,
-            "in_mbps": 0.0,
-            "out_mbps": 0.0,
-            "monitored": False,
-            "message": "Device not connected to LibreNMS",
-        }
+        raise HTTPException(status_code=404, detail="Device not found")
 
     librenms = LibreNMSService()
-    current_status = device.status
+    return await _calculate_device_metrics(device, db, librenms)
 
-    try:
-        lnms_device = await librenms.get_device_by_id(device.librenms_device_id)
-        if lnms_device:
-            new_status = "online" if lnms_device.get("status") == 1 else "offline"
-            if device.status != new_status:
-                device.status = new_status
-                device.librenms_last_synced = datetime.utcnow()
-                db.commit()
-                current_status = new_status
 
-        enabled_ports = (
-            db.query(LibreNMSPort)
-            .filter(
-                LibreNMSPort.device_id == device.device_id,
-                LibreNMSPort.enabled.is_(True),
-            )
-            .all()
-        )
+@router.post("/bulk-live-details")
+async def get_bulk_device_details(
+    payload: BulkLiveDetailsRequest, db: Session = Depends(get_db)
+):
+    librenms = LibreNMSService()
+    results = []
 
-        if not enabled_ports:
-            return {
-                "device_id": device.device_id,
-                "status": current_status,
-                "in_mbps": 0.0,
-                "out_mbps": 0.0,
-                "monitored": True,
-                "warning": "No enabled ports configured for this device (run sync or enable a port).",
-                "last_seen": lnms_device.get("last_polled") if lnms_device else "N/A",
-            }
+    devices = db.query(Device).filter(Device.device_id.in_(payload.device_ids)).all()
+    device_map = {d.device_id: d for d in devices}
 
-        total_in_octets_rate = 0.0
-        total_out_octets_rate = 0.0
+    for device_id in payload.device_ids:
+        device = device_map.get(device_id)
+        if not device:
+            continue
 
-        for port_row in enabled_ports:
-            port_detail = await librenms.get_port_by_id(int(port_row.port_id))
-            port_list = port_detail.get("port", [])
-            if not port_list:
-                continue
+        metrics = await _calculate_device_metrics(device, db, librenms)
+        results.append(metrics)
 
-            port_data = port_list[0]
-
-            # Skip disabled/ignored ports just in case (defensive)
-            if (
-                int(port_data.get("disabled", 0) or 0) == 1
-                or int(port_data.get("ignore", 0) or 0) == 1
-            ):
-                continue
-
-            total_in_octets_rate += float(port_data.get("ifInOctets_rate", 0) or 0)
-            total_out_octets_rate += float(port_data.get("ifOutOctets_rate", 0) or 0)
-
-        in_mbps = (total_in_octets_rate * 8) / 1_000_000
-        out_mbps = (total_out_octets_rate * 8) / 1_000_000
-
-        return {
-            "device_id": device.device_id,
-            "status": current_status,
-            "in_mbps": round(in_mbps, 2),
-            "out_mbps": round(out_mbps, 2),
-            "last_seen": lnms_device.get("last_polled") if lnms_device else "N/A",
-        }
-
-    except Exception as e:
-        return {
-            "device_id": device.device_id,
-            "status": device.status,
-            "in_mbps": 0.0,
-            "out_mbps": 0.0,
-            "error": str(e),
-        }
+    return results
 
 
 # Get devices with location data for map display
@@ -176,7 +173,6 @@ def get_device(device_id: int, db: Session = Depends(get_db)):
     return device
 
 
-# Update device
 @router.patch("/{device_id}", response_model=DeviceResponse)
 def update_device(
     device_id: int,
@@ -184,7 +180,6 @@ def update_device(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_technician_or_admin),
 ):
-    # Find device
     device = db.query(Device).filter(Device.device_id == device_id).first()
 
     if not device:
@@ -205,7 +200,6 @@ def update_device(
     return device
 
 
-# Delete device
 @router.delete("/{device_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_device(
     device_id: int,

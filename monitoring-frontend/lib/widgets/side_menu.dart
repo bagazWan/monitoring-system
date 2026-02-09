@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
+import '../models/user.dart';
 
 class SideMenu extends StatefulWidget {
   final int selectedIndex;
   final Function(int) onItemSelected;
+  final User? currentUser;
 
   const SideMenu({
     super.key,
     required this.selectedIndex,
     required this.onItemSelected,
+    this.currentUser,
   });
 
   @override
@@ -28,39 +31,45 @@ class _SideMenuState extends State<SideMenu> {
     const Color activeColor = Colors.blueAccent;
     const Color inactiveColor = Colors.black54;
 
+    List<NavigationRailDestination> destinations = [
+      const NavigationRailDestination(
+          icon: Icon(Icons.dashboard), label: Text('Dashboard')),
+      const NavigationRailDestination(
+          icon: Icon(Icons.router), label: Text('Devices')),
+      const NavigationRailDestination(
+          icon: Icon(Icons.location_on), label: Text('Map')),
+      const NavigationRailDestination(
+          icon: Icon(Icons.notifications), label: Text('Alerts')),
+    ];
+
+    if (widget.currentUser?.role == 'admin') {
+      destinations.add(
+        const NavigationRailDestination(
+            icon: Icon(Icons.people), label: Text('Users')),
+      );
+    }
+
     return Container(
       decoration: BoxDecoration(
         color: sidebarBg,
         border: Border(right: BorderSide(color: Colors.grey[200]!)),
       ),
       child: NavigationRail(
-        backgroundColor: sidebarBg,
-        extended: shouldExtend,
-        minExtendedWidth: 200,
-        selectedIndex: widget.selectedIndex,
-        onDestinationSelected: widget.onItemSelected,
-        leading: IconButton(
-          icon: Icon(shouldExtend ? Icons.menu_open : Icons.menu),
-          onPressed: () => setState(() => _manualToggle = !_manualToggle),
-        ),
-        unselectedIconTheme: const IconThemeData(color: inactiveColor),
-        selectedIconTheme: const IconThemeData(color: activeColor),
-        unselectedLabelTextStyle: const TextStyle(color: inactiveColor),
-        selectedLabelTextStyle:
-            const TextStyle(color: activeColor, fontWeight: FontWeight.bold),
-        destinations: const [
-          NavigationRailDestination(
-              icon: Icon(Icons.dashboard), label: Text('Dashboard')),
-          NavigationRailDestination(
-              icon: Icon(Icons.router), label: Text('Devices')),
-          NavigationRailDestination(
-              icon: Icon(Icons.location_on), label: Text('Map')),
-          NavigationRailDestination(
-              icon: Icon(Icons.notifications), label: Text('Alerts')),
-          // NavigationRailDestination(
-          //     icon: Icon(Icons.person), label: Text('Profile')),
-        ],
-      ),
+          backgroundColor: sidebarBg,
+          extended: shouldExtend,
+          minExtendedWidth: 200,
+          selectedIndex: widget.selectedIndex,
+          onDestinationSelected: widget.onItemSelected,
+          leading: IconButton(
+            icon: Icon(shouldExtend ? Icons.menu_open : Icons.menu),
+            onPressed: () => setState(() => _manualToggle = !_manualToggle),
+          ),
+          unselectedIconTheme: const IconThemeData(color: inactiveColor),
+          selectedIconTheme: const IconThemeData(color: activeColor),
+          unselectedLabelTextStyle: const TextStyle(color: inactiveColor),
+          selectedLabelTextStyle:
+              const TextStyle(color: activeColor, fontWeight: FontWeight.bold),
+          destinations: destinations),
     );
   }
 }

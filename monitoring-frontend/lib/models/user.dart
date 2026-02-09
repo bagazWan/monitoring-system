@@ -1,12 +1,12 @@
 class User {
-  final int userId;
+  final int id;
   final String username;
   final String email;
   final String fullName;
   final String role;
 
   User({
-    required this.userId,
+    required this.id,
     required this.username,
     required this.email,
     required this.fullName,
@@ -16,7 +16,7 @@ class User {
   // API response
   factory User.fromJson(Map<String, dynamic> json) {
     return User(
-      userId: json['user_id'],
+      id: json['user_id'],
       username: json['username'],
       email: json['email'],
       fullName: json['full_name'],
@@ -26,7 +26,7 @@ class User {
 
   Map<String, dynamic> toJson() {
     return {
-      'user_id': userId,
+      'user_id': id,
       'username': username,
       'email': email,
       'full_name': fullName,

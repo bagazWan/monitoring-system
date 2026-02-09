@@ -5,9 +5,11 @@ import '../../widgets/alert_notification.dart';
 import '../../services/auth_service.dart';
 import '../../services/device_service.dart';
 import '../../services/websocket_service.dart';
+import '../../models/user.dart';
 import 'dashboard/dashboard_screen.dart';
 import 'devices/device_list_screen.dart';
 import 'alerts/alert_screen.dart';
+import 'users/user_management_screen.dart';
 
 class MainLayout extends StatefulWidget {
   const MainLayout({super.key});
@@ -19,19 +21,30 @@ class MainLayout extends StatefulWidget {
 class _MainLayoutState extends State<MainLayout> {
   int _currentPageIndex = 0;
   StreamSubscription? _alertSub;
+  User? _currentUser;
 
   final List<Widget> _pages = [
     const DashboardScreen(),
     const DeviceListScreen(),
     const Center(child: Text("Map Visualization")),
     const AlertScreen(),
-    const Center(child: Text("Profile Settings")),
+    const UserManagementScreen(),
   ];
+
+  Future<void> _checkUser() async {
+    try {
+      final user = await AuthService().getCurrentUser();
+      setState(() => _currentUser = user);
+    } catch (e) {
+      print("Error fetching user: $e");
+    }
+  }
 
   @override
   void initState() {
     super.initState();
     WebSocketService().connect();
+    _checkUser();
 
     _alertSub = WebSocketService().alertStream.listen((alertData) {
       if (!mounted) return;
@@ -158,8 +171,8 @@ class _MainLayoutState extends State<MainLayout> {
                     icon: Icon(Icons.location_on), label: "Map"),
                 BottomNavigationBarItem(
                     icon: Icon(Icons.notifications), label: "Alerts"),
-                // BottomNavigationBarItem(
-                //     icon: Icon(Icons.person), label: "Profile"),
+                BottomNavigationBarItem(
+                    icon: Icon(Icons.people), label: "Users"),
               ],
             )
           : null,
@@ -170,6 +183,7 @@ class _MainLayoutState extends State<MainLayout> {
               selectedIndex: _currentPageIndex,
               onItemSelected: (index) =>
                   setState(() => _currentPageIndex = index),
+              currentUser: _currentUser,
             ),
           Expanded(
             child: Container(

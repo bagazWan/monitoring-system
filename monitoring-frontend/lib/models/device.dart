@@ -30,7 +30,7 @@ class BaseNode {
     this.lastReplacedAt,
     this.librenmsId,
   });
-  // Factory to create from Device JSON
+
   factory BaseNode.fromDeviceJson(Map<String, dynamic> json) {
     return BaseNode(
         id: json['device_id'],
@@ -61,7 +61,6 @@ class BaseNode {
     };
   }
 
-  // Factory to create from Switch JSON
   factory BaseNode.fromSwitchJson(Map<String, dynamic> json) {
     return BaseNode(
         id: json['switch_id'],

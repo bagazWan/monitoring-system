@@ -31,33 +31,57 @@ class _AlertScreenState extends State<AlertScreen>
   }
 
   @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.grey[50],
-      appBar: AppBar(
-        title: const Text(
-          'Incident Log',
-          style: TextStyle(
-              color: Colors.black, fontSize: 22, fontWeight: FontWeight.bold),
-        ),
-        backgroundColor: Colors.white,
-        elevation: 0.5,
-        bottom: TabBar(
-          controller: _tabController,
-          labelColor: Colors.blue[700],
-          unselectedLabelColor: Colors.grey,
-          indicatorColor: Colors.blue[700],
-          tabs: const [
-            Tab(text: 'Active Alerts'),
-            Tab(text: 'Alerts Log'),
-          ],
-        ),
-      ),
-      body: TabBarView(
-        controller: _tabController,
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          ActiveAlertsTab(isTechnicianOrAdmin: _isTechnicianOrAdmin),
-          const AlertLogTab(),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(24.0),
+            child: const Text(
+              'Incident Log',
+              style: TextStyle(
+                  color: Colors.black,
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold),
+            ),
+          ),
+          Container(
+            width: double.infinity,
+            decoration: BoxDecoration(
+              border: Border(
+                bottom: BorderSide(color: Colors.grey[200]!, width: 1),
+              ),
+            ),
+            child: TabBar(
+              controller: _tabController,
+              labelColor: Colors.blue[700],
+              unselectedLabelColor: Colors.grey,
+              indicatorColor: Colors.blue[700],
+              indicatorSize: TabBarIndicatorSize.label,
+              tabs: const [
+                Tab(text: 'Active Alerts'),
+                Tab(text: 'Alerts Log'),
+              ],
+            ),
+          ),
+          Expanded(
+            child: TabBarView(
+              controller: _tabController,
+              children: [
+                ActiveAlertsTab(isTechnicianOrAdmin: _isTechnicianOrAdmin),
+                const AlertLogTab(),
+              ],
+            ),
+          ),
         ],
       ),
     );

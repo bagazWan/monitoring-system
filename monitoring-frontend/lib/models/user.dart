@@ -13,7 +13,6 @@ class User {
     required this.role,
   });
 
-  // API response
   factory User.fromJson(Map<String, dynamic> json) {
     return User(
       id: json['user_id'],
@@ -34,7 +33,6 @@ class User {
     };
   }
 
-  // Check permissions
   bool get isAdmin => role == 'admin';
   bool get isTechnician => role == 'teknisi';
   bool get canEdit => isAdmin || isTechnician;

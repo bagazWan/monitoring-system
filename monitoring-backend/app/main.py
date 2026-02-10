@@ -10,8 +10,11 @@ from app.api.v1 import (
     auth,
     dashboard,
     devices,
+    fo_routes,
     librenms_ports,
     locations,
+    map,
+    network_nodes,
     register,
     switches,
     sync,
@@ -90,6 +93,9 @@ def root():
 app.include_router(devices.router, prefix="/api/v1")
 app.include_router(switches.router, prefix="/api/v1")
 app.include_router(locations.router, prefix="/api/v1")
+app.include_router(map.router, prefix="/api/v1")
+app.include_router(network_nodes.router, prefix="/api/v1")
+app.include_router(fo_routes.router, prefix="/api/v1")
 app.include_router(users.router, prefix="/api/v1")
 app.include_router(alerts.router, prefix="/api/v1")
 app.include_router(auth.router, prefix="/api/v1")

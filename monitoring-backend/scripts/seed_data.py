@@ -204,86 +204,6 @@ def seed_database():
             db.commit()
             print(f"Created {len(routes)} FO routes")
 
-        # 6. Create switch/hub
-        # print("\nCreating switches...")
-
-        # existing_switches = db.query(Switch).count()
-        # if existing_switches > 0:
-        #     print(f"Skipping (already have {existing_switches} switches)")
-        #     switches = db.query(Switch).all()
-        # else:
-        #     switches = [
-        #         Switch(
-        #             name="SW-KALBOD-01",
-        #             ip_address="192.168.1.1",
-        #             location_id=locations[0].location_id,
-        #             node_id=nodes[0].node_id,
-        #             status="online",
-        #             description="Main switch Kalbod toll gate",
-        #         ),
-        #         Switch(
-        #             name="SW-TALLO-BARAT-01",
-        #             ip_address="192.168.1.2",
-        #             location_id=locations[1].location_id,
-        #             node_id=nodes[1].node_id,
-        #             status="online",
-        #             description="Main switch Ramp Tallo Barat",
-        #         ),
-        #     ]
-        #     db.add_all(switches)
-        #     db.commit()
-        #     db.refresh(switches[0])
-        #     print(f"Created {len(switches)} switches")
-
-        # 7. Create devices (non hub)
-        # print("\n[Creating devices...")
-
-        # existing_devices = db.query(Device).count()
-        # if existing_devices > 0:
-        #     print(f"Skipping (already have {existing_devices} devices)")
-        # else:
-        #     devices = [
-        #         Device(
-        #             name="CCTV-KALBOD-ENTRY",
-        #             ip_address="192.168.1.101",
-        #             mac_address="00:11:22:33:44:01",
-        #             device_type="CCTV",
-        #             location_id=locations[0].location_id,
-        #             switch_id=switches[0].switch_id,
-        #             status="online",
-        #         ),
-        #         Device(
-        #             name="CCTV-KALBOD-EXIT",
-        #             ip_address="192.168.1.102",
-        #             mac_address="00:11:22:33:44:02",
-        #             device_type="CCTV",
-        #             location_id=locations[0].location_id,
-        #             switch_id=switches[0].switch_id,
-        #             status="online",
-        #         ),
-        #         Device(
-        #             name="CCTV-TALLO-BARAT-ENTRY",
-        #             ip_address="192.168.2.102",
-        #             mac_address="00:11:22:33:44:03",
-        #             device_type="CCTV",
-        #             location_id=locations[1].location_id,
-        #             switch_id=switches[1].switch_id,
-        #             status="online",
-        #         ),
-        #         Device(
-        #             name="CCTV-TALLO-BARAT-EXIT",
-        #             ip_address="192.168.2.103",
-        #             mac_address="00:11:22:33:44:04",
-        #             device_type="CCTV",
-        #             location_id=locations[1].location_id,
-        #             switch_id=switches[1].switch_id,
-        #             status="online",
-        #         ),
-        #     ]
-        #     db.add_all(devices)
-        #     db.commit()
-        #     print(f"Created {len(devices)} devices")
-
         print("DATABASE SEEDING COMPLETE")
 
         # Count all records
@@ -292,8 +212,6 @@ def seed_database():
         location_count = db.query(Location).count()
         node_count = db.query(NetworkNode).count()
         route_count = db.query(FORoute).count()
-        # switch_count = db.query(Switch).count()
-        # device_count = db.query(Device).count()
 
         print(f"\nCurrent Database State:")
         print(f"   - Users: {user_count}")
@@ -301,8 +219,6 @@ def seed_database():
         print(f"   - Locations: {location_count}")
         print(f"   - Network Nodes: {node_count}")
         print(f"   - FO Routes: {route_count}")
-        # print(f"   - Switches: {switch_count}")
-        # print(f"   - Devices: {device_count}")
 
     except Exception as e:
         print(f"\n❌ ERROR: {e}")

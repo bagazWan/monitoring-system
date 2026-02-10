@@ -3,6 +3,7 @@ import 'package:flutter_web_plugins/url_strategy.dart';
 import 'screens/auth/register_screen.dart';
 import 'screens/auth/auth_gate.dart';
 import 'screens/devices/register_node_screen.dart';
+import 'widgets/visual_feedback.dart';
 
 void main() {
   usePathUrlStrategy();
@@ -24,7 +25,7 @@ class MyApp extends StatelessWidget {
           brightness: Brightness.light,
         ),
       ),
-      home: const AuthGate(),
+      home: const ErrorBoundary(child: AuthGate()),
       routes: {
         '/register': (context) => const RegisterScreen(),
         '/register-node': (context) => const RegisterNodeScreen(),

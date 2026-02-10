@@ -4,6 +4,7 @@ import '../../../models/alert.dart';
 import '../../../services/alert_service.dart';
 import '../../../services/websocket_service.dart';
 import '../../../widgets/alert_card.dart';
+import '../../../widgets/visual_feedback.dart';
 import '../dialogs/alert_acknowledge_dialog.dart';
 import '../alert_filter_bar.dart';
 
@@ -91,6 +92,14 @@ class _ActiveAlertsTabState extends State<ActiveAlertsTab> {
     }).toList();
   }
 
+  void _clearFilters() {
+    setState(() {
+      _selectedSeverity = null;
+      _selectedLocation = null;
+      _applyFilters();
+    });
+  }
+
   Future<void> _openAcknowledgeDialog(Alert alert) async {
     final saved = await showDialog<bool>(
       context: context,
@@ -102,7 +111,12 @@ class _ActiveAlertsTabState extends State<ActiveAlertsTab> {
   @override
   Widget build(BuildContext context) {
     if (_isLoading) return const Center(child: CircularProgressIndicator());
-    if (_error != null) return Center(child: Text("Error: $_error"));
+    if (_error != null) {
+      return AsyncErrorWidget(
+        error: _error!,
+        onRetry: _fetchAlerts,
+      );
+    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -119,10 +133,18 @@ class _ActiveAlertsTabState extends State<ActiveAlertsTab> {
             _selectedLocation = val;
             _applyFilters();
           }),
+          onClear: (_selectedSeverity != null || _selectedLocation != null)
+              ? _clearFilters
+              : null,
         ),
         Expanded(
           child: _filteredAlerts.isEmpty
-              ? const Center(child: Text("No active alerts match filters"))
+              ? EmptyStateWidget(
+                  message: _allAlerts.isEmpty
+                      ? "No active alerts"
+                      : "No active alerts match filters",
+                  icon: Icons.notifications_off_outlined,
+                )
               : RefreshIndicator(
                   onRefresh: _fetchAlerts,
                   child: ListView.builder(

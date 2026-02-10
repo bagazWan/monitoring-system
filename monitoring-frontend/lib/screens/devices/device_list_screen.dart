@@ -8,7 +8,7 @@ import 'device_card.dart';
 import '../../models/device.dart';
 import '../../services/device_service.dart';
 import '../../services/websocket_service.dart';
-import '../../widgets/error_boundary.dart';
+import '../../widgets/visual_feedback.dart';
 import '../../widgets/search_bar.dart';
 import '../../widgets/pagination.dart';
 
@@ -333,6 +333,8 @@ class _DeviceListScreenState extends State<DeviceListScreen> {
                               foregroundColor: Colors.white,
                               padding: const EdgeInsets.symmetric(
                                   horizontal: 16, vertical: 12),
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8)),
                             ),
                           ),
                         ],
@@ -421,13 +423,29 @@ class _DeviceListScreenState extends State<DeviceListScreen> {
     }
 
     if (_filteredNodes.isEmpty) {
+      if (_searchQuery.isNotEmpty) {
+        return SliverFillRemaining(
+          child: EmptyStateWidget.searching(
+            isSearching: true,
+            searchQuery: _searchQuery,
+            label: 'devices',
+            defaultIcon: Icons.devices_other,
+          ),
+        );
+      }
+
       return SliverFillRemaining(
         child: EmptyStateWidget(
           message: _allNodes.isEmpty
               ? 'No devices found'
               : 'No devices match your filters',
           icon: Icons.devices_other,
-          onAction: _allNodes.isNotEmpty ? _clearFilters : null,
+          onAction: (_searchQuery.isNotEmpty ||
+                  _selectedType != null ||
+                  _selectedLocation != null ||
+                  _selectedStatus != null)
+              ? _clearFilters
+              : null,
           actionLabel: 'Clear Filters',
         ),
       );

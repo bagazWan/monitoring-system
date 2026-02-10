@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
 import '../../widgets/summary_card.dart';
+import '../../widgets/visual_feedback.dart';
 import '../../services/device_service.dart';
 import '../../services/websocket_service.dart';
 import '../../models/dashboard_stats.dart';
@@ -32,7 +33,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   void _initWebSocket() {
     final wsService = WebSocketService();
-
     wsService.connect();
 
     // Listen for connection state
@@ -103,12 +103,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     );
                   }
                   if (snapshot.hasError) {
-                    return Center(
-                      child: Text("Error: ${snapshot.error}"),
+                    return AsyncErrorWidget(
+                      error: snapshot.error!,
+                      onRetry: _handleManualRefresh,
                     );
                   }
                   if (!snapshot.hasData) {
-                    return const Center(child: Text("No data available"));
+                    return const EmptyStateWidget(
+                      message: "No data available",
+                      icon: Icons.dashboard_customize_outlined,
+                    );
                   }
                   final stats = snapshot.data!;
 

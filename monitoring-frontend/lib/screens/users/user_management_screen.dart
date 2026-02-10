@@ -3,6 +3,8 @@ import '../../models/user.dart';
 import '../../services/user_service.dart';
 import '../../widgets/search_bar.dart';
 import '../../widgets/pagination.dart';
+import '../../widgets/data_table.dart';
+import '../../widgets/visual_feedback.dart';
 import 'user_form_dialog.dart';
 
 class UserManagementScreen extends StatefulWidget {
@@ -21,7 +23,6 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
   final TextEditingController _searchController = TextEditingController();
   int _currentPage = 1;
   final int _itemsPerPage = 10;
-  final ScrollController _scrollController = ScrollController();
 
   @override
   void initState() {
@@ -37,7 +38,6 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
   @override
   void dispose() {
     _searchController.dispose();
-    _scrollController.dispose();
     super.dispose();
   }
 
@@ -189,7 +189,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                 ),
               ],
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 12),
             if (_isLoading)
               const Center(
                   child: Padding(
@@ -197,11 +197,70 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                 child: CircularProgressIndicator(),
               ))
             else if (_error != null)
-              Center(child: Text("Error: $_error"))
+              Center(
+                  child: AsyncErrorWidget(error: _error!, onRetry: _fetchUsers))
             else if (_filteredUsers.isEmpty)
-              _buildEmptyState()
+              EmptyStateWidget.searching(
+                isSearching: _searchController.text.isNotEmpty,
+                searchQuery: _searchController.text,
+                label: 'users',
+                defaultIcon: Icons.people_outline,
+              )
             else ...[
-              _buildUserTable(),
+              CustomDataTable(
+                columns: const [
+                  DataColumn(
+                      label: Expanded(
+                          child: Text("Username",
+                              style: TextStyle(fontWeight: FontWeight.bold)))),
+                  DataColumn(
+                      label: Expanded(
+                          child: Text("Full Name",
+                              style: TextStyle(fontWeight: FontWeight.bold)))),
+                  DataColumn(
+                      label: Expanded(
+                          child: Text("Email",
+                              style: TextStyle(fontWeight: FontWeight.bold)))),
+                  DataColumn(
+                      label: Expanded(
+                          child: Text("Role",
+                              textAlign: TextAlign.center,
+                              style: TextStyle(fontWeight: FontWeight.bold)))),
+                  DataColumn(
+                      label: Expanded(
+                          child: Text("Actions",
+                              textAlign: TextAlign.center,
+                              style: TextStyle(fontWeight: FontWeight.bold)))),
+                ],
+                rows: _paginatedUsers.map((user) {
+                  return DataRow(cells: [
+                    DataCell(Text(user.username,
+                        style: const TextStyle(fontWeight: FontWeight.w500))),
+                    DataCell(Text(user.fullName)),
+                    DataCell(Text(user.email)),
+                    DataCell(Center(child: _buildRoleBadge(user.role))),
+                    DataCell(Center(
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.edit,
+                                size: 18, color: Colors.blue),
+                            onPressed: () => _openUserDialog(user: user),
+                            tooltip: "Edit",
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.delete,
+                                size: 18, color: Colors.red),
+                            onPressed: () => _deleteUser(user),
+                            tooltip: "Delete",
+                          ),
+                        ],
+                      ),
+                    )),
+                  ]);
+                }).toList(),
+              ),
               const SizedBox(height: 16),
               if (_filteredUsers.isNotEmpty)
                 PaginationWidget(
@@ -212,95 +271,6 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
             ]
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildUserTable() {
-    return Card(
-      elevation: 0,
-      clipBehavior: Clip.antiAlias,
-      shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-          side: const BorderSide(color: Colors.black12)),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          return Scrollbar(
-            controller: _scrollController,
-            thumbVisibility: true,
-            trackVisibility: true,
-            child: SingleChildScrollView(
-              controller: _scrollController,
-              scrollDirection: Axis.horizontal,
-              child: ConstrainedBox(
-                constraints: BoxConstraints(minWidth: constraints.maxWidth),
-                child: DataTable(
-                  headingRowColor: MaterialStateProperty.all(Colors.grey[100]),
-                  showCheckboxColumn: false,
-                  dataRowMinHeight: 48,
-                  dataRowMaxHeight: 48,
-                  columns: const [
-                    DataColumn(
-                      label: Expanded(
-                          child: Text("Username",
-                              style: TextStyle(fontWeight: FontWeight.bold))),
-                    ),
-                    DataColumn(
-                      label: Expanded(
-                          child: Text("Full Name",
-                              style: TextStyle(fontWeight: FontWeight.bold))),
-                    ),
-                    DataColumn(
-                      label: Expanded(
-                          child: Text("Email",
-                              style: TextStyle(fontWeight: FontWeight.bold))),
-                    ),
-                    DataColumn(
-                      label: Expanded(
-                          child: Text("Role",
-                              textAlign: TextAlign.center,
-                              style: TextStyle(fontWeight: FontWeight.bold))),
-                    ),
-                    DataColumn(
-                      label: Expanded(
-                          child: Text("Actions",
-                              textAlign: TextAlign.center,
-                              style: TextStyle(fontWeight: FontWeight.bold))),
-                    ),
-                  ],
-                  rows: _paginatedUsers.map((user) {
-                    return DataRow(cells: [
-                      DataCell(Text(user.username,
-                          style: const TextStyle(fontWeight: FontWeight.w500))),
-                      DataCell(Text(user.fullName)),
-                      DataCell(Text(user.email)),
-                      DataCell(Center(child: _buildRoleBadge(user.role))),
-                      DataCell(Center(
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            IconButton(
-                              icon: const Icon(Icons.edit,
-                                  size: 18, color: Colors.blue),
-                              onPressed: () => _openUserDialog(user: user),
-                              tooltip: "Edit",
-                            ),
-                            IconButton(
-                              icon: const Icon(Icons.delete,
-                                  size: 18, color: Colors.red),
-                              onPressed: () => _deleteUser(user),
-                              tooltip: "Delete",
-                            ),
-                          ],
-                        ),
-                      )),
-                    ]);
-                  }).toList(),
-                ),
-              ),
-            ),
-          );
-        },
       ),
     );
   }
@@ -328,35 +298,6 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
         role.toUpperCase(),
         style:
             TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.bold),
-      ),
-    );
-  }
-
-  Widget _buildEmptyState() {
-    final isSearching = _searchController.text.isNotEmpty;
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(48),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            isSearching ? Icons.search_off : Icons.people_outline,
-            size: 48,
-            color: Colors.grey[400],
-          ),
-          const SizedBox(height: 16),
-          Text(
-            isSearching
-                ? "No user found matching \"${_searchController.text}\""
-                : "No users found",
-            style: TextStyle(
-              fontSize: 16,
-              color: Colors.grey[600],
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ],
       ),
     );
   }

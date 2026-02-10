@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../models/librenms_port.dart';
 import '../../../services/port_service.dart';
+import '../../../widgets/visual_feedback.dart';
 
 class DevicePortsTab extends StatefulWidget {
   final int? deviceId;
@@ -72,16 +73,9 @@ class _DevicePortsTabState extends State<DevicePortsTab> {
   Widget build(BuildContext context) {
     if (_loadingPorts) return const Center(child: CircularProgressIndicator());
     if (_ports.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.router_outlined, size: 64, color: Colors.grey[300]),
-            const SizedBox(height: 16),
-            Text("No ports found",
-                style: TextStyle(color: Colors.grey[500], fontSize: 16)),
-          ],
-        ),
+      return const EmptyStateWidget(
+        message: "No ports found",
+        icon: Icons.router_outlined,
       );
     }
 

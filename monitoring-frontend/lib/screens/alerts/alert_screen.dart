@@ -45,7 +45,7 @@ class _AlertScreenState extends State<AlertScreen>
         children: [
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.all(24.0),
+            padding: const EdgeInsets.fromLTRB(24.0, 24.0, 24.0, 12),
             child: const Text(
               'Incident Log',
               style: TextStyle(

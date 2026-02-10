@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-/// A widget that catches errors in its child widget tree and displays. Provides a fallback UI instead of crashing the app.
 class ErrorBoundary extends StatefulWidget {
   final Widget child;
   final Widget Function(FlutterErrorDetails error, VoidCallback retry)?
@@ -137,7 +136,6 @@ class _DefaultErrorWidget extends StatelessWidget {
   }
 }
 
-/// A simpler async error handler widget for FutureBuilder/StreamBuilder errors
 class AsyncErrorWidget extends StatelessWidget {
   final Object error;
   final VoidCallback? onRetry;
@@ -198,7 +196,6 @@ class AsyncErrorWidget extends StatelessWidget {
   }
 }
 
-/// Empty state widget when no data is available
 class EmptyStateWidget extends StatelessWidget {
   final String message;
   final IconData icon;
@@ -208,43 +205,74 @@ class EmptyStateWidget extends StatelessWidget {
   const EmptyStateWidget({
     super.key,
     required this.message,
-    this.icon = Icons.inbox_outlined,
+    required this.icon,
     this.onAction,
     this.actionLabel,
   });
 
+  factory EmptyStateWidget.searching({
+    required bool isSearching,
+    required String searchQuery,
+    String label = 'data',
+    IconData defaultIcon = Icons.list,
+    VoidCallback? onAction,
+    String? actionLabel,
+  }) {
+    if (isSearching) {
+      return EmptyStateWidget(
+        message: 'No $label found matching "$searchQuery"',
+        icon: Icons.search_off,
+        onAction: onAction,
+        actionLabel: actionLabel,
+      );
+    } else {
+      return EmptyStateWidget(
+        message: 'No $label found',
+        icon: defaultIcon,
+        onAction: onAction,
+        actionLabel: actionLabel,
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              icon,
-              size: 64,
-              color: Colors.grey[300],
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(48),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            icon,
+            size: 48,
+            color: Colors.grey[400],
+          ),
+          const SizedBox(height: 16),
+          Text(
+            message,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 16,
+              color: Colors.grey[600],
+              fontWeight: FontWeight.w500,
             ),
-            const SizedBox(height: 16),
-            Text(
-              message,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 16,
-                color: Colors.grey[600],
+          ),
+          if (onAction != null && actionLabel != null) ...[
+            const SizedBox(height: 24),
+            TextButton.icon(
+              onPressed: onAction,
+              style: TextButton.styleFrom(
+                foregroundColor: Colors.red,
+                side: const BorderSide(color: Colors.red),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
               ),
+              icon: const Icon(Icons.clear, size: 18),
+              label: Text(actionLabel!),
             ),
-            if (onAction != null && actionLabel != null) ...[
-              const SizedBox(height: 16),
-              ElevatedButton(
-                onPressed: onAction,
-                child: Text(actionLabel!),
-              ),
-            ],
           ],
-        ),
+        ],
       ),
     );
   }

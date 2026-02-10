@@ -6,6 +6,7 @@ class AlertFilterBar extends StatelessWidget {
   final VoidCallback? onRefresh;
   final String? selectedSeverity;
   final ValueChanged<String?>? onSeverityChanged;
+  final VoidCallback? onClear;
 
   // alert log tab filter
   final DateTimeRange? selectedDateRange;
@@ -30,6 +31,7 @@ class AlertFilterBar extends StatelessWidget {
     this.selectedLocation,
     this.locations,
     this.onLocationChanged,
+    this.onClear,
   });
 
   @override
@@ -98,7 +100,18 @@ class AlertFilterBar extends StatelessWidget {
             IconButton(
               icon: const Icon(Icons.refresh),
               onPressed: onRefresh,
-            )
+            ),
+          if (onClear != null)
+            TextButton.icon(
+              onPressed: onClear,
+              icon: const Icon(Icons.clear_all, size: 16),
+              label: const Text("Clear"),
+              style: TextButton.styleFrom(
+                foregroundColor: Colors.red[700],
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              ),
+            ),
         ],
       ),
     );

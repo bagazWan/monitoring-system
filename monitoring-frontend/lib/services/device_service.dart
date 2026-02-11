@@ -5,6 +5,7 @@ import '../models/dashboard_stats.dart';
 import '../models/device.dart';
 import '../models/location.dart';
 import '../models/switch_summary.dart';
+import '../models/network_node.dart';
 import '../services/auth_service.dart';
 
 class DeviceService {
@@ -122,7 +123,6 @@ class DeviceService {
       List<BaseNode> nodes) async {
     if (nodes.isEmpty) return {};
 
-    final headers = await _getHeaders();
     final Map<String, Map<String, dynamic>> results = {};
     final deviceIds = nodes
         .where((n) => n.nodeKind == 'device' && n.id != null)
@@ -137,7 +137,7 @@ class DeviceService {
     if (deviceIds.isNotEmpty) {
       futures.add(http.post(
         Uri.parse('${ApiConfig.devices}/bulk-live-details'),
-        headers: headers,
+        headers: await _getHeaders(),
         body: jsonEncode({'device_ids': deviceIds}),
       ));
     } else {
@@ -147,7 +147,7 @@ class DeviceService {
     if (switchIds.isNotEmpty) {
       futures.add(http.post(
         Uri.parse('${ApiConfig.switches}/bulk-live-details'),
-        headers: headers,
+        headers: await _getHeaders(),
         body: jsonEncode({'switch_ids': switchIds}),
       ));
     } else {
@@ -179,6 +179,20 @@ class DeviceService {
       return data.map((j) => Location.fromJson(j)).toList();
     }
     throw Exception('Failed to load locations');
+  }
+
+  Future<List<NetworkNode>> getNetworkNodes() async {
+    final response = await http.get(
+      Uri.parse(ApiConfig.networkNodes),
+      headers: await _getHeaders(),
+    );
+
+    if (response.statusCode == 200) {
+      final List<dynamic> data = json.decode(response.body);
+      return data.map((json) => NetworkNode.fromJson(json)).toList();
+    } else {
+      throw Exception('Failed to load network nodes');
+    }
   }
 
   Future<List<SwitchSummary>> getSwitches() async {

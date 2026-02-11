@@ -17,16 +17,13 @@ class PortsService {
     int? deviceId,
     int? switchId,
   }) async {
-    final headers = await _getHeaders();
-
     final query =
         deviceId != null ? '?device_id=$deviceId' : '?switch_id=$switchId';
 
     final response = await http.get(
-      Uri.parse(
-          '${ApiConfig.baseUrl}${ApiConfig.apiVersion}/librenms-ports$query'),
-      headers: headers,
-    );
+        Uri.parse(
+            '${ApiConfig.baseUrl}${ApiConfig.apiVersion}/librenms-ports$query'),
+        headers: await _getHeaders());
 
     if (response.statusCode == 200) {
       final List<dynamic> data = jsonDecode(response.body);
@@ -37,12 +34,10 @@ class PortsService {
   }
 
   Future<void> updatePort(int portRowId, Map<String, dynamic> payload) async {
-    final headers = await _getHeaders();
-
     final response = await http.patch(
       Uri.parse(
           '${ApiConfig.baseUrl}${ApiConfig.apiVersion}/librenms-ports/$portRowId'),
-      headers: headers,
+      headers: await _getHeaders(),
       body: jsonEncode(payload),
     );
 

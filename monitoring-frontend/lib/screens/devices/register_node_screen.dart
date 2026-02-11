@@ -3,6 +3,7 @@ import '../../services/device_service.dart';
 import '../../models/location.dart';
 import '../../models/switch_summary.dart';
 import '../../models/device.dart';
+import '../../models/network_node.dart';
 
 class RegisterNodeScreen extends StatefulWidget {
   final BaseNode? initialData;
@@ -31,9 +32,10 @@ class _RegisterNodeScreenState extends State<RegisterNodeScreen> {
   bool _forceAdd = false;
   int? _selectedLocationId;
   int? _selectedSwitchId;
-
+  int? _selectedNetworkNodeId;
   List<Location> _locations = [];
   List<SwitchSummary> _switches = [];
+  List<NetworkNode> _networkNodes = [];
 
   @override
   void initState() {
@@ -63,9 +65,11 @@ class _RegisterNodeScreenState extends State<RegisterNodeScreen> {
     try {
       final locations = await _service.getLocations();
       final switches = await _service.getSwitches();
+      final nodes = await _service.getNetworkNodes();
       setState(() {
         _locations = locations;
         _switches = switches;
+        _networkNodes = nodes;
       });
     } catch (e) {
       if (mounted) {
@@ -91,14 +95,19 @@ class _RegisterNodeScreenState extends State<RegisterNodeScreen> {
         "name": _nameController.text.trim().isEmpty
             ? null
             : _nameController.text.trim(),
-        "device_type": _deviceTypeController.text.trim().isEmpty
-            ? null
-            : _deviceTypeController.text.trim(),
-        "location_id": _selectedLocationId,
-        "switch_id": _selectedSwitchId,
         "description": _descriptionController.text.trim().isEmpty
             ? null
             : _descriptionController.text.trim(),
+        "location_id": _selectedLocationId,
+        if (_nodeType == 'device') ...{
+          "device_type": _deviceTypeController.text.trim().isEmpty
+              ? null
+              : _deviceTypeController.text.trim(),
+          "switch_id": _selectedSwitchId,
+        },
+        if (_nodeType == 'switch') ...{
+          "node_id": _selectedNetworkNodeId,
+        }
       };
       await _service.registerLibreNMS(payload);
 
@@ -210,6 +219,7 @@ class _RegisterNodeScreenState extends State<RegisterNodeScreen> {
                             _selectedSwitchId,
                             _switches,
                             (val) => setState(() => _selectedSwitchId = val)),
+                      if (_nodeType == 'switch') _buildNetworkNodeDropdown(),
                     ],
                   ),
                   const SizedBox(height: 16),
@@ -433,6 +443,27 @@ class _RegisterNodeScreenState extends State<RegisterNodeScreen> {
             borderRadius: BorderRadius.circular(8),
             borderSide: BorderSide(color: Colors.grey[300]!)),
       ),
+    );
+  }
+
+  Widget _buildNetworkNodeDropdown() {
+    return DropdownButtonFormField<int>(
+      value: _selectedNetworkNodeId,
+      items: _networkNodes
+          .map((node) => DropdownMenuItem<int>(
+                value: node.id,
+                child: Text(node.name ?? "Node #${node.id} (${node.type})",
+                    overflow: TextOverflow.ellipsis),
+              ))
+          .toList(),
+      onChanged: (val) => setState(() => _selectedNetworkNodeId = val),
+      decoration: InputDecoration(
+          labelText: "Network Node",
+          filled: true,
+          fillColor: Colors.grey[50],
+          border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: Colors.grey[300]!))),
     );
   }
 }

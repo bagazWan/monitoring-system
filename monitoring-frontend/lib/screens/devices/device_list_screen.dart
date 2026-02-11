@@ -446,7 +446,6 @@ class _DeviceListScreenState extends State<DeviceListScreen> {
                   _selectedStatus != null)
               ? _clearFilters
               : null,
-          actionLabel: 'Clear Filters',
         ),
       );
     }

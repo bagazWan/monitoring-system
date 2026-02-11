@@ -63,15 +63,11 @@ class _DeviceConfigScreenState extends State<DeviceConfigScreen>
     }
   }
 
-  Future<void> _onSave(String name, String ip, int? locId, String? desc) async {
+  Future<void> _onSave(Map<String, dynamic> data) async {
     if (_currentNode.id == null) return;
     try {
-      await _deviceService.updateNode(_currentNode.nodeKind, _currentNode.id!, {
-        "name": name,
-        "ip_address": ip,
-        "location_id": locId,
-        "description": desc,
-      });
+      await _deviceService.updateNode(
+          _currentNode.nodeKind, _currentNode.id!, data);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text("Settings saved successfully")));

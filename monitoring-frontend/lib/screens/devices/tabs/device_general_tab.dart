@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import '../../../models/device.dart';
 import '../../../models/location.dart';
+import '../../../models/switch_summary.dart';
+import '../../../models/network_node.dart';
+import '../../../services/device_service.dart';
 
-typedef SaveCallback = Future<void> Function(
-    String name, String ip, int? locId, String? desc);
+typedef SaveCallback = Future<void> Function(Map<String, dynamic> data);
 typedef DangerActionCallback = Future<void> Function(String action);
 
 class DeviceGeneralTab extends StatefulWidget {
@@ -31,7 +33,13 @@ class _DeviceGeneralTabState extends State<DeviceGeneralTab> {
   late TextEditingController _nameController;
   late TextEditingController _ipController;
   late TextEditingController _descController;
+  late TextEditingController _typeController;
   int? _selectedLocationId;
+  int? _selectedSwitchId;
+  int? _selectedNetworkNodeId;
+
+  List<SwitchSummary> _switches = [];
+  List<NetworkNode> _networkNodes = [];
   bool _saving = false;
 
   @override
@@ -41,7 +49,14 @@ class _DeviceGeneralTabState extends State<DeviceGeneralTab> {
     _ipController = TextEditingController(text: widget.node.ipAddress);
     _descController =
         TextEditingController(text: widget.node.description ?? "");
+    _typeController = TextEditingController(text: widget.node.deviceType ?? "");
     _selectedLocationId = widget.node.locationId;
+    if (widget.node.nodeKind == 'device') {
+      _selectedSwitchId = widget.node.switchId;
+    } else if (widget.node.nodeKind == 'switch') {
+      _selectedNetworkNodeId = widget.node.nodeId;
+    }
+    _fetchDropdowns();
   }
 
   @override
@@ -52,23 +67,47 @@ class _DeviceGeneralTabState extends State<DeviceGeneralTab> {
       _ipController.text = widget.node.ipAddress;
       _descController.text = widget.node.description ?? "";
       _selectedLocationId = widget.node.locationId;
+      _selectedSwitchId = widget.node.switchId;
+      _selectedNetworkNodeId = widget.node.nodeId;
     }
   }
 
   Future<void> _handleSave() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _saving = true);
-    await widget.onSave(
-      _nameController.text.trim(),
-      _ipController.text.trim(),
-      _selectedLocationId,
-      _descController.text.trim().isEmpty ? null : _descController.text.trim(),
-    );
+    await widget.onSave({
+      "name": _nameController.text.trim(),
+      "ip_address": _ipController.text.trim(),
+      "description": _descController.text.trim().isEmpty
+          ? null
+          : _descController.text.trim(),
+      "location_id": _selectedLocationId,
+      "device_type": _typeController.text.trim(),
+      "switch_id": _selectedSwitchId,
+      "node_id": _selectedNetworkNodeId,
+    });
     if (mounted) setState(() => _saving = false);
+  }
+
+  Future<void> _fetchDropdowns() async {
+    final service = DeviceService();
+    try {
+      if (widget.node.nodeKind == 'device') {
+        final sw = await service.getSwitches();
+        if (mounted) setState(() => _switches = sw);
+      } else {
+        final nodes = await service.getNetworkNodes();
+        if (mounted) setState(() => _networkNodes = nodes);
+      }
+    } catch (e) {
+      debugPrint("Error fetching dropdowns: $e");
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final bool isSwitch = widget.node.nodeKind == 'switch';
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
       child: Form(
@@ -80,6 +119,8 @@ class _DeviceGeneralTabState extends State<DeviceGeneralTab> {
               _buildTextField("Display Name", _nameController),
               const SizedBox(height: 16),
               _buildTextField("IP Address", _ipController),
+              const SizedBox(height: 16),
+              _buildTextField("Device Type", _typeController, required: false),
             ]),
             const SizedBox(height: 24),
             _buildSectionCard("Location & Details", [
@@ -92,6 +133,28 @@ class _DeviceGeneralTabState extends State<DeviceGeneralTab> {
                 onChanged: (val) => setState(() => _selectedLocationId = val),
                 decoration: _inputDecoration("Location"),
               ),
+              const SizedBox(height: 16),
+              if (!isSwitch)
+                DropdownButtonFormField<int>(
+                  value: _selectedSwitchId,
+                  items: _switches
+                      .map((s) =>
+                          DropdownMenuItem(value: s.id, child: Text(s.name)))
+                      .toList(),
+                  onChanged: (val) => setState(() => _selectedSwitchId = val),
+                  decoration: _inputDecoration("Connected Switch"),
+                ),
+              if (isSwitch)
+                DropdownButtonFormField<int>(
+                  value: _selectedNetworkNodeId,
+                  items: _networkNodes
+                      .map((n) => DropdownMenuItem(
+                          value: n.id, child: Text(n.name ?? "Node #${n.id}")))
+                      .toList(),
+                  onChanged: (val) =>
+                      setState(() => _selectedNetworkNodeId = val),
+                  decoration: _inputDecoration("Assigned Network Node"),
+                ),
               const SizedBox(height: 16),
               _buildTextField("Description", _descController,
                   maxLines: 3, required: false),

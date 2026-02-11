@@ -18,10 +18,9 @@ class AlertService {
   }
 
   Future<List<Alert>> getActiveAlerts() async {
-    final headers = await _getHeaders();
     final response = await http.get(
       Uri.parse('${ApiConfig.alerts}/active'),
-      headers: headers,
+      headers: await _getHeaders(),
     );
 
     if (response.statusCode == 200) {
@@ -38,8 +37,6 @@ class AlertService {
     String? severity,
     String? status, // null = all
   }) async {
-    final headers = await _getHeaders();
-
     final queryParams = <String>[];
 
     if (status != null && status.isNotEmpty) {
@@ -64,10 +61,8 @@ class AlertService {
 
     final query = queryParams.isEmpty ? '' : '?${queryParams.join('&')}';
 
-    final response = await http.get(
-      Uri.parse('${ApiConfig.alerts}/$query'),
-      headers: headers,
-    );
+    final response = await http.get(Uri.parse('${ApiConfig.alerts}/$query'),
+        headers: await _getHeaders());
 
     if (response.statusCode == 200) {
       final List<dynamic> data = json.decode(response.body);
@@ -78,10 +73,9 @@ class AlertService {
   }
 
   Future<void> acknowledgeAlert(int alertId, String resolutionNote) async {
-    final headers = await _getHeaders();
     final response = await http.patch(
       Uri.parse('${ApiConfig.alerts}/$alertId'),
-      headers: headers,
+      headers: await _getHeaders(),
       body: json.encode({
         'resolution_note': resolutionNote,
       }),

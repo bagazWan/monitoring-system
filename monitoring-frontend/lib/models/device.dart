@@ -42,6 +42,7 @@ class BaseNode {
         status: json['status'],
         locationId: json['location_id'],
         locationName: json['location_name'],
+        switchId: json['switch_id'],
         description: json['description'],
         lastReplacedAt: json['last_replaced_at'],
         librenmsId: json['librenms_device_id']);
@@ -71,6 +72,7 @@ class BaseNode {
         deviceType: 'Switch',
         locationName: json['location_name'],
         locationId: json['location_id'],
+        nodeId: json['node_id'],
         description: json['description'],
         lastReplacedAt: json['last_replaced_at'],
         librenmsId: json['librenms_device_id']);

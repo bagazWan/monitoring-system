@@ -6,12 +6,14 @@ from pydantic import BaseModel, Field
 
 class NetworkNodeCreate(BaseModel):
     location_id: int = Field(..., gt=0)
+    name: Optional[str] = None
     node_type: str = Field(..., min_length=1, max_length=255)
     description: Optional[str] = None
 
 
 class NetworkNodeUpdate(BaseModel):
     location_id: Optional[int] = Field(None, gt=0)
+    name: Optional[str] = None
     node_type: Optional[str] = Field(None, min_length=1, max_length=255)
     description: Optional[str] = None
 
@@ -19,6 +21,7 @@ class NetworkNodeUpdate(BaseModel):
 class NetworkNodeResponse(BaseModel):
     node_id: int
     location_id: int
+    name: Optional[str]
     node_type: str
     description: Optional[str]
     created_at: datetime

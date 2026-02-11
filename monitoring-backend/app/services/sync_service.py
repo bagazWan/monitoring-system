@@ -18,7 +18,7 @@ class SyncService:
         self, update_existing: bool = False
     ) -> Dict[str, Any]:
         """
-        Fetches all devices from LibreNMS and syncs them to DB
+        Fetches ALL devices from LibreNMS and syncs them to local DB.
         """
         all_devices = await self.librenms.get_devices()
 
@@ -46,7 +46,7 @@ class SyncService:
                         stats["created_switches"] += 1
                     logs.append(msg)
                 else:
-                    msg = self._process_device(lnms_dev, update_existing)
+                    msg = await self._process_device(lnms_dev, update_existing)
                     if "Created" in msg:
                         stats["created_devices"] += 1
                     if "Updated" in msg:
@@ -61,11 +61,9 @@ class SyncService:
         return {"stats": stats, "logs": logs}
 
     async def _process_switch(self, lnms_dev: dict) -> str:
-        librenms_id = lnms_dev.get("device_id")
-        existing_switch = (
-            self.db.query(Switch)
-            .filter(Switch.librenms_device_id == librenms_id)
-            .first()
+        librenms_id = int(lnms_dev.get("device_id"))
+        existing_switch = self._find_existing_switch(
+            librenms_id, lnms_dev.get("ip"), lnms_dev.get("hostname")
         )
 
         if existing_switch:
@@ -90,16 +88,18 @@ class SyncService:
             librenms_device_id=librenms_id,
             switch=new_switch,
         )
+        self.db.commit()
+
         return f"Created Switch: {new_switch.name}"
 
-    def _process_device(self, lnms_dev: dict, update_existing: bool) -> str:
-        librenms_id = lnms_dev.get("device_id")
+    async def _process_device(self, lnms_dev: dict, update_existing: bool) -> str:
+        librenms_id = int(lnms_dev.get("device_id"))
         ip = lnms_dev.get("ip")
         detected_type = self._determine_device_type(lnms_dev)
         status_str = "online" if lnms_dev.get("status") == 1 else "offline"
 
-        existing_device = (
-            self.db.query(Device).filter(Device.librenms_id == librenms_id).first()
+        existing_device = self._find_existing_device(
+            librenms_id, ip, lnms_dev.get("hostname")
         )
 
         if not existing_device:
@@ -107,17 +107,32 @@ class SyncService:
                 name=self._pick_display_name(lnms_dev),
                 ip_address=ip,
                 location_id=self.default_location_id,
-                librenms_id=librenms_id,
+                librenms_device_id=librenms_id,
+                librenms_hostname=lnms_dev.get("hostname"),
                 status=status_str,
                 device_type=detected_type,
-                last_synced_at=datetime.now(),
+                created_at=datetime.now(),
+                updated_at=datetime.now(),
             )
             self.db.add(new_device)
             self.db.commit()
+            self.db.refresh(new_device)
+
+            await discover_and_store_ports_for(
+                db=self.db,
+                librenms=self.librenms,
+                librenms_device_id=librenms_id,
+                device=new_device,
+            )
+            self.db.commit()
+
             return f"Created Device: {new_device.name} ({detected_type})"
 
         elif update_existing:
             updates_made = []
+
+            existing_device.librenms_device_id = librenms_id
+
             if existing_device.device_type != detected_type:
                 existing_device.device_type = detected_type
                 updates_made.append("type")
@@ -132,7 +147,15 @@ class SyncService:
                 existing_device.status = status_str
                 updates_made.append("status")
 
-            existing_device.last_synced_at = datetime.now()
+            existing_device.librenms_last_synced = datetime.now()
+
+            await discover_and_store_ports_for(
+                db=self.db,
+                librenms=self.librenms,
+                librenms_device_id=librenms_id,
+                device=existing_device,
+            )
+
             self.db.commit()
 
             if updates_made:
@@ -141,16 +164,67 @@ class SyncService:
 
         return f"Skipped Device: {existing_device.name} (Exists)"
 
+    def _find_existing_device(
+        self, librenms_id: int, ip: str, hostname: str
+    ) -> Optional[Device]:
+        """Matches by ID, then IP, then Hostname to avoid duplicates."""
+        existing = (
+            self.db.query(Device)
+            .filter(Device.librenms_device_id == librenms_id)
+            .first()
+        )
+        if existing:
+            return existing
+
+        if ip:
+            existing = self.db.query(Device).filter(Device.ip_address == ip).first()
+            if existing:
+                return existing
+
+        if hostname:
+            existing = (
+                self.db.query(Device)
+                .filter(Device.librenms_hostname == hostname)
+                .first()
+            )
+            if existing:
+                return existing
+
+        return None
+
+    def _find_existing_switch(
+        self, librenms_id: int, ip: str, hostname: str
+    ) -> Optional[Switch]:
+        existing = (
+            self.db.query(Switch)
+            .filter(Switch.librenms_device_id == librenms_id)
+            .first()
+        )
+        if existing:
+            return existing
+
+        if ip:
+            existing = self.db.query(Switch).filter(Switch.ip_address == ip).first()
+            if existing:
+                return existing
+
+        if hostname:
+            existing = (
+                self.db.query(Switch)
+                .filter(Switch.librenms_hostname == hostname)
+                .first()
+            )
+            if existing:
+                return existing
+
+        return None
+
     def _safe_set_device_ip(
         self, device: Device, new_ip: Optional[str]
     ) -> Optional[str]:
-        """
-        Update device.ip_address from LibreNMS if it does not conflict with another device.
-        """
         if not new_ip or device.ip_address == new_ip:
             return None
 
-        # Check for conflict with any other device (excluding self)
         conflict = (
             self.db.query(Device)
             .filter(Device.ip_address == new_ip, Device.device_id != device.device_id)

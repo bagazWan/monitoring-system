@@ -171,11 +171,13 @@ def seed_database():
             nodes = [
                 NetworkNode(
                     location_id=locations[0].location_id,
+                    name="ODP Kalbod",
                     node_type="FO_TERMINATION",
                     description="Main fiber termination at Kalbod",
                 ),
                 NetworkNode(
                     location_id=locations[1].location_id,
+                    name="ODP Tallo Barat",
                     node_type="FO_TERMINATION",
                     description="Fiber termination at Tallo Barat",
                 ),

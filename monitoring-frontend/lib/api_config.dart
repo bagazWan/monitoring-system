@@ -11,6 +11,7 @@ class ApiConfig {
   static const String switches = '$baseUrl$apiVersion/switches';
   static const String locations = '$baseUrl$apiVersion/locations';
   static const String networkNodes = '$baseUrl$apiVersion/network-nodes';
+  static const String mapTopology = '$baseUrl$apiVersion/map/topology';
   static const String alerts = '$baseUrl$apiVersion/alerts';
   static const String users = '$baseUrl$apiVersion/users';
   static const String dashboardStats = '$baseUrl$apiVersion/stats';

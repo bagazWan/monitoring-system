@@ -10,6 +10,7 @@ import 'dashboard/dashboard_screen.dart';
 import 'devices/device_list_screen.dart';
 import 'alerts/alert_screen.dart';
 import 'users/user_management_screen.dart';
+import 'map/map_screen.dart';
 
 class MainLayout extends StatefulWidget {
   const MainLayout({super.key});
@@ -26,7 +27,7 @@ class _MainLayoutState extends State<MainLayout> {
   final List<Widget> _pages = [
     const DashboardScreen(),
     const DeviceListScreen(),
-    const Center(child: Text("Map Visualization")),
+    const MapScreen(),
     const AlertScreen(),
     const UserManagementScreen(),
   ];

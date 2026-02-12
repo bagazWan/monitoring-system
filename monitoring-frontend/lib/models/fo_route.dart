@@ -2,7 +2,7 @@ class FORoute {
   final int id;
   final int startNodeId;
   final int endNodeId;
-  final int? length;
+  final double? length;
   final String? description;
 
   FORoute({
@@ -18,7 +18,7 @@ class FORoute {
       id: json['routes_id'],
       startNodeId: json['start_node_id'],
       endNodeId: json['end_node_id'],
-      length: json['length_m'],
+      length: (json['length_m'] as num?)?.toDouble(),
       description: json['description'],
     );
   }

@@ -51,6 +51,7 @@ class _MapViewState extends State<MapView> {
   @override
   void dispose() {
     _mapSub?.cancel();
+    _mapController.dispose();
     super.dispose();
   }
 
@@ -91,16 +92,29 @@ class _MapViewState extends State<MapView> {
           nodesAtLoc.any((n) => (n.status ?? '').toLowerCase() == 'offline');
       final anyOnline =
           nodesAtLoc.any((n) => (n.status ?? '').toLowerCase() == 'online');
-      final color =
+      final Color statusColor =
           anyOffline ? Colors.red : (anyOnline ? Colors.green : Colors.orange);
 
       return Marker(
-        width: 44,
-        height: 44,
+        width: 18,
+        height: 18,
         point: LatLng(loc.latitude, loc.longitude),
         child: GestureDetector(
           onTap: () => widget.onLocationTap(loc, nodesAtLoc),
-          child: Icon(Icons.location_on, size: 40, color: color),
+          child: Container(
+            decoration: BoxDecoration(
+              color: statusColor,
+              shape: BoxShape.circle,
+              border: Border.all(color: Colors.white, width: 2),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.2),
+                  blurRadius: 4,
+                  offset: const Offset(0, 2),
+                )
+              ],
+            ),
+          ),
         ),
       );
     }).toList();
@@ -119,6 +133,7 @@ class _MapViewState extends State<MapView> {
             TileLayer(
               urlTemplate: MapTileConfig.urlTemplate,
               userAgentPackageName: 'com.mmn.networkMonitoring',
+              tileProvider: NetworkTileProvider(silenceExceptions: true),
             ),
             if (widget.showRoutes) PolylineLayer(polylines: polylines),
             MarkerLayer(markers: markers),

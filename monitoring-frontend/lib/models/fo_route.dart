@@ -22,4 +22,13 @@ class FORoute {
       description: json['description'],
     );
   }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'start_node_id': startNodeId,
+      'end_node_id': endNodeId,
+      'length_m': length,
+      'description': description,
+    };
+  }
 }

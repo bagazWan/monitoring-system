@@ -22,4 +22,13 @@ class NetworkNode {
       description: json['description'],
     );
   }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'location_id': locationId,
+      'name': name,
+      'node_type': type,
+      'description': description,
+    };
+  }
 }

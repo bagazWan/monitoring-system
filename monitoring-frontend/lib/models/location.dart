@@ -3,6 +3,7 @@ class Location {
   final double latitude;
   final double longitude;
   final String? address;
+  final String? type;
   final String name;
   final String? description;
 
@@ -11,6 +12,7 @@ class Location {
     required this.latitude,
     required this.longitude,
     this.address,
+    this.type,
     required this.name,
     this.description,
   });
@@ -22,7 +24,18 @@ class Location {
       latitude: json['latitude'],
       longitude: json['longitude'],
       address: json['address'],
+      type: json['location_type'],
       description: json['description'],
     );
+  }
+  Map<String, dynamic> toJson() {
+    return {
+      'name': name,
+      'latitude': latitude,
+      'longitude': longitude,
+      'address': address,
+      'location_type': type,
+      'description': description,
+    };
   }
 }

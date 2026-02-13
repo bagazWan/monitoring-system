@@ -4,6 +4,7 @@ import 'screens/auth/register_screen.dart';
 import 'screens/auth/auth_gate.dart';
 import 'screens/devices/register_node_screen.dart';
 import 'widgets/visual_feedback.dart';
+import 'screens/map/location_management_screen.dart';
 
 void main() {
   usePathUrlStrategy();
@@ -29,6 +30,7 @@ class MyApp extends StatelessWidget {
       routes: {
         '/register': (context) => const RegisterScreen(),
         '/register-node': (context) => const RegisterNodeScreen(),
+        '/location-management': (context) => const LocationManagementScreen(),
       },
     );
   }

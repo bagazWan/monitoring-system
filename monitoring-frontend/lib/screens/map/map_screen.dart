@@ -159,6 +159,22 @@ class _MapScreenState extends State<MapScreen> {
                       side: const BorderSide(color: Colors.black12),
                       onSelected: (v) => setState(() => _showRoutes = v),
                     ),
+                    ElevatedButton.icon(
+                      onPressed: () async {
+                        await Navigator.pushNamed(
+                            context, '/location-management');
+                      },
+                      icon: const Icon(Icons.dataset, size: 18),
+                      label: const Text("Location Master Data"),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.blueAccent,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 12),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8)),
+                      ),
+                    ),
                   ],
                 ),
               ],

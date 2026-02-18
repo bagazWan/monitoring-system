@@ -34,6 +34,15 @@ class _UserFormDialogState extends State<UserFormDialog> {
     }
   }
 
+  @override
+  void dispose() {
+    _usernameController.dispose();
+    _fullNameController.dispose();
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
+
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _isLoading = true);

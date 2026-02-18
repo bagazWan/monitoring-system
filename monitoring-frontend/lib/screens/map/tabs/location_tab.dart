@@ -172,18 +172,24 @@ class _LocationTabState extends State<LocationTab> {
             CustomDataTable(
               columns: const [
                 DataColumn(
-                    label: Text("Name",
-                        style: TextStyle(fontWeight: FontWeight.bold))),
-                DataColumn(
-                    label: Text("Address",
-                        style: TextStyle(fontWeight: FontWeight.bold))),
-                DataColumn(
-                    label: Center(
-                        child: Text("Description",
+                    label: Expanded(
+                        child: Text("Name",
+                            textAlign: TextAlign.center,
                             style: TextStyle(fontWeight: FontWeight.bold)))),
                 DataColumn(
-                    label: Center(
+                    label: Expanded(
+                        child: Text("Address",
+                            textAlign: TextAlign.center,
+                            style: TextStyle(fontWeight: FontWeight.bold)))),
+                DataColumn(
+                    label: Expanded(
+                        child: Text("Description",
+                            textAlign: TextAlign.center,
+                            style: TextStyle(fontWeight: FontWeight.bold)))),
+                DataColumn(
+                    label: Expanded(
                         child: Text("Action",
+                            textAlign: TextAlign.center,
                             style: TextStyle(fontWeight: FontWeight.bold)))),
               ],
               rows: paginated

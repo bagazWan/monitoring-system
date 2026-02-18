@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:latlong2/latlong.dart';
+import '../../models/user.dart';
 import '../../models/device.dart';
 import '../../models/location.dart';
 import '../../models/map_topology.dart';
 import '../../services/map_service.dart';
+import '../../services/auth_service.dart';
 import 'widgets/map_details_panel.dart';
 import 'widgets/map_view.dart';
 
@@ -16,19 +18,18 @@ class MapScreen extends StatefulWidget {
 
 class _MapScreenState extends State<MapScreen> {
   static const double desktopBreakpoint = 900;
-
   final _service = MapService();
 
+  User? _currentUser;
+  bool get _isAdmin => _currentUser?.role == 'admin';
   bool _loading = true;
   String? _error;
   MapTopology? _topology;
 
   bool _hideEmptyLocations = true;
   bool _showRoutes = true;
-
   Location? _selectedLocation;
   List<BaseNode> _selectedNodesAtLocation = const [];
-
   bool _panelExpanded = false;
 
   bool _isDesktop(BuildContext context) =>
@@ -37,7 +38,17 @@ class _MapScreenState extends State<MapScreen> {
   @override
   void initState() {
     super.initState();
+    _checkUserRole();
     _load();
+  }
+
+  Future<void> _checkUserRole() async {
+    try {
+      final user = await AuthService().getCurrentUser();
+      if (mounted) setState(() => _currentUser = user);
+    } catch (e) {
+      debugPrint("Failed to load user role: $e");
+    }
   }
 
   Future<void> _load() async {
@@ -159,22 +170,24 @@ class _MapScreenState extends State<MapScreen> {
                       side: const BorderSide(color: Colors.black12),
                       onSelected: (v) => setState(() => _showRoutes = v),
                     ),
-                    ElevatedButton.icon(
-                      onPressed: () async {
-                        await Navigator.pushNamed(
-                            context, '/location-management');
-                      },
-                      icon: const Icon(Icons.dataset, size: 18),
-                      label: const Text("Location Master Data"),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.blueAccent,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 12),
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8)),
+                    if (_isAdmin) ...[
+                      ElevatedButton.icon(
+                        onPressed: () async {
+                          await Navigator.pushNamed(
+                              context, '/location-management');
+                        },
+                        icon: const Icon(Icons.dataset, size: 18),
+                        label: const Text("Location Master Data"),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.blueAccent,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 12),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8)),
+                        ),
                       ),
-                    ),
+                    ]
                   ],
                 ),
               ],

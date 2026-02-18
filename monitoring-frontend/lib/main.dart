@@ -8,6 +8,9 @@ import 'screens/map/location_management_screen.dart';
 
 void main() {
   usePathUrlStrategy();
+  WidgetsFlutterBinding.ensureInitialized();
+  PaintingBinding.instance.imageCache.maximumSize = 300;
+  PaintingBinding.instance.imageCache.maximumSizeBytes = 30 << 20;
   runApp(const MyApp());
 }
 

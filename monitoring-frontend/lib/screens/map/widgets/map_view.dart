@@ -52,6 +52,8 @@ class _MapViewState extends State<MapView> {
   void dispose() {
     _mapSub?.cancel();
     _mapController.dispose();
+    PaintingBinding.instance.imageCache.clear();
+    PaintingBinding.instance.imageCache.clearLiveImages();
     super.dispose();
   }
 
@@ -127,7 +129,7 @@ class _MapViewState extends State<MapView> {
             initialCenter: widget.center,
             initialZoom: 13.20,
             minZoom: 13,
-            maxZoom: 18,
+            maxZoom: 17,
           ),
           children: [
             TileLayer(

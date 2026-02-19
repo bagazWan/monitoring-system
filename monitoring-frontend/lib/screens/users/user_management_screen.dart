@@ -1,6 +1,8 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../models/user.dart';
 import '../../services/user_service.dart';
+import '../../services/websocket_service.dart';
 import '../../widgets/search_bar.dart';
 import '../../widgets/pagination.dart';
 import '../../widgets/data_table.dart';
@@ -16,6 +18,7 @@ class UserManagementScreen extends StatefulWidget {
 
 class _UserManagementScreenState extends State<UserManagementScreen> {
   final UserService _userService = UserService();
+  StreamSubscription<StatusChangeEvent>? _statusSubscription;
   bool _isLoading = true;
   List<User> _users = [];
   String? _error;
@@ -28,6 +31,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
   void initState() {
     super.initState();
     _fetchUsers();
+    _initWebSocket();
     _searchController.addListener(() {
       setState(() {
         _currentPage = 1;
@@ -38,7 +42,25 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
   @override
   void dispose() {
     _searchController.dispose();
+    _statusSubscription?.cancel();
     super.dispose();
+  }
+
+  void _initWebSocket() {
+    final wsService = WebSocketService();
+    _statusSubscription = wsService.statusChanges.listen((event) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${event.name} is now ${event.newStatus}'),
+            backgroundColor: event.newStatus.toLowerCase() == 'online'
+                ? Colors.green
+                : Colors.red,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    });
   }
 
   Future<void> _fetchUsers() async {

@@ -90,12 +90,23 @@ class _MapViewState extends State<MapView> {
     final markers = widget.visibleLocations.map((loc) {
       final nodesAtLoc = widget.nodesByLocation[loc.id] ?? [];
 
-      final anyOffline =
-          nodesAtLoc.any((n) => (n.status ?? '').toLowerCase() == 'offline');
-      final anyOnline =
-          nodesAtLoc.any((n) => (n.status ?? '').toLowerCase() == 'online');
-      final Color statusColor =
-          anyOffline ? Colors.red : (anyOnline ? Colors.green : Colors.orange);
+      Color statusColor;
+      if (nodesAtLoc.isEmpty) {
+        statusColor = Colors.grey;
+      } else {
+        final bool allOffline = nodesAtLoc
+            .every((n) => (n.status ?? '').toLowerCase() == 'offline');
+        final bool allOnline =
+            nodesAtLoc.every((n) => (n.status ?? '').toLowerCase() == 'online');
+
+        if (allOffline) {
+          statusColor = Colors.red;
+        } else if (allOnline) {
+          statusColor = Colors.green;
+        } else {
+          statusColor = Colors.orange;
+        }
+      }
 
       return Marker(
         width: 18,

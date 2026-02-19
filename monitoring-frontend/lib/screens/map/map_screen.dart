@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:latlong2/latlong.dart';
 import '../../models/user.dart';
@@ -6,6 +7,7 @@ import '../../models/location.dart';
 import '../../models/map_topology.dart';
 import '../../services/map_service.dart';
 import '../../services/auth_service.dart';
+import '../../services/websocket_service.dart';
 import 'widgets/map_details_panel.dart';
 import 'widgets/map_view.dart';
 
@@ -19,6 +21,7 @@ class MapScreen extends StatefulWidget {
 class _MapScreenState extends State<MapScreen> {
   static const double desktopBreakpoint = 900;
   final _service = MapService();
+  StreamSubscription<StatusChangeEvent>? _statusSubscription;
 
   User? _currentUser;
   bool get _isAdmin => _currentUser?.role == 'admin';
@@ -40,6 +43,44 @@ class _MapScreenState extends State<MapScreen> {
     super.initState();
     _checkUserRole();
     _load();
+    _initWebSocket();
+  }
+
+  @override
+  void dispose() {
+    _statusSubscription?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _refreshDataSilent() async {
+    try {
+      final topo = await _service.getTopology();
+      if (mounted) {
+        setState(() {
+          _topology = topo;
+        });
+      }
+    } catch (e) {
+      debugPrint("Background refresh failed: $e");
+    }
+  }
+
+  void _initWebSocket() {
+    final wsService = WebSocketService();
+    _statusSubscription = wsService.statusChanges.listen((event) {
+      if (mounted) {
+        _refreshDataSilent();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${event.name} is now ${event.newStatus}'),
+            backgroundColor: event.newStatus.toLowerCase() == 'online'
+                ? Colors.green
+                : Colors.red,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    });
   }
 
   Future<void> _checkUserRole() async {

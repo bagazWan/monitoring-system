@@ -16,3 +16,17 @@ class DashboardStats(BaseModel):
     total_bandwidth: Optional[float]
     uptime_percentage: float
     top_down_locations: List[LocationDownSummary]
+    top_down_window_days: int
+    cctv_total: int
+    cctv_online: int
+    cctv_uptime_percentage: float
+
+
+class UptimeTrendPoint(BaseModel):
+    date: str
+    uptime_percentage: float
+
+
+class UptimeTrendResponse(BaseModel):
+    days: int
+    data: List[UptimeTrendPoint]

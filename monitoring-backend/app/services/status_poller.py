@@ -1,12 +1,12 @@
 import asyncio
 import logging
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 from sqlalchemy.orm import Session
 
 from app.core.database import SessionLocal
-from app.models import Device, Switch
+from app.models import Device, StatusHistory, Switch
 from app.services.librenms_service import LibreNMSService
 from app.services.websocket_manager import ws_manager
 
@@ -71,6 +71,15 @@ async def poll_and_broadcast_status(libre_service: LibreNMSService) -> int:
                 device.status = new_status
                 device.librenms_last_synced = datetime.now()
 
+                db.add(
+                    StatusHistory(
+                        node_type="device",
+                        node_id=device.device_id,
+                        status=new_status,
+                        changed_at=datetime.now(),
+                    )
+                )
+
                 # Broadcast status change
                 await ws_manager.broadcast(
                     {
@@ -113,6 +122,15 @@ async def poll_and_broadcast_status(libre_service: LibreNMSService) -> int:
                 # Update database
                 switch.status = new_status
                 switch.librenms_last_synced = datetime.now()
+
+                db.add(
+                    StatusHistory(
+                        node_type="switch",
+                        node_id=switch.switch_id,
+                        status=new_status,
+                        changed_at=datetime.now(),
+                    )
+                )
 
                 # Broadcast status change
                 await ws_manager.broadcast(

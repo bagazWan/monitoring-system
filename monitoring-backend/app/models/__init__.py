@@ -7,6 +7,7 @@ from app.models.location import Location
 from app.models.network_node import NetworkNode
 from app.models.problem_category import ProblemCategory
 from app.models.replacement import DeviceReplacement, SwitchReplacement
+from app.models.status_history import StatusHistory
 from app.models.switch import Switch
 from app.models.user import User
 
@@ -25,4 +26,5 @@ __all__ = [
     "Alert",
     "DeviceReplacement",
     "LibreNMSPort",
+    "StatusHistory",
 ]

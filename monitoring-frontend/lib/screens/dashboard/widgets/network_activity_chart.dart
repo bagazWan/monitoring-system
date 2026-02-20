@@ -329,7 +329,7 @@ class _NetworkActivityChartState extends State<NetworkActivityChart> {
       return const SizedBox.shrink();
     }
 
-    final time = widget.data[index].timestamp;
+    final time = widget.data[index].timestamp.toLocal();
     final label =
         '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
 

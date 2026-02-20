@@ -18,6 +18,30 @@ class LocationDownSummary {
   }
 }
 
+class DashboardTraffic {
+  final DateTime timestamp;
+  final double? inboundMbps;
+  final double? outboundMbps;
+
+  DashboardTraffic({
+    required this.timestamp,
+    required this.inboundMbps,
+    required this.outboundMbps,
+  });
+
+  factory DashboardTraffic.fromJson(Map<String, dynamic> json) {
+    return DashboardTraffic(
+      timestamp: DateTime.parse(json['timestamp']),
+      inboundMbps: json['inbound_mbps'] == null
+          ? null
+          : (json['inbound_mbps'] as num).toDouble(),
+      outboundMbps: json['outbound_mbps'] == null
+          ? null
+          : (json['outbound_mbps'] as num).toDouble(),
+    );
+  }
+}
+
 class DashboardStats {
   final int totalDevices;
   final int onlineDevices;
@@ -25,6 +49,10 @@ class DashboardStats {
   final double? totalBandwidth;
   final double uptimePercentage;
   final List<LocationDownSummary> topDownLocations;
+  final int topDownWindowDays;
+  final int cctvTotal;
+  final int cctvOnline;
+  final double cctvUptimePercentage;
 
   DashboardStats({
     required this.totalDevices,
@@ -33,6 +61,10 @@ class DashboardStats {
     required this.totalBandwidth,
     required this.uptimePercentage,
     required this.topDownLocations,
+    required this.topDownWindowDays,
+    required this.cctvTotal,
+    required this.cctvOnline,
+    required this.cctvUptimePercentage,
   });
 
   factory DashboardStats.fromJson(Map<String, dynamic> json) {
@@ -48,6 +80,45 @@ class DashboardStats {
       topDownLocations: (json['top_down_locations'] as List? ?? [])
           .map((item) => LocationDownSummary.fromJson(item))
           .toList(),
+      topDownWindowDays: json['top_down_window_days'] ?? 7,
+      cctvTotal: json['cctv_total'] ?? 0,
+      cctvOnline: json['cctv_online'] ?? 0,
+      cctvUptimePercentage: (json['cctv_uptime_percentage'] ?? 0.0).toDouble(),
+    );
+  }
+}
+
+class UptimeTrendPoint {
+  final DateTime date;
+  final double uptimePercentage;
+
+  UptimeTrendPoint({
+    required this.date,
+    required this.uptimePercentage,
+  });
+
+  factory UptimeTrendPoint.fromJson(Map<String, dynamic> json) {
+    return UptimeTrendPoint(
+      date: DateTime.parse(json['date']),
+      uptimePercentage: (json['uptime_percentage'] as num).toDouble(),
+    );
+  }
+}
+
+class UptimeTrendResponse {
+  final int days;
+  final List<UptimeTrendPoint> data;
+
+  UptimeTrendResponse({
+    required this.days,
+    required this.data,
+  });
+
+  factory UptimeTrendResponse.fromJson(Map<String, dynamic> json) {
+    final raw = json['data'] as List? ?? [];
+    return UptimeTrendResponse(
+      days: json['days'] ?? 7,
+      data: raw.map((e) => UptimeTrendPoint.fromJson(e)).toList(),
     );
   }
 }

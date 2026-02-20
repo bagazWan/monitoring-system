@@ -16,6 +16,10 @@ class ApiConfig {
   static const String alerts = '$baseUrl$apiVersion/alerts';
   static const String users = '$baseUrl$apiVersion/users';
   static const String dashboardStats = '$baseUrl$apiVersion/dashboard/stats';
+  static const String dashboardTraffic =
+      '$baseUrl$apiVersion/dashboard/traffic';
+  static const String dashboardUptimeTrend =
+      '$baseUrl$apiVersion/dashboard/uptime-trend';
   static const String syncLibreNMS = '$baseUrl$apiVersion/sync/from-librenms';
   static const String deviceList = '$baseUrl$apiVersion/devices/with-locations';
   static const String switchList =

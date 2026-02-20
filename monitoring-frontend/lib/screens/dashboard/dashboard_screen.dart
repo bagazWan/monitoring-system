@@ -3,10 +3,14 @@ import 'package:flutter/material.dart';
 import '../../models/dashboard_stats.dart';
 import '../../models/location.dart';
 import '../../services/device_service.dart';
+import '../../services/dashboard_service.dart';
 import '../../services/websocket_service.dart';
-import '../../widgets/filter_dropdown.dart';
-import '../../widgets/summary_card.dart';
 import '../../widgets/visual_feedback.dart';
+import 'widgets/network_activity_chart.dart';
+import 'widgets/dashboard_filters.dart';
+import 'widgets/summary_grid.dart';
+import 'widgets/top_down.dart';
+import 'widgets/dashboard_charts.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -17,9 +21,11 @@ class DashboardScreen extends StatefulWidget {
 
 class _DashboardScreenState extends State<DashboardScreen> {
   final DeviceService _deviceService = DeviceService();
+  final DashboardService _dashboardService = DashboardService();
 
   late Future<DashboardStats> _dashboardStatsFuture;
   Timer? _refreshTimer;
+  Timer? _trafficTimer;
   StreamSubscription<StatusChangeEvent>? _statusSubscription;
   StreamSubscription<WebSocketConnectionState>? _connectionSubscription;
 
@@ -27,13 +33,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
   bool _isLoadingLocations = true;
   String? _selectedLocationName; // null == All
 
+  final List<NetworkActivityData> _trafficData = [];
+  final int _maxTrafficPoints = 60;
+  final List<UptimeTrendPoint> _uptimeTrendData = [];
+  int _topDownWindowDays = 7;
+  bool _isTrafficLoading = true;
+  bool _isUptimeLoading = true;
+
   @override
   void initState() {
     super.initState();
-    _dashboardStatsFuture = _deviceService.getDashboardStats();
+    _dashboardStatsFuture = _dashboardService.getDashboardStats(
+      topDownWindowDays: _topDownWindowDays,
+    );
     _initLocations();
     _initWebSocket();
-
+    _initTraffic();
+    _refreshUptimeTrend();
     _refreshTimer = Timer.periodic(const Duration(seconds: 30), (_) {
       _refreshDashboard();
     });
@@ -71,6 +87,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
     });
   }
 
+  void _initTraffic() {
+    _refreshTraffic();
+    _trafficTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+      _refreshTraffic();
+    });
+  }
+
   int? _resolveSelectedLocationId() {
     if (_selectedLocationName == null) return null;
     final match = _locations.where((l) => l.name == _selectedLocationName);
@@ -81,19 +104,86 @@ class _DashboardScreenState extends State<DashboardScreen> {
   void _refreshDashboard() {
     if (!mounted) return;
     setState(() {
-      _dashboardStatsFuture = _deviceService.getDashboardStats(
-          locationId: _resolveSelectedLocationId());
+      _dashboardStatsFuture = _dashboardService.getDashboardStats(
+        locationId: _resolveSelectedLocationId(),
+        topDownWindowDays: _topDownWindowDays,
+      );
     });
+  }
+
+  Future<void> _refreshTraffic() async {
+    try {
+      final traffic = await _dashboardService.getDashboardTraffic(
+        locationId: _resolveSelectedLocationId(),
+      );
+
+      if (!mounted) return;
+
+      if (traffic.inboundMbps == null && traffic.outboundMbps == null) {
+        setState(() {
+          _isTrafficLoading = false;
+        });
+        return;
+      }
+
+      final dataPoint = NetworkActivityData(
+        timestamp: traffic.timestamp,
+        inbound: traffic.inboundMbps ?? 0,
+        outbound: traffic.outboundMbps ?? 0,
+      );
+
+      setState(() {
+        _trafficData.add(dataPoint);
+        if (_trafficData.length > _maxTrafficPoints) {
+          _trafficData.removeAt(0);
+        }
+        _isTrafficLoading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _isTrafficLoading = false;
+      });
+    }
+  }
+
+  Future<void> _refreshUptimeTrend() async {
+    try {
+      final trend = await _dashboardService.getUptimeTrend(days: 7);
+      if (!mounted) return;
+      setState(() {
+        _uptimeTrendData
+          ..clear()
+          ..addAll(trend.data);
+        _isUptimeLoading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _isUptimeLoading = false;
+      });
+    }
   }
 
   Future<void> _handleManualRefresh() async {
     _refreshDashboard();
+    await _refreshTraffic();
+    await _refreshUptimeTrend();
     await _dashboardStatsFuture;
+  }
+
+  void _resetTrafficData() {
+    setState(() {
+      _trafficData.clear();
+      _isTrafficLoading = true;
+    });
+    _refreshTraffic();
   }
 
   @override
   void dispose() {
     _refreshTimer?.cancel();
+    _trafficTimer?.cancel();
     _statusSubscription?.cancel();
     _connectionSubscription?.cancel();
     super.dispose();
@@ -139,197 +229,56 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     "Overview",
                     style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
                   ),
-                  const SizedBox(height: 14),
-                  _buildFilterRow(),
+                  const SizedBox(height: 16),
+                  DashboardFilters(
+                    isLoading: _isLoadingLocations,
+                    locations: _locations,
+                    selectedLocationName: _selectedLocationName,
+                    onLocationChanged: (value) {
+                      setState(() {
+                        _selectedLocationName = value;
+                        _dashboardStatsFuture =
+                            _dashboardService.getDashboardStats(
+                          locationId: _resolveSelectedLocationId(),
+                          topDownWindowDays: _topDownWindowDays,
+                        );
+                      });
+                      _resetTrafficData();
+                    },
+                  ),
                   const SizedBox(height: 20),
-                  _buildGridSummary(stats, offlineCount),
+                  DashboardSummaryGrid(
+                    stats: stats,
+                    offlineCount: offlineCount,
+                  ),
                   const SizedBox(height: 30),
-                  _buildTopDownSection(stats),
+                  DashboardTopDown(
+                    stats: stats,
+                    selectedWindowDays: _topDownWindowDays,
+                    onWindowChanged: (window) {
+                      setState(() {
+                        _topDownWindowDays = window;
+                        _dashboardStatsFuture =
+                            _dashboardService.getDashboardStats(
+                          locationId: _resolveSelectedLocationId(),
+                          topDownWindowDays: _topDownWindowDays,
+                        );
+                      });
+                    },
+                  ),
                   const SizedBox(height: 30),
-                  _buildVisualizationPlaceholder(),
+                  DashboardCharts(
+                    trafficData: _trafficData,
+                    isTrafficLoading: _isTrafficLoading,
+                    uptimeData: _uptimeTrendData,
+                    isUptimeLoading: _isUptimeLoading,
+                  ),
                 ],
               );
             },
           ),
         ),
       ),
-    );
-  }
-
-  Widget _buildFilterRow() {
-    if (_isLoadingLocations) {
-      return const SizedBox(
-        height: 36,
-        child: Align(
-          alignment: Alignment.centerLeft,
-          child: SizedBox(
-            height: 16,
-            width: 16,
-            child: CircularProgressIndicator(strokeWidth: 2),
-          ),
-        ),
-      );
-    }
-
-    final locationNames = _locations.map((e) => e.name).toList();
-
-    return Wrap(
-      spacing: 10,
-      runSpacing: 10,
-      children: [
-        SizedBox(
-          width: 220,
-          child: FilterDropdown(
-            label: "Location",
-            value: _selectedLocationName,
-            items: locationNames,
-            onChanged: (value) {
-              setState(() {
-                _selectedLocationName = value;
-                _dashboardStatsFuture = _deviceService.getDashboardStats(
-                  locationId: _resolveSelectedLocationId(),
-                );
-              });
-            },
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildGridSummary(DashboardStats stats, int offlineCount) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        int crossAxisCount = 4;
-        if (constraints.maxWidth < 600) {
-          crossAxisCount = 1;
-        } else if (constraints.maxWidth < 1100) {
-          crossAxisCount = 2;
-        }
-
-        return GridView.count(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          crossAxisCount: crossAxisCount,
-          crossAxisSpacing: 20,
-          mainAxisSpacing: 20,
-          childAspectRatio: constraints.maxWidth < 600 ? 3.0 : 1.8,
-          children: [
-            SummaryCard(
-              title: "Availability",
-              value: "${stats.uptimePercentage.toStringAsFixed(2)}%",
-              icon: Icons.health_and_safety_outlined,
-              iconColor: Colors.green,
-              subtitle: "${stats.onlineDevices}/${stats.totalDevices} online",
-            ),
-            SummaryCard(
-              title: "Active Alerts",
-              value: stats.activeAlerts.toString(),
-              icon: Icons.warning_amber_rounded,
-              iconColor: Colors.orange,
-              subtitle: "Unresolved issues",
-            ),
-            SummaryCard(
-              title: "Devices Down",
-              value: offlineCount.toString(),
-              icon: Icons.portable_wifi_off,
-              iconColor: Colors.redAccent,
-              subtitle: "Current offline count",
-            ),
-            SummaryCard(
-              title: "Observed Throughput",
-              value: stats.totalBandwidth == null
-                  ? "N/A"
-                  : "${stats.totalBandwidth!.toStringAsFixed(2)} Mbps",
-              icon: Icons.speed,
-              iconColor: Colors.purple,
-              subtitle: stats.totalBandwidth == null
-                  ? "No valid LibreNMS rate data"
-                  : "Aggregate in+out traffic",
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  Widget _buildTopDownSection(DashboardStats stats) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          "Top Down Locations",
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-        ),
-        const SizedBox(height: 10),
-        if (stats.topDownLocations.isEmpty)
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.grey.shade200),
-            ),
-            child: const Text("No down locations right now."),
-          )
-        else
-          Container(
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.grey.shade200),
-            ),
-            child: ListView.separated(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: stats.topDownLocations.length,
-              separatorBuilder: (_, __) =>
-                  Divider(height: 1, color: Colors.grey.shade200),
-              itemBuilder: (context, index) {
-                final item = stats.topDownLocations[index];
-                return ListTile(
-                  leading: CircleAvatar(
-                    backgroundColor: Colors.red.withOpacity(0.12),
-                    child: Text("${index + 1}",
-                        style: const TextStyle(color: Colors.red)),
-                  ),
-                  title: Text(item.locationName),
-                  trailing: Text(
-                    "${item.offlineCount} offline",
-                    style: const TextStyle(
-                        color: Colors.redAccent, fontWeight: FontWeight.w600),
-                  ),
-                );
-              },
-            ),
-          ),
-      ],
-    );
-  }
-
-  Widget _buildVisualizationPlaceholder() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          "Performance Visualizations",
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-        ),
-        const SizedBox(height: 10),
-        Container(
-          height: 280,
-          width: double.infinity,
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.grey.shade200),
-          ),
-          child: const Center(
-            child: Text("Uptime, Latency, and Bandwidth trend charts"),
-          ),
-        ),
-      ],
     );
   }
 }

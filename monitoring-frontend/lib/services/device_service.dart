@@ -1,7 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../api_config.dart';
-import '../models/dashboard_stats.dart';
 import '../models/device.dart';
 import '../models/location.dart';
 import '../models/switch_summary.dart';
@@ -15,33 +14,6 @@ class DeviceService {
       'Content-Type': 'application/json',
       'Authorization': 'Bearer $token',
     };
-  }
-
-  Future<DashboardStats> getDashboardStats({int? locationId}) async {
-    String url = ApiConfig.dashboardStats;
-    if (locationId != null) {
-      url += "?location_id=$locationId";
-    }
-
-    final response = await http.get(
-      Uri.parse(url),
-      headers: await _getHeaders(),
-    );
-
-    if (response.statusCode == 200) {
-      return DashboardStats.fromJson(jsonDecode(response.body));
-    }
-    throw Exception('Failed to load dashboard stats');
-  }
-
-  Future<DashboardStats> getDashboardSummary() async {
-    final response = await http.get(Uri.parse(ApiConfig.dashboardStats));
-
-    if (response.statusCode == 200) {
-      return DashboardStats.fromJson(jsonDecode(response.body));
-    } else {
-      throw Exception('Failed to load dashboard summary');
-    }
   }
 
   Future<List<BaseNode>> getAllNodes() async {
@@ -87,21 +59,6 @@ class DeviceService {
       }
     } else {
       throw Exception('Failed to load node details');
-    }
-  }
-
-  Future<void> syncFromLibreNMS() async {
-    final response = await http.post(
-      Uri.parse(ApiConfig.syncLibreNMS),
-      headers: await _getHeaders(),
-      body: jsonEncode({
-        "default_location_id": 1,
-        "update_existing": true,
-      }),
-    );
-
-    if (response.statusCode != 200) {
-      throw Exception('Sync failed: ${response.body}');
     }
   }
 

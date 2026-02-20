@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../../widgets/side_menu.dart';
 import '../../widgets/alert_notification.dart';
 import '../../services/auth_service.dart';
-import '../../services/device_service.dart';
+import '../../services/sync_service.dart';
 import '../../services/websocket_service.dart';
 import '../../models/user.dart';
 import 'dashboard/dashboard_screen.dart';
@@ -91,7 +91,7 @@ class _MainLayoutState extends State<MainLayout> {
     );
 
     try {
-      await DeviceService().syncFromLibreNMS();
+      await SyncService().syncFromLibreNMS();
 
       if (context.mounted) {
         Navigator.pop(context);

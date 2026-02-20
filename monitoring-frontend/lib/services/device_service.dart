@@ -17,14 +17,21 @@ class DeviceService {
     };
   }
 
-  Future<Map<String, dynamic>> fetchDashboardStats() async {
-    final response = await http.get(Uri.parse(ApiConfig.dashboardStats));
+  Future<DashboardStats> getDashboardStats({int? locationId}) async {
+    String url = ApiConfig.dashboardStats;
+    if (locationId != null) {
+      url += "?location_id=$locationId";
+    }
+
+    final response = await http.get(
+      Uri.parse(url),
+      headers: await _getHeaders(),
+    );
 
     if (response.statusCode == 200) {
-      return jsonDecode(response.body);
-    } else {
-      throw Exception('Failed to load dashboard stats');
+      return DashboardStats.fromJson(jsonDecode(response.body));
     }
+    throw Exception('Failed to load dashboard stats');
   }
 
   Future<DashboardStats> getDashboardSummary() async {

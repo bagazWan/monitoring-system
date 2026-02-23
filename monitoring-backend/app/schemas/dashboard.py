@@ -30,3 +30,8 @@ class UptimeTrendPoint(BaseModel):
 class UptimeTrendResponse(BaseModel):
     days: int
     data: List[UptimeTrendPoint]
+
+
+class DeviceTypeStats(BaseModel):
+    device_type: str
+    count: int

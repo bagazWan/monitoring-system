@@ -57,9 +57,15 @@ class DashboardService {
     throw Exception('Failed to load dashboard traffic');
   }
 
-  Future<UptimeTrendResponse> getUptimeTrend({int days = 7}) async {
+  Future<UptimeTrendResponse> getUptimeTrend(
+      {int days = 7, int? locationId}) async {
+    final params = <String, String>{'days': days.toString()};
+    if (locationId != null) {
+      params['location_id'] = locationId.toString();
+    }
+
     final uri = Uri.parse(ApiConfig.dashboardUptimeTrend)
-        .replace(queryParameters: {'days': days.toString()});
+        .replace(queryParameters: params);
 
     final response = await http.get(
       uri,

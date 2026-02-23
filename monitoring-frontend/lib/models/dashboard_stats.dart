@@ -49,6 +49,7 @@ class DashboardStats {
   final double? totalBandwidth;
   final double uptimePercentage;
   final List<LocationDownSummary> topDownLocations;
+  final List<DeviceTypeStats> deviceTypeStats;
   final int topDownWindowDays;
   final int cctvTotal;
   final int cctvOnline;
@@ -61,6 +62,7 @@ class DashboardStats {
     required this.totalBandwidth,
     required this.uptimePercentage,
     required this.topDownLocations,
+    required this.deviceTypeStats,
     required this.topDownWindowDays,
     required this.cctvTotal,
     required this.cctvOnline,
@@ -79,6 +81,9 @@ class DashboardStats {
       uptimePercentage: (json['uptime_percentage'] ?? 0.0).toDouble(),
       topDownLocations: (json['top_down_locations'] as List? ?? [])
           .map((item) => LocationDownSummary.fromJson(item))
+          .toList(),
+      deviceTypeStats: (json['device_type_stats'] as List? ?? [])
+          .map((e) => DeviceTypeStats.fromJson(e))
           .toList(),
       topDownWindowDays: json['top_down_window_days'] ?? 7,
       cctvTotal: json['cctv_total'] ?? 0,
@@ -119,6 +124,23 @@ class UptimeTrendResponse {
     return UptimeTrendResponse(
       days: json['days'] ?? 7,
       data: raw.map((e) => UptimeTrendPoint.fromJson(e)).toList(),
+    );
+  }
+}
+
+class DeviceTypeStats {
+  final String deviceType;
+  final int count;
+
+  DeviceTypeStats({
+    required this.deviceType,
+    required this.count,
+  });
+
+  factory DeviceTypeStats.fromJson(Map<String, dynamic> json) {
+    return DeviceTypeStats(
+      deviceType: json['device_type'] ?? 'Unknown',
+      count: json['count'] ?? 0,
     );
   }
 }

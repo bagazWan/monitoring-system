@@ -1,9 +1,9 @@
 import asyncio
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, time, timedelta, timezone
 from typing import Optional, Tuple
 
-from sqlalchemy import func, or_
+from sqlalchemy import and_, func, or_
 from sqlalchemy.orm import Session
 
 from app.models import (
@@ -82,6 +82,162 @@ def _get_ports_for_location(db: Session, location_id: Optional[int]):
         return enabled_ports
 
     return ports_query.all()
+
+
+def _add_interval(day_map, start: datetime, end: datetime, is_online: bool):
+    if end <= start:
+        return
+
+    current = start
+    while current < end:
+        day_start = datetime.combine(current.date(), time.min, tzinfo=current.tzinfo)
+        day_end = day_start + timedelta(days=1)
+        slice_end = min(day_end, end)
+        seconds = (slice_end - current).total_seconds()
+
+        if current.date() in day_map:
+            day_map[current.date()]["total"] += seconds
+            if is_online:
+                day_map[current.date()]["online"] += seconds
+
+        current = slice_end
+
+
+def build_uptime_trend(
+    db: Session, days: int, location_id: Optional[int] = None
+) -> dict:
+    now = datetime.now(timezone.utc)
+    window_start = (now - timedelta(days=days - 1)).replace(
+        hour=0, minute=0, second=0, microsecond=0
+    )
+
+    dev_query = db.query(Device.device_id, Device.status)
+    sw_query = db.query(Switch.switch_id, Switch.status)
+
+    if location_id:
+        dev_query = dev_query.filter(Device.location_id == location_id)
+        sw_query = sw_query.filter(Switch.location_id == location_id)
+
+    devices = dev_query.all()
+    switches = sw_query.all()
+
+    node_keys = [("device", d.device_id, d.status) for d in devices] + [
+        ("switch", s.switch_id, s.status) for s in switches
+    ]
+
+    if not node_keys:
+        return {"days": 0, "data": []}
+
+    device_ids = {d.device_id for d in devices}
+    switch_ids = {s.switch_id for s in switches}
+
+    filters = []
+    if device_ids:
+        filters.append(
+            and_(
+                StatusHistory.node_type == "device",
+                StatusHistory.node_id.in_(device_ids),
+            )
+        )
+    if switch_ids:
+        filters.append(
+            and_(
+                StatusHistory.node_type == "switch",
+                StatusHistory.node_id.in_(switch_ids),
+            )
+        )
+
+    if not filters:
+        return {"days": 0, "data": []}
+
+    earliest_history = (
+        db.query(func.min(StatusHistory.changed_at)).filter(or_(*filters)).scalar()
+    )
+
+    has_recent_history = (
+        db.query(StatusHistory.history_id)
+        .filter(StatusHistory.changed_at >= window_start)
+        .filter(or_(*filters))
+        .first()
+        is not None
+    )
+
+    if earliest_history is None:
+        start_dt = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    elif has_recent_history:
+        start_dt = window_start
+    else:
+        start_dt = earliest_history.replace(hour=0, minute=0, second=0, microsecond=0)
+
+    days_span = (now.date() - start_dt.date()).days + 1
+    day_map = {
+        (start_dt.date() + timedelta(days=i)): {"online": 0.0, "total": 0.0}
+        for i in range(days_span)
+    }
+
+    history_rows = (
+        db.query(StatusHistory)
+        .filter(StatusHistory.changed_at >= start_dt)
+        .filter(or_(*filters))
+        .order_by(StatusHistory.changed_at.asc())
+        .all()
+    )
+
+    last_sub = (
+        db.query(
+            StatusHistory.node_type,
+            StatusHistory.node_id,
+            func.max(StatusHistory.changed_at).label("last_changed_at"),
+        )
+        .filter(StatusHistory.changed_at < start_dt)
+        .filter(or_(*filters))
+        .group_by(StatusHistory.node_type, StatusHistory.node_id)
+        .subquery()
+    )
+
+    last_rows = (
+        db.query(StatusHistory.node_type, StatusHistory.node_id, StatusHistory.status)
+        .join(
+            last_sub,
+            and_(
+                StatusHistory.node_type == last_sub.c.node_type,
+                StatusHistory.node_id == last_sub.c.node_id,
+                StatusHistory.changed_at == last_sub.c.last_changed_at,
+            ),
+        )
+        .all()
+    )
+
+    last_status_map = {(row.node_type, row.node_id): row.status for row in last_rows}
+
+    history_map = {}
+    for row in history_rows:
+        key = (row.node_type, row.node_id)
+        history_map.setdefault(key, []).append(row)
+
+    for node_type, node_id, current_status in node_keys:
+        key = (node_type, node_id)
+        events = history_map.get(key, [])
+        status = last_status_map.get(key, current_status)
+        cursor = start_dt
+
+        for ev in events:
+            _add_interval(day_map, cursor, ev.changed_at, status == "online")
+            status = ev.status
+            cursor = ev.changed_at
+
+        _add_interval(day_map, cursor, now, status == "online")
+
+    data = []
+    for day in sorted(day_map.keys()):
+        total = day_map[day]["total"]
+        online = day_map[day]["online"]
+        pct = (online / total * 100) if total > 0 else 0.0
+        data.append(
+            {"date": day.strftime("%Y-%m-%d"), "uptime_percentage": round(pct, 2)}
+        )
+
+    return {"days": len(data), "data": data}
 
 
 async def _aggregate_port_rates(
@@ -187,6 +343,42 @@ async def build_dashboard_stats(
         .all()
     )
 
+    device_type_rows = (
+        dev_query.with_entities(
+            func.coalesce(func.lower(func.trim(Device.device_type)), "unknown").label(
+                "device_type"
+            ),
+            func.count(Device.device_id).label("count"),
+        )
+        .group_by(func.coalesce(func.lower(func.trim(Device.device_type)), "unknown"))
+        .all()
+    )
+
+    breakdown_map = {row.device_type: int(row.count) for row in device_type_rows}
+
+    if total_switches > 0:
+        breakdown_map["switch"] = breakdown_map.get("switch", 0) + total_switches
+
+    def _format_device_type(value: str) -> str:
+        if value == "cctv":
+            return "CCTV"
+        if value == "switch":
+            return "Switch"
+        if value == "router":
+            return "Router"
+        if value == "access_point":
+            return "Access Point"
+        if value == "unknown":
+            return "Unknown"
+        return value.replace("_", " ").title()
+
+    device_type_stats = [
+        {"device_type": _format_device_type(key), "count": value}
+        for key, value in sorted(
+            breakdown_map.items(), key=lambda item: (-item[1], item[0])
+        )
+    ]
+
     merged = {}
     for row in dev_down + sw_down:
         loc_id = row.location_id
@@ -224,6 +416,7 @@ async def build_dashboard_stats(
         "cctv_total": cctv_total,
         "cctv_online": cctv_online,
         "cctv_uptime_percentage": round(cctv_uptime, 2),
+        "device_type_stats": device_type_stats,
     }
 
 
@@ -234,45 +427,3 @@ async def build_dashboard_traffic(*, db: Session, location_id: Optional[int]) ->
         "inbound_mbps": round(total_in, 2) if data_found else None,
         "outbound_mbps": round(total_out, 2) if data_found else None,
     }
-
-
-def build_uptime_trend(db: Session, days: int) -> dict:
-    end_date = datetime.now(timezone.utc).date()
-    start_date = end_date - timedelta(days=days - 1)
-
-    day_map = {
-        (start_date + timedelta(days=i)): {"online": 0, "total": 0} for i in range(days)
-    }
-
-    # count status changes per day
-    rows = (
-        db.query(
-            func.date(StatusHistory.changed_at).label("day"),
-            StatusHistory.status.label("status"),
-            func.count(StatusHistory.history_id).label("count"),
-        )
-        .filter(StatusHistory.changed_at >= start_date)
-        .group_by(func.date(StatusHistory.changed_at), StatusHistory.status)
-        .all()
-    )
-
-    for row in rows:
-        day = row.day
-        if day in day_map:
-            day_map[day]["total"] += int(row.count)
-            if row.status == "online":
-                day_map[day]["online"] += int(row.count)
-
-    data = []
-    for day, counts in sorted(day_map.items()):
-        total = counts["total"]
-        online = counts["online"]
-        pct = (online / total * 100) if total > 0 else 0.0
-        data.append(
-            {
-                "date": day.strftime("%Y-%m-%d"),
-                "uptime_percentage": round(pct, 2),
-            }
-        )
-
-    return {"days": days, "data": data}

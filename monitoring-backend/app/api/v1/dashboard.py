@@ -34,6 +34,7 @@ async def get_dashboard_traffic(
 @router.get("/uptime-trend")
 def get_uptime_trend(
     days: int = Query(7, ge=1, le=30),
+    location_id: Optional[int] = Query(None),
     db: Session = Depends(get_db),
 ):
-    return build_uptime_trend(db, days)
+    return build_uptime_trend(db, days, location_id=location_id)

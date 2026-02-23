@@ -112,10 +112,10 @@ class _UptimeTrendChart extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            "Uptime Trend",
+            "Devices Uptime/Availability",
             style: TextStyle(fontWeight: FontWeight.bold),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 12),
           Expanded(
             child: isLoading
                 ? const Center(child: CircularProgressIndicator(strokeWidth: 2))

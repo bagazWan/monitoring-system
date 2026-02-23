@@ -52,6 +52,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     _refreshUptimeTrend();
     _refreshTimer = Timer.periodic(const Duration(seconds: 30), (_) {
       _refreshDashboard();
+      _refreshUptimeTrend();
     });
   }
 
@@ -84,6 +85,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     _statusSubscription = wsService.statusChanges.listen((_) {
       if (!mounted) return;
       _refreshDashboard();
+      _refreshUptimeTrend();
     });
   }
 
@@ -149,7 +151,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Future<void> _refreshUptimeTrend() async {
     try {
-      final trend = await _dashboardService.getUptimeTrend(days: 7);
+      final trend = await _dashboardService.getUptimeTrend(
+        days: 7,
+        locationId: _resolveSelectedLocationId(),
+      );
       if (!mounted) return;
       setState(() {
         _uptimeTrendData
@@ -192,93 +197,99 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   Widget build(BuildContext context) {
     return RefreshIndicator(
-      onRefresh: _handleManualRefresh,
-      child: SingleChildScrollView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: FutureBuilder<DashboardStats>(
-            future: _dashboardStatsFuture,
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting &&
-                  !snapshot.hasData) {
-                return const Center(child: CircularProgressIndicator());
-              }
-
-              if (snapshot.hasError) {
-                return AsyncErrorWidget(
-                  error: snapshot.error!,
-                  onRetry: _handleManualRefresh,
-                );
-              }
-
-              if (!snapshot.hasData) {
-                return const EmptyStateWidget(
-                  message: "No dashboard data available",
-                  icon: Icons.dashboard_customize_outlined,
-                );
-              }
-
-              final stats = snapshot.data!;
-              final offlineCount = stats.totalDevices - stats.onlineDevices;
-
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    "Overview",
-                    style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 16),
-                  DashboardFilters(
-                    isLoading: _isLoadingLocations,
-                    locations: _locations,
-                    selectedLocationName: _selectedLocationName,
-                    onLocationChanged: (value) {
-                      setState(() {
-                        _selectedLocationName = value;
-                        _dashboardStatsFuture =
-                            _dashboardService.getDashboardStats(
-                          locationId: _resolveSelectedLocationId(),
-                          topDownWindowDays: _topDownWindowDays,
-                        );
-                      });
-                      _resetTrafficData();
-                    },
-                  ),
-                  const SizedBox(height: 20),
-                  DashboardSummaryGrid(
-                    stats: stats,
-                    offlineCount: offlineCount,
-                  ),
-                  const SizedBox(height: 30),
-                  DashboardTopDown(
-                    stats: stats,
-                    selectedWindowDays: _topDownWindowDays,
-                    onWindowChanged: (window) {
-                      setState(() {
-                        _topDownWindowDays = window;
-                        _dashboardStatsFuture =
-                            _dashboardService.getDashboardStats(
-                          locationId: _resolveSelectedLocationId(),
-                          topDownWindowDays: _topDownWindowDays,
-                        );
-                      });
-                    },
-                  ),
-                  const SizedBox(height: 30),
-                  DashboardCharts(
-                    trafficData: _trafficData,
-                    isTrafficLoading: _isTrafficLoading,
-                    uptimeData: _uptimeTrendData,
-                    isUptimeLoading: _isUptimeLoading,
-                  ),
-                ],
-              );
-            },
+        onRefresh: _handleManualRefresh,
+        child: ScrollConfiguration(
+          behavior: ScrollConfiguration.of(context).copyWith(
+            scrollbars: false,
           ),
-        ),
-      ),
-    );
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: FutureBuilder<DashboardStats>(
+                future: _dashboardStatsFuture,
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting &&
+                      !snapshot.hasData) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+
+                  if (snapshot.hasError) {
+                    return AsyncErrorWidget(
+                      error: snapshot.error!,
+                      onRetry: _handleManualRefresh,
+                    );
+                  }
+
+                  if (!snapshot.hasData) {
+                    return const EmptyStateWidget(
+                      message: "No dashboard data available",
+                      icon: Icons.dashboard_customize_outlined,
+                    );
+                  }
+
+                  final stats = snapshot.data!;
+                  final offlineCount = stats.totalDevices - stats.onlineDevices;
+
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        "Overview",
+                        style: TextStyle(
+                            fontSize: 24, fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 16),
+                      DashboardFilters(
+                        isLoading: _isLoadingLocations,
+                        locations: _locations,
+                        selectedLocationName: _selectedLocationName,
+                        onLocationChanged: (value) {
+                          setState(() {
+                            _selectedLocationName = value;
+                            _dashboardStatsFuture =
+                                _dashboardService.getDashboardStats(
+                              locationId: _resolveSelectedLocationId(),
+                              topDownWindowDays: _topDownWindowDays,
+                            );
+                          });
+                          _resetTrafficData();
+                          _refreshUptimeTrend();
+                        },
+                      ),
+                      const SizedBox(height: 20),
+                      DashboardSummaryGrid(
+                        stats: stats,
+                        offlineCount: offlineCount,
+                      ),
+                      const SizedBox(height: 30),
+                      DashboardCharts(
+                        trafficData: _trafficData,
+                        isTrafficLoading: _isTrafficLoading,
+                        uptimeData: _uptimeTrendData,
+                        isUptimeLoading: _isUptimeLoading,
+                      ),
+                      const SizedBox(height: 30),
+                      DashboardTopDown(
+                        stats: stats,
+                        selectedWindowDays: _topDownWindowDays,
+                        onWindowChanged: (window) {
+                          setState(() {
+                            _topDownWindowDays = window;
+                            _dashboardStatsFuture =
+                                _dashboardService.getDashboardStats(
+                              locationId: _resolveSelectedLocationId(),
+                              topDownWindowDays: _topDownWindowDays,
+                            );
+                          });
+                        },
+                      ),
+                    ],
+                  );
+                },
+              ),
+            ),
+          ),
+        ));
   }
 }

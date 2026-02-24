@@ -1,10 +1,14 @@
-from sqlalchemy import Column, DateTime, Integer, String, func
+from sqlalchemy import Column, DateTime, Index, Integer, String, func
 
 from app.core.database import Base
 
 
 class StatusHistory(Base):
     __tablename__ = "status_history"
+    __table_args__ = (
+        Index("ix_status_history_node_changed", "node_type", "node_id", "changed_at"),
+        Index("ix_status_history_status", "status"),
+    )
 
     history_id = Column(Integer, primary_key=True, autoincrement=True)
     node_type = Column(String(32), nullable=False)

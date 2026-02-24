@@ -9,6 +9,8 @@ class ApiConfig {
   static const String me = '$baseUrl$apiVersion/auth/me';
   static const String devices = '$baseUrl$apiVersion/devices';
   static const String switches = '$baseUrl$apiVersion/switches';
+  static const String deviceNodes = '$baseUrl$apiVersion/devices/nodes';
+  static const String deviceTypes = '$baseUrl$apiVersion/devices/types';
   static const String locations = '$baseUrl$apiVersion/locations';
   static const String networkNodes = '$baseUrl$apiVersion/network-nodes';
   static const String foRoutes = '$baseUrl$apiVersion/fo-routes';

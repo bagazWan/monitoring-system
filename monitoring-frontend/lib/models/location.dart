@@ -39,3 +39,27 @@ class Location {
     };
   }
 }
+
+class LocationPage {
+  final List<Location> items;
+  final int total;
+  final int page;
+  final int pageSize;
+
+  LocationPage({
+    required this.items,
+    required this.total,
+    required this.page,
+    required this.pageSize,
+  });
+
+  factory LocationPage.fromJson(Map<String, dynamic> json) {
+    final raw = json['items'] as List? ?? [];
+    return LocationPage(
+      items: raw.map((e) => Location.fromJson(e)).toList(),
+      total: json['total'] ?? 0,
+      page: json['page'] ?? 1,
+      pageSize: json['page_size'] ?? 10,
+    );
+  }
+}

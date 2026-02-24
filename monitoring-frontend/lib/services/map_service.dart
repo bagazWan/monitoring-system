@@ -28,12 +28,40 @@ class MapService {
     throw Exception('Failed to load topology: ${response.body}');
   }
 
+  Future<LocationPage> getLocationsPage({
+    int page = 1,
+    int limit = 10,
+    String? search,
+  }) async {
+    final params = <String, String>{
+      'page': page.toString(),
+      'limit': limit.toString(),
+    };
+    if (search != null && search.isNotEmpty) {
+      params['search'] = search;
+    }
+
+    final uri = Uri.parse(ApiConfig.locations).replace(queryParameters: params);
+    final response = await http.get(uri, headers: await _getHeaders());
+
+    if (response.statusCode == 200) {
+      return LocationPage.fromJson(jsonDecode(response.body));
+    }
+    throw Exception('Failed to load locations');
+  }
+
   Future<List<Location>> getLocations() async {
     final response = await http.get(Uri.parse(ApiConfig.locations),
         headers: await _getHeaders());
     if (response.statusCode == 200) {
-      final List data = jsonDecode(response.body);
-      return data.map((j) => Location.fromJson(j)).toList();
+      final data = jsonDecode(response.body);
+      if (data is List) {
+        return data.map((j) => Location.fromJson(j)).toList();
+      }
+      if (data is Map<String, dynamic>) {
+        final items = data['items'] as List? ?? [];
+        return items.map((j) => Location.fromJson(j)).toList();
+      }
     }
     throw Exception('Failed to load locations');
   }
@@ -70,6 +98,33 @@ class MapService {
     }
   }
 
+  Future<NetworkNodePage> getNetworkNodesPage({
+    int page = 1,
+    int limit = 10,
+    String? search,
+    int? locationId,
+  }) async {
+    final params = <String, String>{
+      'page': page.toString(),
+      'limit': limit.toString(),
+    };
+    if (search != null && search.isNotEmpty) {
+      params['search'] = search;
+    }
+    if (locationId != null) {
+      params['location_id'] = locationId.toString();
+    }
+
+    final uri =
+        Uri.parse(ApiConfig.networkNodes).replace(queryParameters: params);
+    final response = await http.get(uri, headers: await _getHeaders());
+
+    if (response.statusCode == 200) {
+      return NetworkNodePage.fromJson(jsonDecode(response.body));
+    }
+    throw Exception('Failed to load nodes');
+  }
+
   Future<List<NetworkNode>> getNetworkNodes() async {
     final response = await http.get(
       Uri.parse(ApiConfig.networkNodes),
@@ -77,8 +132,14 @@ class MapService {
     );
 
     if (response.statusCode == 200) {
-      final List data = jsonDecode(response.body);
-      return data.map((j) => NetworkNode.fromJson(j)).toList();
+      final data = jsonDecode(response.body);
+      if (data is List) {
+        return data.map((j) => NetworkNode.fromJson(j)).toList();
+      }
+      if (data is Map<String, dynamic>) {
+        final items = data['items'] as List? ?? [];
+        return items.map((j) => NetworkNode.fromJson(j)).toList();
+      }
     }
     throw Exception('Failed to load nodes');
   }
@@ -114,13 +175,49 @@ class MapService {
     }
   }
 
+  Future<FORoutePage> getFORoutesPage({
+    int page = 1,
+    int limit = 10,
+    String? search,
+    int? startNodeId,
+    int? endNodeId,
+  }) async {
+    final params = <String, String>{
+      'page': page.toString(),
+      'limit': limit.toString(),
+    };
+    if (search != null && search.isNotEmpty) {
+      params['search'] = search;
+    }
+    if (startNodeId != null) {
+      params['start_node_id'] = startNodeId.toString();
+    }
+    if (endNodeId != null) {
+      params['end_node_id'] = endNodeId.toString();
+    }
+
+    final uri = Uri.parse(ApiConfig.foRoutes).replace(queryParameters: params);
+    final response = await http.get(uri, headers: await _getHeaders());
+
+    if (response.statusCode == 200) {
+      return FORoutePage.fromJson(jsonDecode(response.body));
+    }
+    throw Exception('Failed to load routes');
+  }
+
   Future<List<FORoute>> getFORoutes() async {
     final response = await http.get(Uri.parse(ApiConfig.foRoutes),
         headers: await _getHeaders());
 
     if (response.statusCode == 200) {
-      final List data = jsonDecode(response.body);
-      return data.map((j) => FORoute.fromJson(j)).toList();
+      final data = jsonDecode(response.body);
+      if (data is List) {
+        return data.map((j) => FORoute.fromJson(j)).toList();
+      }
+      if (data is Map<String, dynamic>) {
+        final items = data['items'] as List? ?? [];
+        return items.map((j) => FORoute.fromJson(j)).toList();
+      }
     }
     throw Exception('Failed to load routes');
   }

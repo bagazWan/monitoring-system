@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../../models/user.dart';
 import '../../services/auth_service.dart';
@@ -20,15 +19,18 @@ class DeviceListScreen extends StatefulWidget {
 }
 
 class _DeviceListScreenState extends State<DeviceListScreen> {
-  List<BaseNode> _allNodes = [];
-  List<BaseNode> _filteredNodes = [];
+  List<BaseNode> _nodes = [];
+  int _totalItems = 0;
+
   bool _isLoading = true;
   String? _error;
   User? _currentUser;
   bool get _isAdmin => _currentUser?.role == 'admin';
+
   StreamSubscription<StatusChangeEvent>? _statusSubscription;
   Map<String, Map<String, dynamic>> _liveStats = {};
   Timer? _batchTimer;
+  Timer? _searchDebounce;
 
   // Search & Filters
   final TextEditingController _searchController = TextEditingController();
@@ -42,12 +44,13 @@ class _DeviceListScreenState extends State<DeviceListScreen> {
   // Pagination
   int _currentPage = 1;
   int _itemsPerPage = 10;
-  final List<int> _itemsPerPageOptions = [10, 25, 50, 100];
 
   @override
   void initState() {
     super.initState();
     _checkUserRole();
+    _loadDeviceTypes();
+    _loadLocations();
     _fetchNodes();
     _initWebSocket();
     _searchController.addListener(_onSearchChanged);
@@ -66,14 +69,14 @@ class _DeviceListScreenState extends State<DeviceListScreen> {
   void _startBatchPolling() {
     _batchTimer?.cancel();
     _batchTimer = Timer.periodic(const Duration(seconds: 5), (_) {
-      if (mounted && _filteredNodes.isNotEmpty) {
+      if (mounted && _nodes.isNotEmpty) {
         _fetchBatchLiveStats();
       }
     });
   }
 
   Future<void> _fetchBatchLiveStats() async {
-    final visibleNodes = _paginatedNodes;
+    final visibleNodes = _nodes;
     if (visibleNodes.isEmpty) return;
 
     try {
@@ -93,15 +96,37 @@ class _DeviceListScreenState extends State<DeviceListScreen> {
     _searchController.dispose();
     _statusSubscription?.cancel();
     _batchTimer?.cancel();
+    _searchDebounce?.cancel();
     super.dispose();
   }
 
   void _onSearchChanged() {
-    setState(() {
-      _searchQuery = _searchController.text.toLowerCase();
-      _currentPage = 1;
-      _applyFilters();
+    _searchDebounce?.cancel();
+    _searchDebounce = Timer(const Duration(milliseconds: 350), () {
+      setState(() {
+        _searchQuery = _searchController.text.trim();
+        _currentPage = 1;
+      });
+      _fetchNodes();
     });
+  }
+
+  Future<void> _loadDeviceTypes() async {
+    try {
+      final types = await DeviceService().getDeviceTypes();
+      if (!mounted) return;
+      setState(() => _deviceTypes = types);
+    } catch (_) {}
+  }
+
+  Future<void> _loadLocations() async {
+    try {
+      final locations = await DeviceService().getLocations();
+      if (!mounted) return;
+      setState(() {
+        _locations = locations.map((l) => l.name).toList()..sort();
+      });
+    } catch (_) {}
   }
 
   Future<void> _fetchNodes() async {
@@ -111,9 +136,16 @@ class _DeviceListScreenState extends State<DeviceListScreen> {
     });
 
     try {
-      final nodes = await DeviceService().getAllNodes();
+      final page = await DeviceService().getNodesPage(
+        search: _searchQuery,
+        locationName: _selectedLocation,
+        deviceType: _selectedType,
+        status: _selectedStatus,
+        page: _currentPage,
+        limit: _itemsPerPage,
+      );
 
-      nodes.sort((a, b) {
+      page.items.sort((a, b) {
         final isSwitchA = a.nodeKind == 'switch';
         final isSwitchB = b.nodeKind == 'switch';
 
@@ -125,63 +157,19 @@ class _DeviceListScreenState extends State<DeviceListScreen> {
         return idA.compareTo(idB);
       });
 
-      if (mounted) {
-        setState(() {
-          _allNodes = nodes;
-          _extractFilterOptions();
-          _applyFilters();
-          _isLoading = false;
-        });
-        _fetchBatchLiveStats();
-      }
+      if (!mounted) return;
+      setState(() {
+        _nodes = page.items;
+        _totalItems = page.total;
+        _isLoading = false;
+      });
+      _fetchBatchLiveStats();
     } catch (e) {
       setState(() {
         _error = e.toString();
         _isLoading = false;
       });
     }
-  }
-
-  void _extractFilterOptions() {
-    _deviceTypes = _allNodes
-        .map((n) => n.deviceType ?? 'Unknown')
-        .toSet()
-        .toList()
-      ..sort();
-
-    _locations = _allNodes
-        .map((n) => n.locationName ?? 'Unknown')
-        .toSet()
-        .toList()
-      ..sort();
-  }
-
-  void _applyFilters() {
-    _filteredNodes = _allNodes.where((node) {
-      if (_searchQuery.isNotEmpty) {
-        final matchesSearch = node.name.toLowerCase().contains(_searchQuery) ||
-            node.ipAddress.toLowerCase().contains(_searchQuery) ||
-            (node.macAddress?.toLowerCase().contains(_searchQuery) ?? false);
-        if (!matchesSearch) return false;
-      }
-
-      if (_selectedType != null &&
-          (node.deviceType ?? 'Unknown') != _selectedType) {
-        return false;
-      }
-
-      if (_selectedLocation != null &&
-          (node.locationName ?? 'Unknown') != _selectedLocation) {
-        return false;
-      }
-
-      if (_selectedStatus != null &&
-          node.status?.toLowerCase() != _selectedStatus) {
-        return false;
-      }
-
-      return true;
-    }).toList();
   }
 
   void _updateFilter({String? type, String? location, String? status}) {
@@ -192,8 +180,8 @@ class _DeviceListScreenState extends State<DeviceListScreen> {
       }
       if (status != null || _selectedStatus != null) _selectedStatus = status;
       _currentPage = 1;
-      _applyFilters();
     });
+    _fetchNodes();
   }
 
   void _clearFilters() {
@@ -204,8 +192,8 @@ class _DeviceListScreenState extends State<DeviceListScreen> {
       _selectedLocation = null;
       _selectedStatus = null;
       _currentPage = 1;
-      _applyFilters();
     });
+    _fetchNodes();
   }
 
   void _initWebSocket() {
@@ -219,12 +207,11 @@ class _DeviceListScreenState extends State<DeviceListScreen> {
 
   void _handleStatusChange(StatusChangeEvent event) {
     setState(() {
-      for (int i = 0; i < _allNodes.length; i++) {
-        final node = _allNodes[i];
+      for (int i = 0; i < _nodes.length; i++) {
+        final node = _nodes[i];
         final isMatch = _isNodeMatch(node, event);
         if (isMatch) {
-          _allNodes[i].status = event.newStatus;
-          _applyFilters();
+          _nodes[i].status = event.newStatus;
           break;
         }
       }
@@ -268,13 +255,9 @@ class _DeviceListScreenState extends State<DeviceListScreen> {
     );
   }
 
-  int get _totalPages => (_filteredNodes.length / _itemsPerPage).ceil();
-  int get _startIndex => (_currentPage - 1) * _itemsPerPage;
-  int get _endIndex =>
-      math.min(_startIndex + _itemsPerPage, _filteredNodes.length);
-  List<BaseNode> get _paginatedNodes => _filteredNodes.isEmpty
-      ? []
-      : _filteredNodes.sublist(_startIndex, _endIndex);
+  int get _totalPages => (_totalItems / _itemsPerPage).ceil().clamp(1, 9999);
+
+  List<BaseNode> get _paginatedNodes => _nodes;
 
   @override
   Widget build(BuildContext context) {
@@ -353,7 +336,10 @@ class _DeviceListScreenState extends State<DeviceListScreen> {
                 child: PaginationWidget(
                   currentPage: _currentPage,
                   totalPages: _totalPages,
-                  onPageChanged: (page) => setState(() => _currentPage = page),
+                  onPageChanged: (page) {
+                    setState(() => _currentPage = page);
+                    _fetchNodes();
+                  },
                 ),
               ),
             ),
@@ -365,41 +351,13 @@ class _DeviceListScreenState extends State<DeviceListScreen> {
 
   Widget _buildResultsSummary() {
     final showing = _paginatedNodes.length;
-    final total = _filteredNodes.length;
-    final allTotal = _allNodes.length;
+    final total = _totalItems;
 
     return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Text(
-          total == allTotal
-              ? 'Showing $showing of $total'
-              : 'Showing $showing of $total ($allTotal total)',
-          style: TextStyle(color: Colors.grey[600], fontSize: 12),
-        ),
-        Row(
-          children: [
-            Text('Show: ',
-                style: TextStyle(color: Colors.grey[600], fontSize: 12)),
-            DropdownButton<int>(
-              value: _itemsPerPage,
-              underline: const SizedBox(),
-              isDense: true,
-              style: const TextStyle(fontSize: 12, color: Colors.black87),
-              items: _itemsPerPageOptions
-                  .map((count) =>
-                      DropdownMenuItem(value: count, child: Text('$count')))
-                  .toList(),
-              onChanged: (value) {
-                if (value != null) {
-                  setState(() {
-                    _itemsPerPage = value;
-                    _currentPage = 1;
-                  });
-                }
-              },
-            ),
-          ],
+          "Showing $showing of $total devices",
+          style: TextStyle(color: Colors.grey[600]),
         ),
       ],
     );
@@ -422,7 +380,7 @@ class _DeviceListScreenState extends State<DeviceListScreen> {
       );
     }
 
-    if (_filteredNodes.isEmpty) {
+    if (_nodes.isEmpty) {
       if (_searchQuery.isNotEmpty) {
         return SliverFillRemaining(
           child: EmptyStateWidget.searching(
@@ -436,9 +394,7 @@ class _DeviceListScreenState extends State<DeviceListScreen> {
 
       return SliverFillRemaining(
         child: EmptyStateWidget(
-          message: _allNodes.isEmpty
-              ? 'No devices found'
-              : 'No devices match your filters',
+          message: 'No devices found',
           icon: Icons.devices_other,
           onAction: (_searchQuery.isNotEmpty ||
                   _selectedType != null ||

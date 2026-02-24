@@ -220,4 +220,49 @@ class DeviceService {
       throw Exception('Failed to delete node: ${response.body}');
     }
   }
+
+  Future<NodePage> getNodesPage({
+    String? search,
+    String? locationName,
+    String? deviceType,
+    String? status,
+    int page = 1,
+    int limit = 10,
+  }) async {
+    final params = <String, String>{
+      'page': page.toString(),
+      'limit': limit.toString(),
+    };
+
+    if (search != null && search.isNotEmpty) {
+      params['search'] = search;
+    }
+    if (locationName != null && locationName.isNotEmpty) {
+      params['location_name'] = locationName;
+    }
+    if (deviceType != null && deviceType.isNotEmpty) {
+      params['device_type'] = deviceType;
+    }
+    if (status != null && status.isNotEmpty) {
+      params['status'] = status;
+    }
+
+    final uri =
+        Uri.parse(ApiConfig.deviceNodes).replace(queryParameters: params);
+
+    final response = await http.get(uri, headers: await _getHeaders());
+    if (response.statusCode == 200) {
+      return NodePage.fromJson(jsonDecode(response.body));
+    }
+    throw Exception('Failed to load devices');
+  }
+
+  Future<List<String>> getDeviceTypes() async {
+    final response = await http.get(Uri.parse(ApiConfig.deviceTypes));
+    if (response.statusCode == 200) {
+      final List data = jsonDecode(response.body);
+      return data.map((e) => e.toString()).toList();
+    }
+    throw Exception('Failed to load device types');
+  }
 }

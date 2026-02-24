@@ -91,3 +91,26 @@ class DeviceWithLocation(BaseModel):
     latitude: float
     longitude: float
     location_name: str
+
+
+class NodeSummary(BaseModel):
+    node_kind: str
+    id: int
+    name: str
+    ip_address: str
+    status: str
+    device_type: Optional[str]
+    location_id: Optional[int]
+    location_name: Optional[str]
+    switch_id: Optional[int]
+    node_id: Optional[int]
+    description: Optional[str]
+    last_replaced_at: Optional[datetime]
+    librenms_device_id: Optional[int]
+
+
+class NodePageResponse(BaseModel):
+    items: List[NodeSummary]
+    total: int
+    page: int
+    page_size: int

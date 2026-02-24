@@ -2,15 +2,17 @@ from typing import List, Optional
 
 from app.api.dependencies import require_admin, require_technician_or_admin
 from app.core.database import get_db
-from app.models import Device, LibreNMSPort, Location, User
+from app.models import Device, LibreNMSPort, Location, Switch, User
 from app.schemas.device import (
     BulkLiveDetailsRequest,
     DeviceResponse,
     DeviceUpdate,
     DeviceWithLocation,
+    NodePageResponse,
 )
 from app.services.librenms_service import LibreNMSService
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import false, func, or_
 from sqlalchemy.orm import Session
 
 router = APIRouter(prefix="/devices", tags=["Devices"])
@@ -125,6 +127,117 @@ async def get_bulk_device_details(
         results.append(metrics)
 
     return results
+
+
+@router.get("/nodes", response_model=NodePageResponse)
+def get_nodes(
+    page: int = Query(1, ge=1),
+    limit: int = Query(10, ge=1, le=100),
+    search: Optional[str] = Query(None),
+    location_name: Optional[str] = Query(None),
+    device_type: Optional[str] = Query(None),
+    status: Optional[str] = Query(None),
+    db: Session = Depends(get_db),
+):
+    device_query = db.query(Device).join(Location, isouter=True)
+    switch_query = db.query(Switch).join(Location, isouter=True)
+
+    if search:
+        term = f"%{search.lower()}%"
+        device_query = device_query.filter(
+            or_(
+                func.lower(Device.name).like(term),
+                func.lower(Device.ip_address).like(term),
+            )
+        )
+        switch_query = switch_query.filter(
+            or_(
+                func.lower(Switch.name).like(term),
+                func.lower(Switch.ip_address).like(term),
+            )
+        )
+
+    if location_name:
+        device_query = device_query.filter(Location.name == location_name)
+        switch_query = switch_query.filter(Location.name == location_name)
+
+    if status:
+        device_query = device_query.filter(Device.status == status)
+        switch_query = switch_query.filter(Switch.status == status)
+
+    if device_type:
+        if device_type.lower() == "switch":
+            device_query = device_query.filter(false())
+        else:
+            device_query = device_query.filter(
+                func.lower(func.coalesce(Device.device_type, "unknown"))
+                == device_type.lower()
+            )
+            switch_query = switch_query.filter(false())
+
+    device_rows = device_query.all()
+    switch_rows = switch_query.all()
+
+    items = []
+    for device in device_rows:
+        items.append(
+            {
+                "node_kind": "device",
+                "id": device.device_id,
+                "name": device.name,
+                "ip_address": device.ip_address,
+                "status": device.status,
+                "device_type": device.device_type,
+                "location_id": device.location_id,
+                "location_name": device.location.name if device.location else None,
+                "switch_id": device.switch_id,
+                "node_id": None,
+                "description": device.description,
+                "last_replaced_at": device.last_replaced_at,
+                "librenms_device_id": device.librenms_device_id,
+            }
+        )
+
+    for switch in switch_rows:
+        items.append(
+            {
+                "node_kind": "switch",
+                "id": switch.switch_id,
+                "name": switch.name,
+                "ip_address": switch.ip_address,
+                "status": switch.status,
+                "device_type": "Switch",
+                "location_id": switch.location_id,
+                "location_name": switch.location.name if switch.location else None,
+                "switch_id": None,
+                "node_id": switch.node_id,
+                "description": switch.description,
+                "last_replaced_at": switch.last_replaced_at,
+                "librenms_device_id": switch.librenms_device_id,
+            }
+        )
+
+    items.sort(key=lambda x: (0 if x["node_kind"] == "switch" else 1, x["id"]))
+
+    total = len(items)
+    start = (page - 1) * limit
+    end = start + limit
+    page_items = items[start:end]
+
+    return {"items": page_items, "total": total, "page": page, "page_size": limit}
+
+
+@router.get("/types", response_model=List[str])
+def get_device_types(db: Session = Depends(get_db)):
+    types = (
+        db.query(func.coalesce(func.lower(func.trim(Device.device_type)), "unknown"))
+        .distinct()
+        .all()
+    )
+    device_types = {t[0].title() for t in types if t[0]}
+    if db.query(Switch.switch_id).first() is not None:
+        device_types.add("Switch")
+    return sorted(device_types)
 
 
 # Get devices with location data for map display

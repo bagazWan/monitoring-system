@@ -31,3 +31,10 @@ class LocationResponse(BaseModel):
 
     class Config:
         from_attributes = True  # Allows conversion from SQLAlchemy model
+
+
+class LocationPageResponse(BaseModel):
+    items: list[LocationResponse]
+    total: int
+    page: int
+    page_size: int

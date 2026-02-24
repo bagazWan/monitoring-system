@@ -21,29 +21,36 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
   StreamSubscription<StatusChangeEvent>? _statusSubscription;
   bool _isLoading = true;
   List<User> _users = [];
+  int _totalItems = 0;
   String? _error;
 
   final TextEditingController _searchController = TextEditingController();
   int _currentPage = 1;
   final int _itemsPerPage = 10;
+  Timer? _searchDebounce;
 
   @override
   void initState() {
     super.initState();
     _fetchUsers();
     _initWebSocket();
-    _searchController.addListener(() {
-      setState(() {
-        _currentPage = 1;
-      });
-    });
+    _searchController.addListener(_onSearchChanged);
   }
 
   @override
   void dispose() {
     _searchController.dispose();
     _statusSubscription?.cancel();
+    _searchDebounce?.cancel();
     super.dispose();
+  }
+
+  void _onSearchChanged() {
+    _searchDebounce?.cancel();
+    _searchDebounce = Timer(const Duration(milliseconds: 350), () {
+      setState(() => _currentPage = 1);
+      _fetchUsers();
+    });
   }
 
   void _initWebSocket() {
@@ -69,20 +76,25 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
       _error = null;
     });
     try {
-      final users = await _userService.getUsers();
-      users.sort((a, b) => a.id.compareTo(b.id));
+      final page = await _userService.getUsers(
+        page: _currentPage,
+        limit: _itemsPerPage,
+        search: _searchController.text.trim(),
+      );
+
+      page.items.sort((a, b) => a.id.compareTo(b.id));
+
       if (mounted) {
         setState(() {
-          _users = users;
+          _users = page.items;
+          _totalItems = page.total;
           _isLoading = false;
         });
 
-        final totalItems = _filteredUsers.length;
-        final totalPages = (totalItems / _itemsPerPage).ceil();
-
+        final totalPages = (_totalItems / _itemsPerPage).ceil().clamp(1, 9999);
         if (_currentPage > totalPages) {
           setState(() {
-            _currentPage = totalPages > 0 ? totalPages : 1;
+            _currentPage = totalPages;
           });
         }
       }
@@ -96,31 +108,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
     }
   }
 
-  List<User> get _filteredUsers {
-    final query = _searchController.text.toLowerCase();
-    if (query.isEmpty) return _users;
-
-    return _users.where((user) {
-      final username = user.username.toLowerCase();
-      final fullName = user.fullName.toLowerCase();
-      return username.contains(query) || fullName.contains(query);
-    }).toList();
-  }
-
-  List<User> get _paginatedUsers {
-    final filtered = _filteredUsers;
-    final startIndex = (_currentPage - 1) * _itemsPerPage;
-    final endIndex = (startIndex + _itemsPerPage < filtered.length)
-        ? startIndex + _itemsPerPage
-        : filtered.length;
-
-    if (startIndex >= filtered.length) return [];
-    return filtered.sublist(startIndex, endIndex);
-  }
-
-  int get _totalPages {
-    return (_filteredUsers.length / _itemsPerPage).ceil();
-  }
+  int get _totalPages => (_totalItems / _itemsPerPage).ceil().clamp(1, 9999);
 
   Future<void> _openUserDialog({User? user}) async {
     final result = await showDialog(
@@ -134,167 +122,163 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
     }
   }
 
-  Future<void> _deleteUser(User user) async {
+  @override
+  Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (_error != null) {
+      return AsyncErrorWidget(
+        error: _error!,
+        onRetry: _fetchUsers,
+        message: 'Failed to load users',
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                "User Management",
+                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 24),
+              Row(
+                children: [
+                  Expanded(
+                    child: SearchBarWidget(
+                      controller: _searchController,
+                      hintText: 'Search by username or name',
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  ElevatedButton.icon(
+                    onPressed: () => _openUserDialog(),
+                    icon: const Icon(Icons.add),
+                    label: const Text('Add User'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.blue[700],
+                      foregroundColor: Colors.white,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        Expanded(
+          child: _users.isEmpty
+              ? EmptyStateWidget.searching(
+                  isSearching: _searchController.text.isNotEmpty,
+                  searchQuery: _searchController.text,
+                  label: 'users',
+                  defaultIcon: Icons.people_outline,
+                )
+              : SingleChildScrollView(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: CustomDataTable(
+                    columns: const [
+                      DataColumn(
+                          label: Expanded(
+                              child: Text("Username",
+                                  style:
+                                      TextStyle(fontWeight: FontWeight.bold)))),
+                      DataColumn(
+                          label: Expanded(
+                              child: Text("Full Name",
+                                  style:
+                                      TextStyle(fontWeight: FontWeight.bold)))),
+                      DataColumn(
+                          label: Expanded(
+                              child: Text("Email",
+                                  style:
+                                      TextStyle(fontWeight: FontWeight.bold)))),
+                      DataColumn(
+                          label: Expanded(
+                              child: Text("Role",
+                                  textAlign: TextAlign.center,
+                                  style:
+                                      TextStyle(fontWeight: FontWeight.bold)))),
+                      DataColumn(
+                          label: Expanded(
+                              child: Text("Actions",
+                                  textAlign: TextAlign.center,
+                                  style:
+                                      TextStyle(fontWeight: FontWeight.bold)))),
+                    ],
+                    rows: _users.map((user) {
+                      return DataRow(cells: [
+                        DataCell(Text(user.username,
+                            style:
+                                const TextStyle(fontWeight: FontWeight.w500))),
+                        DataCell(Text(user.fullName)),
+                        DataCell(Text(user.email)),
+                        DataCell(Center(child: _buildRoleBadge(user.role))),
+                        DataCell(Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            IconButton(
+                              tooltip: 'Edit',
+                              icon: const Icon(Icons.edit, color: Colors.blue),
+                              onPressed: () => _openUserDialog(user: user),
+                            ),
+                            IconButton(
+                              tooltip: 'Delete',
+                              icon: const Icon(Icons.delete, color: Colors.red),
+                              onPressed: () => _deleteUser(user.id),
+                            ),
+                          ],
+                        )),
+                      ]);
+                    }).toList(),
+                  ),
+                ),
+        ),
+        Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: PaginationWidget(
+            currentPage: _currentPage,
+            totalPages: _totalPages,
+            onPageChanged: (page) {
+              setState(() => _currentPage = page);
+              _fetchUsers();
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _deleteUser(int userId) async {
     final confirm = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text("Delete User?"),
-        content: Text("Are you sure you want to delete ${user.username}?"),
+      builder: (_) => AlertDialog(
+        title: const Text("Delete user"),
+        content: const Text("Are you sure you want to delete this user?"),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text("Cancel")),
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text("Cancel"),
+          ),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.red, foregroundColor: Colors.white),
             onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
             child: const Text("Delete"),
           ),
         ],
       ),
     );
 
-    if (confirm == true) {
-      try {
-        await _userService.deleteUser(user.id);
-        ScaffoldMessenger.of(context)
-            .showSnackBar(const SnackBar(content: Text("User deleted")));
-        _fetchUsers();
-      } catch (e) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text("Error: $e")));
-      }
-    }
-  }
+    if (confirm != true) return;
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.grey[50],
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              "User Management",
-              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 24),
-            Row(
-              children: [
-                Expanded(
-                  child: SearchBarWidget(
-                    controller: _searchController,
-                    hintText: "Search by username or name",
-                    onClear: () => setState(() {
-                      _searchController.clear();
-                    }),
-                  ),
-                ),
-                const SizedBox(width: 16),
-                SizedBox(
-                  height: 40,
-                  child: ElevatedButton.icon(
-                    onPressed: () => _openUserDialog(),
-                    icon: const Icon(Icons.add, size: 20),
-                    label: const Text("Add User"),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.blue[700],
-                      foregroundColor: Colors.white,
-                      elevation: 0,
-                      padding: const EdgeInsets.symmetric(horizontal: 20),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8)),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            if (_isLoading)
-              const Center(
-                  child: Padding(
-                padding: EdgeInsets.all(32.0),
-                child: CircularProgressIndicator(),
-              ))
-            else if (_error != null)
-              Center(
-                  child: AsyncErrorWidget(error: _error!, onRetry: _fetchUsers))
-            else if (_filteredUsers.isEmpty)
-              EmptyStateWidget.searching(
-                isSearching: _searchController.text.isNotEmpty,
-                searchQuery: _searchController.text,
-                label: 'users',
-                defaultIcon: Icons.people_outline,
-              )
-            else ...[
-              CustomDataTable(
-                columns: const [
-                  DataColumn(
-                      label: Expanded(
-                          child: Text("Username",
-                              style: TextStyle(fontWeight: FontWeight.bold)))),
-                  DataColumn(
-                      label: Expanded(
-                          child: Text("Full Name",
-                              style: TextStyle(fontWeight: FontWeight.bold)))),
-                  DataColumn(
-                      label: Expanded(
-                          child: Text("Email",
-                              style: TextStyle(fontWeight: FontWeight.bold)))),
-                  DataColumn(
-                      label: Expanded(
-                          child: Text("Role",
-                              textAlign: TextAlign.center,
-                              style: TextStyle(fontWeight: FontWeight.bold)))),
-                  DataColumn(
-                      label: Expanded(
-                          child: Text("Actions",
-                              textAlign: TextAlign.center,
-                              style: TextStyle(fontWeight: FontWeight.bold)))),
-                ],
-                rows: _paginatedUsers.map((user) {
-                  return DataRow(cells: [
-                    DataCell(Text(user.username,
-                        style: const TextStyle(fontWeight: FontWeight.w500))),
-                    DataCell(Text(user.fullName)),
-                    DataCell(Text(user.email)),
-                    DataCell(Center(child: _buildRoleBadge(user.role))),
-                    DataCell(Center(
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          IconButton(
-                            icon: const Icon(Icons.edit,
-                                size: 18, color: Colors.blue),
-                            onPressed: () => _openUserDialog(user: user),
-                            tooltip: "Edit",
-                          ),
-                          IconButton(
-                            icon: const Icon(Icons.delete,
-                                size: 18, color: Colors.red),
-                            onPressed: () => _deleteUser(user),
-                            tooltip: "Delete",
-                          ),
-                        ],
-                      ),
-                    )),
-                  ]);
-                }).toList(),
-              ),
-              const SizedBox(height: 16),
-              if (_filteredUsers.isNotEmpty)
-                PaginationWidget(
-                  currentPage: _currentPage,
-                  totalPages: _totalPages > 0 ? _totalPages : 1,
-                  onPageChanged: (page) => setState(() => _currentPage = page),
-                ),
-            ]
-          ],
-        ),
-      ),
-    );
+    await _userService.deleteUser(userId);
+    _fetchUsers();
   }
 
   Widget _buildRoleBadge(String role) {

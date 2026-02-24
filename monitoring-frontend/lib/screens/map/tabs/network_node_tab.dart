@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../../models/network_node.dart';
 import '../../../models/location.dart';
@@ -20,39 +21,57 @@ class _NetworkNodeTabState extends State<NetworkNodeTab> {
   bool _isLoading = true;
   List<NetworkNode> _networkNodes = [];
   Map<int, String> _locationNameLookup = {};
+  int _totalItems = 0;
   String? _error;
 
   final TextEditingController _searchController = TextEditingController();
+  Timer? _searchDebounce;
   int _currentPage = 1;
   final int _itemsPerPage = 10;
 
   @override
   void initState() {
     super.initState();
-    _fetchData();
-    _searchController.addListener(() => setState(() => _currentPage = 1));
+    _fetchData(showLoader: true);
+    _searchController.addListener(_onSearchChanged);
   }
 
   @override
   void dispose() {
     _searchController.dispose();
+    _searchDebounce?.cancel();
     super.dispose();
   }
 
-  Future<void> _fetchData() async {
-    setState(() => _isLoading = true);
+  void _onSearchChanged() {
+    _searchDebounce?.cancel();
+    _searchDebounce = Timer(const Duration(milliseconds: 350), () {
+      _currentPage = 1;
+      _fetchData(showLoader: false);
+    });
+  }
+
+  Future<void> _fetchData({required bool showLoader}) async {
+    if (showLoader) {
+      setState(() => _isLoading = true);
+    }
     try {
       final results = await Future.wait([
-        _service.getNetworkNodes(),
+        _service.getNetworkNodesPage(
+          page: _currentPage,
+          limit: _itemsPerPage,
+          search: _searchController.text.trim(),
+        ),
         _service.getLocations(),
       ]);
 
-      final nodes = results[0] as List<NetworkNode>;
+      final nodesPage = results[0] as NetworkNodePage;
       final locations = results[1] as List<Location>;
 
       if (mounted) {
         setState(() {
-          _networkNodes = nodes;
+          _networkNodes = nodesPage.items;
+          _totalItems = nodesPage.total;
           _locationNameLookup = {for (var loc in locations) loc.id: loc.name};
           _isLoading = false;
         });
@@ -62,33 +81,12 @@ class _NetworkNodeTabState extends State<NetworkNodeTab> {
     }
   }
 
-  List<NetworkNode> get _filteredNodes {
-    final query = _searchController.text.toLowerCase();
-    if (query.isEmpty) return _networkNodes;
-    return _networkNodes.where((node) {
-      final locName = _locationNameLookup[node.locationId]?.toLowerCase() ?? "";
-      return (node.name?.toLowerCase().contains(query) ?? false) ||
-          locName.contains(query) ||
-          node.type.toLowerCase().contains(query);
-    }).toList();
-  }
-
-  List<NetworkNode> get _paginatedNodes {
-    final filtered = _filteredNodes;
-    final startIndex = (_currentPage - 1) * _itemsPerPage;
-    if (startIndex >= filtered.length) return [];
-    final endIndex = (startIndex + _itemsPerPage < filtered.length)
-        ? startIndex + _itemsPerPage
-        : filtered.length;
-    return filtered.sublist(startIndex, endIndex);
-  }
-
   Future<void> _openForm({NetworkNode? networkNode}) async {
     final result = await showDialog(
       context: context,
       builder: (context) => NetworkNodeFormDialog(node: networkNode),
     );
-    if (result == true) _fetchData();
+    if (result == true) _fetchData(showLoader: true);
   }
 
   Future<void> _delete(NetworkNode networkNode) async {
@@ -96,7 +94,7 @@ class _NetworkNodeTabState extends State<NetworkNodeTab> {
     if (confirm == true) {
       try {
         await _service.deleteNetworkNode(networkNode.id);
-        _fetchData();
+        _fetchData(showLoader: true);
       } catch (e) {
         ScaffoldMessenger.of(context)
             .showSnackBar(SnackBar(content: Text("Error: $e")));
@@ -128,12 +126,11 @@ class _NetworkNodeTabState extends State<NetworkNodeTab> {
   Widget build(BuildContext context) {
     if (_isLoading) return const Center(child: CircularProgressIndicator());
     if (_error != null) {
-      return AsyncErrorWidget(error: _error!, onRetry: _fetchData);
+      return AsyncErrorWidget(
+          error: _error!, onRetry: () => _fetchData(showLoader: true));
     }
 
-    final filtered = _filteredNodes;
-    final paginated = _paginatedNodes;
-    final totalPages = (filtered.length / _itemsPerPage).ceil();
+    final totalPages = (_totalItems / _itemsPerPage).ceil();
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
@@ -165,7 +162,7 @@ class _NetworkNodeTabState extends State<NetworkNodeTab> {
             ],
           ),
           const SizedBox(height: 16),
-          if (filtered.isEmpty)
+          if (_networkNodes.isEmpty)
             EmptyStateWidget.searching(
               isSearching: _searchController.text.isNotEmpty,
               searchQuery: _searchController.text,
@@ -200,7 +197,7 @@ class _NetworkNodeTabState extends State<NetworkNodeTab> {
                             textAlign: TextAlign.center,
                             style: TextStyle(fontWeight: FontWeight.bold)))),
               ],
-              rows: paginated
+              rows: _networkNodes
                   .map((node) => DataRow(cells: [
                         DataCell(Text(node.name!)),
                         DataCell(Text(
@@ -231,7 +228,10 @@ class _NetworkNodeTabState extends State<NetworkNodeTab> {
             PaginationWidget(
               currentPage: _currentPage,
               totalPages: totalPages > 0 ? totalPages : 1,
-              onPageChanged: (page) => setState(() => _currentPage = page),
+              onPageChanged: (page) {
+                setState(() => _currentPage = page);
+                _fetchData(showLoader: true);
+              },
             )
           ],
         ],

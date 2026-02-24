@@ -1,27 +1,63 @@
-from typing import List, Optional
+from typing import Optional
 
 from app.api.dependencies import require_admin
 from app.core.database import get_db
 from app.models import FORoute, NetworkNode, User
-from app.schemas.network_map import FORouteCreate, FORouteResponse, FORouteUpdate
+from app.schemas.network_map import (
+    FORouteCreate,
+    FORoutePageResponse,
+    FORouteResponse,
+    FORouteUpdate,
+)
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy.orm import Session
+from sqlalchemy import func, or_
+from sqlalchemy.orm import Session, aliased
 
 router = APIRouter(prefix="/fo-routes", tags=["FO Routes"])
 
 
-@router.get("", response_model=List[FORouteResponse])
+@router.get("", response_model=FORoutePageResponse)
 def list_fo_routes(
+    page: int = Query(1, ge=1),
+    limit: int = Query(10, ge=1, le=100),
+    search: Optional[str] = Query(None),
     start_node_id: Optional[int] = Query(None, gt=0),
     end_node_id: Optional[int] = Query(None, gt=0),
     db: Session = Depends(get_db),
 ):
-    query = db.query(FORoute)
+    start_node = aliased(NetworkNode)
+    end_node = aliased(NetworkNode)
+
+    query = (
+        db.query(FORoute)
+        .join(start_node, FORoute.start_node_id == start_node.node_id)
+        .join(end_node, FORoute.end_node_id == end_node.node_id)
+    )
+
     if start_node_id is not None:
         query = query.filter(FORoute.start_node_id == start_node_id)
     if end_node_id is not None:
         query = query.filter(FORoute.end_node_id == end_node_id)
-    return query.order_by(FORoute.routes_id.asc()).all()
+
+    if search:
+        term = f"%{search.lower()}%"
+        query = query.filter(
+            or_(
+                func.lower(start_node.name).like(term),
+                func.lower(end_node.name).like(term),
+                func.lower(FORoute.description).like(term),
+            )
+        )
+
+    total = query.count()
+    items = (
+        query.order_by(FORoute.routes_id.asc())
+        .offset((page - 1) * limit)
+        .limit(limit)
+        .all()
+    )
+
+    return {"items": items, "total": total, "page": page, "page_size": limit}
 
 
 @router.get("/{route_id}", response_model=FORouteResponse)

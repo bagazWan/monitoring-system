@@ -1,4 +1,4 @@
-from typing import List
+from typing import Optional
 
 from app.api.dependencies import get_current_user, require_admin
 from app.core.database import get_db
@@ -7,24 +7,44 @@ from app.models.user import User
 from app.schemas.user import (
     UserChangePassword,
     UserCreate,
+    UserPageResponse,
     UserResponse,
     UserUpdate,
     UserUpdateSelf,
 )
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 router = APIRouter(prefix="/users", tags=["Users"])
 
 
 # Get all users (Admin)
-@router.get("", response_model=List[UserResponse])
+@router.get("", response_model=UserPageResponse)
 def get_all_users(
+    page: int = Query(1, ge=1),
+    limit: int = Query(10, ge=1, le=100),
+    search: Optional[str] = Query(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_admin),
 ):
-    users = db.query(User).all()
-    return users
+    query = db.query(User)
+
+    if search:
+        term = f"%{search.lower()}%"
+        query = query.filter(
+            or_(
+                func.lower(User.username).like(term),
+                func.lower(User.full_name).like(term),
+            )
+        )
+
+    total = query.count()
+    items = (
+        query.order_by(User.user_id.asc()).offset((page - 1) * limit).limit(limit).all()
+    )
+
+    return {"items": items, "total": total, "page": page, "page_size": limit}
 
 
 # Get specific user (Admin)

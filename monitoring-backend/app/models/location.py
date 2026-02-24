@@ -11,8 +11,8 @@ class Location(Base):
     latitude = Column(Float, nullable=False)
     longitude = Column(Float, nullable=False)
     address = Column(String(255))
-    location_type = Column(String(255), nullable=False)
-    name = Column(String(255))
+    location_type = Column(String(255), nullable=False, index=True)
+    name = Column(String(255), index=True)
     description = Column(Text)
     created_at = Column(
         DateTime(timezone=True), server_default=func.now(), nullable=False

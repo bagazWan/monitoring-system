@@ -32,3 +32,27 @@ class FORoute {
     };
   }
 }
+
+class FORoutePage {
+  final List<FORoute> items;
+  final int total;
+  final int page;
+  final int pageSize;
+
+  FORoutePage({
+    required this.items,
+    required this.total,
+    required this.page,
+    required this.pageSize,
+  });
+
+  factory FORoutePage.fromJson(Map<String, dynamic> json) {
+    final raw = json['items'] as List? ?? [];
+    return FORoutePage(
+      items: raw.map((e) => FORoute.fromJson(e)).toList(),
+      total: json['total'] ?? 0,
+      page: json['page'] ?? 1,
+      pageSize: json['page_size'] ?? 10,
+    );
+  }
+}

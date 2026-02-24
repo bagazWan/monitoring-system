@@ -11,11 +11,15 @@ class Switch(Base):
     librenms_device_id = Column(Integer, nullable=True, unique=True, index=True)
     librenms_hostname = Column(String(255), nullable=True, unique=True, index=True)
     librenms_last_synced = Column(DateTime(timezone=True), nullable=True)
-    name = Column(String(255), nullable=False)
-    ip_address = Column(String(255), nullable=False)
-    location_id = Column(Integer, ForeignKey("locations.location_id"), nullable=True)
-    node_id = Column(Integer, ForeignKey("network_nodes.node_id", ondelete="SET NULL"))
-    status = Column(String(255))
+    name = Column(String(255), nullable=False, index=True)
+    ip_address = Column(String(255), nullable=False, index=True)
+    location_id = Column(
+        Integer, ForeignKey("locations.location_id"), nullable=True, index=True
+    )
+    node_id = Column(
+        Integer, ForeignKey("network_nodes.node_id", ondelete="SET NULL"), index=True
+    )
+    status = Column(String(255), index=True)
     description = Column(String(255))
     last_replaced_at = Column(DateTime(timezone=True))
     created_at = Column(

@@ -13,15 +13,29 @@ class UserService {
     };
   }
 
-  Future<List<User>> getUsers() async {
+  Future<UserPage> getUsers({
+    int page = 1,
+    int limit = 10,
+    String? search,
+  }) async {
+    final params = <String, String>{
+      'page': page.toString(),
+      'limit': limit.toString(),
+    };
+
+    if (search != null && search.isNotEmpty) {
+      params['search'] = search;
+    }
+
+    final uri = Uri.parse(ApiConfig.users).replace(queryParameters: params);
+
     final response = await http.get(
-      Uri.parse(ApiConfig.users),
+      uri,
       headers: await _getHeaders(),
     );
 
     if (response.statusCode == 200) {
-      final List<dynamic> data = jsonDecode(response.body);
-      return data.map((json) => User.fromJson(json)).toList();
+      return UserPage.fromJson(jsonDecode(response.body));
     } else {
       throw Exception('Failed to load users: ${response.body}');
     }

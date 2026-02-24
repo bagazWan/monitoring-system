@@ -1,28 +1,53 @@
-from typing import List, Optional
+from typing import Optional
 
 from app.api.dependencies import require_admin
 from app.core.database import get_db
 from app.models import Location, NetworkNode, User
 from app.schemas.network_map import (
     NetworkNodeCreate,
+    NetworkNodePageResponse,
     NetworkNodeResponse,
     NetworkNodeUpdate,
 )
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 router = APIRouter(prefix="/network-nodes", tags=["Network Nodes"])
 
 
-@router.get("", response_model=List[NetworkNodeResponse])
+@router.get("", response_model=NetworkNodePageResponse)
 def list_network_nodes(
+    page: int = Query(1, ge=1),
+    limit: int = Query(10, ge=1, le=100),
+    search: Optional[str] = Query(None),
     location_id: Optional[int] = Query(None, gt=0),
     db: Session = Depends(get_db),
 ):
-    query = db.query(NetworkNode)
+    query = db.query(NetworkNode).outerjoin(Location)
+
     if location_id is not None:
         query = query.filter(NetworkNode.location_id == location_id)
-    return query.order_by(NetworkNode.node_id.asc()).all()
+
+    if search:
+        term = f"%{search.lower()}%"
+        query = query.filter(
+            or_(
+                func.lower(NetworkNode.name).like(term),
+                func.lower(NetworkNode.node_type).like(term),
+                func.lower(Location.name).like(term),
+            )
+        )
+
+    total = query.count()
+    items = (
+        query.order_by(NetworkNode.node_id.asc())
+        .offset((page - 1) * limit)
+        .limit(limit)
+        .all()
+    )
+
+    return {"items": items, "total": total, "page": page, "page_size": limit}
 
 
 @router.get("/{node_id}", response_model=NetworkNodeResponse)

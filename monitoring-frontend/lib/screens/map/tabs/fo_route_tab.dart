@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../../models/fo_route.dart';
 import '../../../models/network_node.dart';
@@ -20,38 +21,57 @@ class _FORouteTabState extends State<FORouteTab> {
   bool _isLoading = true;
   List<FORoute> _routes = [];
   Map<int, String> _nodeNameLookup = {};
+  int _totalItems = 0;
   String? _error;
 
   final TextEditingController _searchController = TextEditingController();
+  Timer? _searchDebounce;
   int _currentPage = 1;
   final int _itemsPerPage = 10;
 
   @override
   void initState() {
     super.initState();
-    _fetchData();
-    _searchController.addListener(() => setState(() => _currentPage = 1));
+    _fetchData(showLoader: true);
+    _searchController.addListener(_onSearchChanged);
   }
 
   @override
   void dispose() {
     _searchController.dispose();
+    _searchDebounce?.cancel();
     super.dispose();
   }
 
-  Future<void> _fetchData() async {
-    setState(() => _isLoading = true);
+  void _onSearchChanged() {
+    _searchDebounce?.cancel();
+    _searchDebounce = Timer(const Duration(milliseconds: 350), () {
+      _currentPage = 1;
+      _fetchData(showLoader: false);
+    });
+  }
+
+  Future<void> _fetchData({required bool showLoader}) async {
+    if (showLoader) {
+      setState(() => _isLoading = true);
+    }
     try {
       final results = await Future.wait([
-        _service.getFORoutes(),
+        _service.getFORoutesPage(
+          page: _currentPage,
+          limit: _itemsPerPage,
+          search: _searchController.text.trim(),
+        ),
         _service.getNetworkNodes(),
       ]);
 
+      final page = results[0] as FORoutePage;
+      final nodes = results[1] as List<NetworkNode>;
+
       if (mounted) {
         setState(() {
-          _routes = results[0] as List<FORoute>;
-          final nodes = results[1] as List<NetworkNode>;
-
+          _routes = page.items;
+          _totalItems = page.total;
           _nodeNameLookup = {
             for (var n in nodes) n.id: n.name ?? "Node #${n.id}"
           };
@@ -68,35 +88,12 @@ class _FORouteTabState extends State<FORouteTab> {
     }
   }
 
-  List<FORoute> get _filteredRoutes {
-    final query = _searchController.text.toLowerCase();
-    if (query.isEmpty) return _routes;
-    return _routes.where((route) {
-      final start = _nodeNameLookup[route.startNodeId]?.toLowerCase() ?? "";
-      final end = _nodeNameLookup[route.endNodeId]?.toLowerCase() ?? "";
-      final desc = route.description?.toLowerCase() ?? "";
-      return start.contains(query) ||
-          end.contains(query) ||
-          desc.contains(query);
-    }).toList();
-  }
-
-  List<FORoute> get _paginatedRoutes {
-    final filtered = _filteredRoutes;
-    final startIndex = (_currentPage - 1) * _itemsPerPage;
-    if (startIndex >= filtered.length) return [];
-    final endIndex = (startIndex + _itemsPerPage < filtered.length)
-        ? startIndex + _itemsPerPage
-        : filtered.length;
-    return filtered.sublist(startIndex, endIndex);
-  }
-
   Future<void> _openForm({FORoute? route}) async {
     final result = await showDialog(
       context: context,
       builder: (context) => FORouteFormDialog(route: route),
     );
-    if (result == true) _fetchData();
+    if (result == true) _fetchData(showLoader: true);
   }
 
   Future<void> _delete(FORoute route) async {
@@ -122,7 +119,7 @@ class _FORouteTabState extends State<FORouteTab> {
     if (confirm == true) {
       try {
         await _service.deleteFORoute(route.id);
-        _fetchData();
+        _fetchData(showLoader: true);
       } catch (e) {
         ScaffoldMessenger.of(context)
             .showSnackBar(SnackBar(content: Text("Error: $e")));
@@ -134,12 +131,11 @@ class _FORouteTabState extends State<FORouteTab> {
   Widget build(BuildContext context) {
     if (_isLoading) return const Center(child: CircularProgressIndicator());
     if (_error != null) {
-      return AsyncErrorWidget(error: _error!, onRetry: _fetchData);
+      return AsyncErrorWidget(
+          error: _error!, onRetry: () => _fetchData(showLoader: true));
     }
 
-    final filtered = _filteredRoutes;
-    final paginated = _paginatedRoutes;
-    final totalPages = (filtered.length / _itemsPerPage).ceil();
+    final totalPages = (_totalItems / _itemsPerPage).ceil();
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
@@ -171,7 +167,7 @@ class _FORouteTabState extends State<FORouteTab> {
             ],
           ),
           const SizedBox(height: 16),
-          if (filtered.isEmpty)
+          if (_routes.isEmpty)
             EmptyStateWidget.searching(
               isSearching: _searchController.text.isNotEmpty,
               searchQuery: _searchController.text,
@@ -206,7 +202,7 @@ class _FORouteTabState extends State<FORouteTab> {
                             textAlign: TextAlign.center,
                             style: TextStyle(fontWeight: FontWeight.bold)))),
               ],
-              rows: paginated
+              rows: _routes
                   .map((route) => DataRow(cells: [
                         DataCell(Text(_nodeNameLookup[route.startNodeId] ??
                             "ID: ${route.startNodeId}")),
@@ -237,7 +233,10 @@ class _FORouteTabState extends State<FORouteTab> {
             PaginationWidget(
               currentPage: _currentPage,
               totalPages: totalPages > 0 ? totalPages : 1,
-              onPageChanged: (page) => setState(() => _currentPage = page),
+              onPageChanged: (page) {
+                setState(() => _currentPage = page);
+                _fetchData(showLoader: true);
+              },
             ),
           ],
         ],

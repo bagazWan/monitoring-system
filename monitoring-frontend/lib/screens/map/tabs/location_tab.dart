@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../../models/location.dart';
 import '../../../services/map_service.dart';
@@ -18,32 +19,50 @@ class _LocationTabState extends State<LocationTab> {
   final MapService _service = MapService();
   bool _isLoading = true;
   List<Location> _locations = [];
+  int _totalItems = 0;
   String? _error;
 
   final TextEditingController _searchController = TextEditingController();
+  Timer? _searchDebounce;
   int _currentPage = 1;
   final int _itemsPerPage = 10;
 
   @override
   void initState() {
     super.initState();
-    _fetchData();
-    _searchController.addListener(() => setState(() => _currentPage = 1));
+    _fetchData(showLoader: true);
+    _searchController.addListener(_onSearchChanged);
   }
 
   @override
   void dispose() {
     _searchController.dispose();
+    _searchDebounce?.cancel();
     super.dispose();
   }
 
-  Future<void> _fetchData() async {
-    setState(() => _isLoading = true);
+  void _onSearchChanged() {
+    _searchDebounce?.cancel();
+    _searchDebounce = Timer(const Duration(milliseconds: 350), () {
+      _currentPage = 1;
+      _fetchData(showLoader: false);
+    });
+  }
+
+  Future<void> _fetchData({required bool showLoader}) async {
+    if (showLoader) {
+      setState(() => _isLoading = true);
+    }
     try {
-      final data = await _service.getLocations();
+      final page = await _service.getLocationsPage(
+        page: _currentPage,
+        limit: _itemsPerPage,
+        search: _searchController.text.trim(),
+      );
       if (mounted) {
         setState(() {
-          _locations = data;
+          _locations = page.items;
+          _totalItems = page.total;
           _isLoading = false;
         });
       }
@@ -57,32 +76,12 @@ class _LocationTabState extends State<LocationTab> {
     }
   }
 
-  List<Location> get _filteredLocations {
-    final query = _searchController.text.toLowerCase();
-    if (query.isEmpty) return _locations;
-    return _locations
-        .where((loc) =>
-            loc.name.toLowerCase().contains(query) ||
-            (loc.address?.toLowerCase().contains(query) ?? false))
-        .toList();
-  }
-
-  List<Location> get _paginatedLocations {
-    final filtered = _filteredLocations;
-    final startIndex = (_currentPage - 1) * _itemsPerPage;
-    if (startIndex >= filtered.length) return [];
-    final endIndex = (startIndex + _itemsPerPage < filtered.length)
-        ? startIndex + _itemsPerPage
-        : filtered.length;
-    return filtered.sublist(startIndex, endIndex);
-  }
-
   Future<void> _openForm({Location? location}) async {
     final result = await showDialog(
       context: context,
       builder: (context) => LocationFormDialog(location: location),
     );
-    if (result == true) _fetchData();
+    if (result == true) _fetchData(showLoader: true);
   }
 
   Future<void> _delete(Location location) async {
@@ -90,7 +89,7 @@ class _LocationTabState extends State<LocationTab> {
     if (confirm == true) {
       try {
         await _service.deleteLocation(location.id);
-        _fetchData();
+        _fetchData(showLoader: true);
       } catch (e) {
         ScaffoldMessenger.of(context)
             .showSnackBar(SnackBar(content: Text("Error: $e")));
@@ -122,12 +121,11 @@ class _LocationTabState extends State<LocationTab> {
   Widget build(BuildContext context) {
     if (_isLoading) return const Center(child: CircularProgressIndicator());
     if (_error != null) {
-      return AsyncErrorWidget(error: _error!, onRetry: _fetchData);
+      return AsyncErrorWidget(
+          error: _error!, onRetry: () => _fetchData(showLoader: true));
     }
 
-    final filtered = _filteredLocations;
-    final paginated = _paginatedLocations;
-    final totalPages = (filtered.length / _itemsPerPage).ceil();
+    final totalPages = (_totalItems / _itemsPerPage).ceil();
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
@@ -162,7 +160,7 @@ class _LocationTabState extends State<LocationTab> {
             ],
           ),
           const SizedBox(height: 16),
-          if (filtered.isEmpty)
+          if (_locations.isEmpty)
             EmptyStateWidget.searching(
               isSearching: _searchController.text.isNotEmpty,
               searchQuery: _searchController.text,
@@ -192,7 +190,7 @@ class _LocationTabState extends State<LocationTab> {
                             textAlign: TextAlign.center,
                             style: TextStyle(fontWeight: FontWeight.bold)))),
               ],
-              rows: paginated
+              rows: _locations
                   .map((loc) => DataRow(cells: [
                         DataCell(Text(loc.name)),
                         DataCell(Text(loc.address ?? "-")),
@@ -218,7 +216,10 @@ class _LocationTabState extends State<LocationTab> {
             PaginationWidget(
               currentPage: _currentPage,
               totalPages: totalPages > 0 ? totalPages : 1,
-              onPageChanged: (page) => setState(() => _currentPage = page),
+              onPageChanged: (page) {
+                setState(() => _currentPage = page);
+                _fetchData(showLoader: true);
+              },
             ),
           ],
         ],

@@ -1,33 +1,53 @@
-from typing import List, Optional
+from typing import Optional
 
 from app.api.dependencies import require_admin
 from app.core.database import get_db
 from app.models import Location, User
-from app.schemas.location import LocationCreate, LocationResponse, LocationUpdate
+from app.schemas.location import (
+    LocationCreate,
+    LocationPageResponse,
+    LocationResponse,
+    LocationUpdate,
+)
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 router = APIRouter(prefix="/locations", tags=["Locations"])
 
 
 # Get all locations
-@router.get("", response_model=List[LocationResponse])
+@router.get("", response_model=LocationPageResponse)
 def get_all_locations(
-    skip: int = Query(0, ge=0, description="Number of records to skip"),
-    limit: int = Query(100, ge=1, le=1000, description="Max records to return"),
+    page: int = Query(1, ge=1),
+    limit: int = Query(10, ge=1, le=100),
+    search: Optional[str] = Query(None),
     location_type: Optional[str] = Query(None, description="Filter by location type"),
     db: Session = Depends(get_db),
 ):
     query = db.query(Location)
 
-    # Apply filters if provided
     if location_type:
         query = query.filter(Location.location_type == location_type)
 
-    # Get locations with pagination
-    locations = query.offset(skip).limit(limit).all()
+    if search:
+        term = f"%{search.lower()}%"
+        query = query.filter(
+            or_(
+                func.lower(Location.name).like(term),
+                func.lower(Location.address).like(term),
+            )
+        )
 
-    return locations
+    total = query.count()
+    items = (
+        query.order_by(Location.location_id.asc())
+        .offset((page - 1) * limit)
+        .limit(limit)
+        .all()
+    )
+
+    return {"items": items, "total": total, "page": page, "page_size": limit}
 
 
 # Get single location

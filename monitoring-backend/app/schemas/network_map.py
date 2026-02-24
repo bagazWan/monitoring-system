@@ -95,3 +95,17 @@ class MapTopologyResponse(BaseModel):
     fo_routes: List[FORouteResponse]
     devices: List[MapDevice]
     switches: List[MapSwitch]
+
+
+class NetworkNodePageResponse(BaseModel):
+    items: List[NetworkNodeResponse]
+    total: int
+    page: int
+    page_size: int
+
+
+class FORoutePageResponse(BaseModel):
+    items: List[FORouteResponse]
+    total: int
+    page: int
+    page_size: int

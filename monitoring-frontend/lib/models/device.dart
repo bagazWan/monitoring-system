@@ -90,3 +90,38 @@ class BaseNode {
     };
   }
 }
+
+class NodePage {
+  final List<BaseNode> items;
+  final int total;
+  final int page;
+  final int pageSize;
+
+  NodePage({
+    required this.items,
+    required this.total,
+    required this.page,
+    required this.pageSize,
+  });
+
+  factory NodePage.fromJson(Map<String, dynamic> json) {
+    final raw = json['items'] as List? ?? [];
+    return NodePage(
+      items: raw.map((e) {
+        if (e['node_kind'] == 'switch') {
+          return BaseNode.fromSwitchJson({
+            ...e,
+            'switch_id': e['id'],
+          });
+        }
+        return BaseNode.fromDeviceJson({
+          ...e,
+          'device_id': e['id'],
+        });
+      }).toList(),
+      total: json['total'] ?? 0,
+      page: json['page'] ?? 1,
+      pageSize: json['page_size'] ?? 10,
+    );
+  }
+}

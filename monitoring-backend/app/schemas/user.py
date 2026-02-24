@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Optional
+from typing import List, Optional
 
 from pydantic import BaseModel, Field
 from pydantic.networks import EmailStr
@@ -71,3 +71,10 @@ class UserResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class UserPageResponse(BaseModel):
+    items: List[UserResponse]
+    total: int
+    page: int
+    page_size: int

@@ -150,38 +150,20 @@ def build_uptime_trend(
     if not filters:
         return {"days": 0, "data": []}
 
-    earliest_history = (
-        db.query(func.min(StatusHistory.changed_at)).filter(or_(*filters)).scalar()
-    )
-
-    has_recent_history = (
-        db.query(StatusHistory.history_id)
-        .filter(StatusHistory.changed_at >= window_start)
-        .filter(or_(*filters))
-        .first()
-        is not None
-    )
-
-    if earliest_history is None:
-        start_dt = now.replace(hour=0, minute=0, second=0, microsecond=0)
-    elif has_recent_history:
-        start_dt = window_start
-    else:
-        start_dt = earliest_history.replace(hour=0, minute=0, second=0, microsecond=0)
-
-    days_span = (now.date() - start_dt.date()).days + 1
     day_map = {
-        (start_dt.date() + timedelta(days=i)): {"online": 0.0, "total": 0.0}
-        for i in range(days_span)
+        (window_start.date() + timedelta(days=i)): {"online": 0.0, "total": 0.0}
+        for i in range(days)
     }
 
     history_rows = (
         db.query(StatusHistory)
-        .filter(StatusHistory.changed_at >= start_dt)
+        .filter(StatusHistory.changed_at >= window_start)
         .filter(or_(*filters))
         .order_by(StatusHistory.changed_at.asc())
         .all()
     )
+
+    days_with_events = {row.changed_at.date() for row in history_rows}
 
     last_sub = (
         db.query(
@@ -189,7 +171,7 @@ def build_uptime_trend(
             StatusHistory.node_id,
             func.max(StatusHistory.changed_at).label("last_changed_at"),
         )
-        .filter(StatusHistory.changed_at < start_dt)
+        .filter(StatusHistory.changed_at < window_start)
         .filter(or_(*filters))
         .group_by(StatusHistory.node_type, StatusHistory.node_id)
         .subquery()
@@ -218,8 +200,17 @@ def build_uptime_trend(
     for node_type, node_id, current_status in node_keys:
         key = (node_type, node_id)
         events = history_map.get(key, [])
-        status = last_status_map.get(key, current_status)
-        cursor = start_dt
+
+        last_status = last_status_map.get(key)
+        if last_status is None:
+            if not events:
+                continue
+            status = events[0].status
+            cursor = events[0].changed_at
+            events = events[1:]
+        else:
+            status = last_status
+            cursor = window_start
 
         for ev in events:
             _add_interval(day_map, cursor, ev.changed_at, status == "online")
@@ -232,10 +223,12 @@ def build_uptime_trend(
     for day in sorted(day_map.keys()):
         total = day_map[day]["total"]
         online = day_map[day]["online"]
-        pct = (online / total * 100) if total > 0 else 0.0
-        data.append(
-            {"date": day.strftime("%Y-%m-%d"), "uptime_percentage": round(pct, 2)}
-        )
+        uptime = round((online / total * 100), 2) if total > 0 else None
+
+        if day not in days_with_events:
+            uptime = None
+
+        data.append({"date": day.strftime("%Y-%m-%d"), "uptime_percentage": uptime})
 
     return {"days": len(data), "data": data}
 

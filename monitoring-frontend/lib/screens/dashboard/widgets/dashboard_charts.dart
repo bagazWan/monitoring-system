@@ -179,16 +179,27 @@ class _UptimeTrendChart extends StatelessWidget {
         ),
         lineBarsData: [
           LineChartBarData(
-            spots: data
-                .asMap()
-                .entries
-                .map((e) => FlSpot(e.key.toDouble(), e.value.uptimePercentage))
-                .toList(),
+            spots: data.asMap().entries.map((e) {
+              final value = e.value.uptimePercentage;
+              return value == null
+                  ? FlSpot.nullSpot
+                  : FlSpot(e.key.toDouble(), value);
+            }).toList(),
             isCurved: true,
             curveSmoothness: 0.3,
             color: Colors.green,
             barWidth: 2,
-            dotData: const FlDotData(show: false),
+            dotData: FlDotData(
+              show: true,
+              checkToShowDot: (spot, barData) => !spot.isNull(),
+              getDotPainter: (spot, percent, barData, index) =>
+                  FlDotCirclePainter(
+                radius: 4,
+                color: Colors.green,
+                strokeWidth: 2,
+                strokeColor: Colors.white,
+              ),
+            ),
             belowBarData: BarAreaData(
               show: true,
               color: Colors.green.withOpacity(0.1),

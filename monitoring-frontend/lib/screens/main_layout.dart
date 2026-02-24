@@ -24,14 +24,6 @@ class _MainLayoutState extends State<MainLayout> {
   StreamSubscription? _alertSub;
   User? _currentUser;
 
-  final List<Widget> _pages = [
-    const DashboardScreen(),
-    const DeviceListScreen(),
-    const MapScreen(),
-    const AlertScreen(),
-    const UserManagementScreen(),
-  ];
-
   Future<void> _checkUser() async {
     try {
       final user = await AuthService().getCurrentUser();
@@ -114,6 +106,30 @@ class _MainLayoutState extends State<MainLayout> {
     bool isMobile = MediaQuery.of(context).size.width < 600;
     const Color headerColor = Colors.white;
     final Color dividerColor = Colors.grey[300]!;
+    final isAdmin = _currentUser?.role == 'admin';
+
+    final pages = <Widget>[
+      const DashboardScreen(),
+      const DeviceListScreen(),
+      const MapScreen(),
+      const AlertScreen(),
+      if (isAdmin) const UserManagementScreen(),
+    ];
+
+    if (_currentPageIndex >= pages.length) {
+      _currentPageIndex = 0;
+    }
+
+    final navItems = <BottomNavigationBarItem>[
+      const BottomNavigationBarItem(icon: Icon(Icons.dashboard), label: "Home"),
+      const BottomNavigationBarItem(icon: Icon(Icons.router), label: "Devices"),
+      const BottomNavigationBarItem(
+          icon: Icon(Icons.location_on), label: "Map"),
+      const BottomNavigationBarItem(
+          icon: Icon(Icons.notifications), label: "Alerts"),
+      if (isAdmin)
+        const BottomNavigationBarItem(icon: Icon(Icons.people), label: "Users"),
+    ];
 
     return Scaffold(
       appBar: AppBar(
@@ -163,18 +179,7 @@ class _MainLayoutState extends State<MainLayout> {
               currentIndex: _currentPageIndex,
               onTap: (index) => setState(() => _currentPageIndex = index),
               type: BottomNavigationBarType.fixed,
-              items: const [
-                BottomNavigationBarItem(
-                    icon: Icon(Icons.dashboard), label: "Home"),
-                BottomNavigationBarItem(
-                    icon: Icon(Icons.router), label: "Devices"),
-                BottomNavigationBarItem(
-                    icon: Icon(Icons.location_on), label: "Map"),
-                BottomNavigationBarItem(
-                    icon: Icon(Icons.notifications), label: "Alerts"),
-                BottomNavigationBarItem(
-                    icon: Icon(Icons.people), label: "Users"),
-              ],
+              items: navItems,
             )
           : null,
       body: Row(
@@ -189,7 +194,7 @@ class _MainLayoutState extends State<MainLayout> {
           Expanded(
             child: Container(
               color: Colors.grey[50],
-              child: _pages[_currentPageIndex],
+              child: pages[_currentPageIndex],
             ),
           ),
         ],

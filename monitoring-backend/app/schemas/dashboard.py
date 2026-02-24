@@ -24,7 +24,7 @@ class DashboardStats(BaseModel):
 
 class UptimeTrendPoint(BaseModel):
     date: str
-    uptime_percentage: float
+    uptime_percentage: Optional[float]
 
 
 class UptimeTrendResponse(BaseModel):

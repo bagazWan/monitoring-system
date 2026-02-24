@@ -95,7 +95,7 @@ class DashboardStats {
 
 class UptimeTrendPoint {
   final DateTime date;
-  final double uptimePercentage;
+  final double? uptimePercentage;
 
   UptimeTrendPoint({
     required this.date,
@@ -105,7 +105,9 @@ class UptimeTrendPoint {
   factory UptimeTrendPoint.fromJson(Map<String, dynamic> json) {
     return UptimeTrendPoint(
       date: DateTime.parse(json['date']),
-      uptimePercentage: (json['uptime_percentage'] as num).toDouble(),
+      uptimePercentage: json['uptime_percentage'] != null
+          ? (json['uptime_percentage'] as num).toDouble()
+          : null,
     );
   }
 }

@@ -35,7 +35,7 @@ class _SideMenuState extends State<SideMenu> {
       const NavigationRailDestination(
           icon: Icon(Icons.dashboard), label: Text('Dashboard')),
       const NavigationRailDestination(
-          icon: Icon(Icons.router), label: Text('Devices')),
+          icon: Icon(Icons.video_camera_back_rounded), label: Text('Devices')),
       const NavigationRailDestination(
           icon: Icon(Icons.location_on), label: Text('Map')),
       const NavigationRailDestination(

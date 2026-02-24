@@ -7,8 +7,13 @@ from app.api.dependencies import (
     require_technician_or_admin,
 )
 from app.core.database import get_db
-from app.models import Alert, SwitchAlert, User
-from app.schemas.alert import AlertResponse, AlertUpdate
+from app.models import Alert, Device, Location, Switch, SwitchAlert, User
+from app.schemas.alert import (
+    AlertBulkDeleteResponse,
+    AlertPageResponse,
+    AlertResponse,
+    AlertUpdate,
+)
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
@@ -62,22 +67,16 @@ def _alert_to_response_dict(alert_obj: Any) -> Dict[str, Any]:
     }
 
 
-@router.get("/", response_model=List[AlertResponse])
-def get_all_alerts(
-    status_filter: Optional[str] = Query(None, description="Filter alerts by status"),
-    severity: Optional[str] = Query(None, description="Filter by severity"),
-    start_date: Optional[datetime] = Query(None),
-    end_date: Optional[datetime] = Query(None),
-    assigned_to: Optional[int] = Query(None, description="Filter by assigned user"),
-    db: Session = Depends(get_db),
+def _apply_alert_filters(
+    device_query,
+    switch_query,
+    *,
+    status_filter: Optional[str],
+    severity: Optional[str],
+    start_date: Optional[datetime],
+    end_date: Optional[datetime],
+    location_name: Optional[str],
 ):
-    """
-    Return combined list of device and switch alerts
-    """
-    # Query all alerts
-    device_query = db.query(Alert)
-    switch_query = db.query(SwitchAlert)
-
     if status_filter:
         if status_filter == "active":
             device_query = device_query.filter(
@@ -94,12 +93,6 @@ def get_all_alerts(
         device_query = device_query.filter(Alert.severity == severity)
         switch_query = switch_query.filter(SwitchAlert.severity == severity)
 
-    if assigned_to:
-        device_query = device_query.filter(Alert.assigned_to_user_id == assigned_to)
-        switch_query = switch_query.filter(
-            SwitchAlert.assigned_to_user_id == assigned_to
-        )
-
     if start_date:
         device_query = device_query.filter(Alert.created_at >= start_date)
         switch_query = switch_query.filter(SwitchAlert.created_at >= start_date)
@@ -108,20 +101,64 @@ def get_all_alerts(
         device_query = device_query.filter(Alert.created_at <= end_date)
         switch_query = switch_query.filter(SwitchAlert.created_at <= end_date)
 
-    all_alerts = []
+    if location_name:
+        device_query = (
+            device_query.join(Device)
+            .join(Location)
+            .filter(Location.name == location_name)
+        )
+        switch_query = (
+            switch_query.join(Switch)
+            .join(Location)
+            .filter(Location.name == location_name)
+        )
 
-    # Normalize device alerts
+    return device_query, switch_query
+
+
+@router.get("/", response_model=AlertPageResponse)
+def get_all_alerts(
+    status_filter: Optional[str] = Query(None, description="Filter alerts by status"),
+    severity: Optional[str] = Query(None, description="Filter by severity"),
+    start_date: Optional[datetime] = Query(None),
+    end_date: Optional[datetime] = Query(None),
+    location_name: Optional[str] = Query(None),
+    page: int = Query(1, ge=1),
+    limit: int = Query(10, ge=1, le=100),
+    db: Session = Depends(get_db),
+):
+    device_query = db.query(Alert)
+    switch_query = db.query(SwitchAlert)
+
+    device_query, switch_query = _apply_alert_filters(
+        device_query,
+        switch_query,
+        status_filter=status_filter,
+        severity=severity,
+        start_date=start_date,
+        end_date=end_date,
+        location_name=location_name,
+    )
+
+    all_alerts = []
     for a in device_query:
         all_alerts.append(_alert_to_response_dict(a))
-
-    # Normalize switch alerts
     for a in switch_query:
         all_alerts.append(_alert_to_response_dict(a))
 
-    # Sort by newest first (created_at may none)
     all_alerts.sort(key=lambda x: x.get("created_at") or "", reverse=True)
 
-    return all_alerts
+    total = len(all_alerts)
+    start = (page - 1) * limit
+    end = start + limit
+    items = all_alerts[start:end]
+
+    return {
+        "items": items,
+        "total": total,
+        "page": page,
+        "page_size": limit,
+    }
 
 
 @router.get("/active", response_model=List[AlertResponse])
@@ -227,3 +264,49 @@ def delete_alert(
     db.commit()
 
     return None
+
+
+@router.delete(
+    "/", response_model=AlertBulkDeleteResponse, status_code=status.HTTP_200_OK
+)
+def delete_alerts_bulk(
+    status_filter: Optional[str] = Query(None),
+    severity: Optional[str] = Query(None),
+    start_date: Optional[datetime] = Query(None),
+    end_date: Optional[datetime] = Query(None),
+    location_name: Optional[str] = Query(None),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin),
+):
+    device_query = db.query(Alert.alert_id)
+    switch_query = db.query(SwitchAlert.alert_id)
+
+    device_query, switch_query = _apply_alert_filters(
+        device_query,
+        switch_query,
+        status_filter=status_filter,
+        severity=severity,
+        start_date=start_date,
+        end_date=end_date,
+        location_name=location_name,
+    )
+
+    device_ids = [row.alert_id for row in device_query.all()]
+    switch_ids = [row.alert_id for row in switch_query.all()]
+
+    deleted = 0
+    if device_ids:
+        deleted += (
+            db.query(Alert)
+            .filter(Alert.alert_id.in_(device_ids))
+            .delete(synchronize_session=False)
+        )
+    if switch_ids:
+        deleted += (
+            db.query(SwitchAlert)
+            .filter(SwitchAlert.alert_id.in_(switch_ids))
+            .delete(synchronize_session=False)
+        )
+
+    db.commit()
+    return {"deleted": deleted}

@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Optional
+from typing import List, Optional
 
 from pydantic import BaseModel, Field
 
@@ -39,3 +39,14 @@ class AlertFilters(BaseModel):
     device_id: Optional[int] = None
     switch_id: Optional[int] = None
     category_id: Optional[int] = None
+
+
+class AlertPageResponse(BaseModel):
+    items: List[AlertResponse]
+    total: int
+    page: int
+    page_size: int
+
+
+class AlertBulkDeleteResponse(BaseModel):
+    deleted: int

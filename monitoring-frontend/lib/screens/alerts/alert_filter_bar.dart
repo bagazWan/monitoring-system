@@ -19,6 +19,8 @@ class AlertFilterBar extends StatelessWidget {
   final List<String>? locations;
   final ValueChanged<String?>? onLocationChanged;
 
+  final Widget? trailingAction;
+
   const AlertFilterBar({
     super.key,
     this.onRefresh,
@@ -32,6 +34,7 @@ class AlertFilterBar extends StatelessWidget {
     this.locations,
     this.onLocationChanged,
     this.onClear,
+    this.trailingAction,
   });
 
   @override
@@ -112,6 +115,7 @@ class AlertFilterBar extends StatelessWidget {
                     const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               ),
             ),
+          if (trailingAction != null) trailingAction!,
         ],
       ),
     );

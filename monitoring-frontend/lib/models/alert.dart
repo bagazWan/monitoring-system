@@ -57,3 +57,27 @@ class Alert {
     );
   }
 }
+
+class AlertPage {
+  final List<Alert> items;
+  final int total;
+  final int page;
+  final int pageSize;
+
+  AlertPage({
+    required this.items,
+    required this.total,
+    required this.page,
+    required this.pageSize,
+  });
+
+  factory AlertPage.fromJson(Map<String, dynamic> json) {
+    return AlertPage(
+      items:
+          (json['items'] as List? ?? []).map((e) => Alert.fromJson(e)).toList(),
+      total: json['total'] ?? 0,
+      page: json['page'] ?? 1,
+      pageSize: json['page_size'] ?? 10,
+    );
+  }
+}

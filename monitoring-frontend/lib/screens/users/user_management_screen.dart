@@ -163,8 +163,10 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                     icon: const Icon(Icons.add),
                     label: const Text('Add User'),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.blue[700],
+                      backgroundColor: Colors.blueAccent,
                       foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8)),
                     ),
                   ),
                 ],

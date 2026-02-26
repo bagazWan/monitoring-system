@@ -7,7 +7,6 @@ import '../dialogs/alert_delete_dialog.dart';
 import '../../../models/alert.dart';
 import '../../../services/alert_service.dart';
 import '../../../services/auth_service.dart';
-import '../../../services/device_service.dart';
 import '../../../services/websocket_service.dart';
 import '../../../../widgets/pagination.dart';
 import '../../../../widgets/visual_feedback.dart';
@@ -41,7 +40,6 @@ class _AlertLogTabState extends State<AlertLogTab> {
   void initState() {
     super.initState();
     _loadUser();
-    _loadLocations();
     _fetchLogs();
     _alertsRefreshSub = WebSocketService().alertsRefresh.listen((_) {
       if (mounted) _fetchLogs();
@@ -62,18 +60,13 @@ class _AlertLogTabState extends State<AlertLogTab> {
     } catch (_) {}
   }
 
-  Future<void> _loadLocations() async {
-    try {
-      final locations = await DeviceService().getLocations();
-      if (!mounted) return;
-      setState(() {
-        _locations = locations
-            .map((l) => l.name)
-            .where((n) => n.isNotEmpty)
-            .toList()
-          ..sort();
-      });
-    } catch (_) {}
+  List<String> _deriveAlertLocations(List<Alert> logs) {
+    return logs
+        .map((l) => l.locationName)
+        .where((n) => n.trim().isNotEmpty && n.trim() != "-")
+        .toSet()
+        .toList()
+      ..sort();
   }
 
   Future<void> _fetchLogs() async {
@@ -95,6 +88,7 @@ class _AlertLogTabState extends State<AlertLogTab> {
       if (!mounted) return;
       setState(() {
         _logs = page.items;
+        _locations = _deriveAlertLocations(page.items);
         _totalItems = page.total;
       });
     } catch (e) {
@@ -131,6 +125,7 @@ class _AlertLogTabState extends State<AlertLogTab> {
     setState(() {
       _logs.removeWhere((item) => item.alertId == alert.alertId);
       _totalItems = (_totalItems - 1).clamp(0, _totalItems);
+      _locations = _deriveAlertLocations(_logs);
     });
 
     if (_logs.isEmpty && _currentPage > 1) {

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../widgets/filter_dropdown.dart';
+import '../../../widgets/filter_dropdown.dart';
 
 class DeviceFilterBar extends StatelessWidget {
   final String? selectedType;

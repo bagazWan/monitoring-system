@@ -12,6 +12,8 @@ import 'widgets/summary_grid.dart';
 import 'widgets/top_down.dart';
 import 'widgets/dashboard_charts.dart';
 
+part 'widgets/dashboard_screen_widgets.dart';
+
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
 
@@ -19,41 +21,60 @@ class DashboardScreen extends StatefulWidget {
   State<DashboardScreen> createState() => _DashboardScreenState();
 }
 
-class _DashboardScreenState extends State<DashboardScreen> {
+class _DashboardScreenState extends State<DashboardScreen>
+    with DashboardScreenWidgets {
   final DeviceService _deviceService = DeviceService();
   final DashboardService _dashboardService = DashboardService();
+  final ScrollController _scrollController = ScrollController();
 
-  late Future<DashboardStats> _dashboardStatsFuture;
   Timer? _refreshTimer;
   Timer? _trafficTimer;
   StreamSubscription<StatusChangeEvent>? _statusSubscription;
   StreamSubscription<WebSocketConnectionState>? _connectionSubscription;
 
-  List<Location> _locations = [];
-  bool _isLoadingLocations = true;
-  String? _selectedLocationName; // null == All
+  final GlobalKey _chartsKey = GlobalKey();
+  final ValueNotifier<bool> _chartsVisible = ValueNotifier(false);
+  final GlobalKey _topDownKey = GlobalKey();
+  final ValueNotifier<bool> _topDownVisible = ValueNotifier(false);
 
-  final List<NetworkActivityData> _trafficData = [];
+  bool _chartsInitialized = false;
+
+  final ValueNotifier<List<Location>> _locations = ValueNotifier([]);
+  final ValueNotifier<bool> _isLoadingLocations = ValueNotifier(true);
+  final ValueNotifier<String?> _selectedLocationName = ValueNotifier(null);
+
+  final ValueNotifier<List<NetworkActivityData>> _trafficData =
+      ValueNotifier([]);
   final int _maxTrafficPoints = 60;
-  final List<UptimeTrendPoint> _uptimeTrendData = [];
-  int _topDownWindowDays = 7;
-  bool _isTrafficLoading = true;
-  bool _isUptimeLoading = true;
+
+  final ValueNotifier<List<UptimeTrendPoint>> _uptimeTrendData =
+      ValueNotifier([]);
+  final ValueNotifier<int> _topDownWindowDays = ValueNotifier(7);
+
+  final ValueNotifier<bool> _isTrafficLoading = ValueNotifier(true);
+  final ValueNotifier<bool> _isUptimeLoading = ValueNotifier(true);
+
+  final ValueNotifier<bool> _isStatsLoading = ValueNotifier(true);
+  final ValueNotifier<DashboardStats?> _dashboardStats = ValueNotifier(null);
+  final ValueNotifier<Object?> _statsError = ValueNotifier(null);
 
   @override
   void initState() {
     super.initState();
-    _dashboardStatsFuture = _dashboardService.getDashboardStats(
-      topDownWindowDays: _topDownWindowDays,
-    );
+    _refreshDashboard();
     _initLocations();
     _initWebSocket();
-    _initTraffic();
-    _refreshUptimeTrend();
+
     _refreshTimer = Timer.periodic(const Duration(seconds: 30), (_) {
       _refreshDashboard();
-      _refreshUptimeTrend();
+      if (_chartsInitialized) {
+        _refreshUptimeTrend();
+      }
     });
+
+    _scrollController.addListener(_checkLazyLoadTargets);
+    WidgetsBinding.instance
+        .addPostFrameCallback((_) => _checkLazyLoadTargets());
   }
 
   Future<void> _initLocations() async {
@@ -64,16 +85,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
       locations
           .sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
 
-      setState(() {
-        _locations = locations;
-        _isLoadingLocations = false;
-      });
+      _locations.value = locations;
+      _isLoadingLocations.value = false;
     } catch (_) {
       if (!mounted) return;
-      setState(() {
-        _locations = [];
-        _isLoadingLocations = false;
-      });
+      _locations.value = [];
+      _isLoadingLocations.value = false;
     }
   }
 
@@ -85,32 +102,45 @@ class _DashboardScreenState extends State<DashboardScreen> {
     _statusSubscription = wsService.statusChanges.listen((_) {
       if (!mounted) return;
       _refreshDashboard();
-      _refreshUptimeTrend();
+      if (_chartsInitialized) {
+        _refreshUptimeTrend();
+      }
     });
   }
 
-  void _initTraffic() {
+  void _startChartData() {
+    if (_chartsInitialized) return;
+    _chartsInitialized = true;
     _refreshTraffic();
+    _refreshUptimeTrend();
     _trafficTimer = Timer.periodic(const Duration(seconds: 30), (_) {
       _refreshTraffic();
     });
   }
 
   int? _resolveSelectedLocationId() {
-    if (_selectedLocationName == null) return null;
-    final match = _locations.where((l) => l.name == _selectedLocationName);
+    final selected = _selectedLocationName.value;
+    if (selected == null) return null;
+    final match = _locations.value.where((l) => l.name == selected);
     if (match.isEmpty) return null;
     return match.first.id;
   }
 
-  void _refreshDashboard() {
-    if (!mounted) return;
-    setState(() {
-      _dashboardStatsFuture = _dashboardService.getDashboardStats(
+  Future<void> _refreshDashboard() async {
+    _isStatsLoading.value = true;
+    _statsError.value = null;
+
+    try {
+      final stats = await _dashboardService.getDashboardStats(
         locationId: _resolveSelectedLocationId(),
-        topDownWindowDays: _topDownWindowDays,
+        topDownWindowDays: _topDownWindowDays.value,
       );
-    });
+      _dashboardStats.value = stats;
+    } catch (e) {
+      _statsError.value = e;
+    } finally {
+      _isStatsLoading.value = false;
+    }
   }
 
   Future<void> _refreshTraffic() async {
@@ -122,9 +152,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       if (!mounted) return;
 
       if (traffic.inboundMbps == null && traffic.outboundMbps == null) {
-        setState(() {
-          _isTrafficLoading = false;
-        });
+        _isTrafficLoading.value = false;
         return;
       }
 
@@ -134,18 +162,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
         outbound: traffic.outboundMbps ?? 0,
       );
 
-      setState(() {
-        _trafficData.add(dataPoint);
-        if (_trafficData.length > _maxTrafficPoints) {
-          _trafficData.removeAt(0);
-        }
-        _isTrafficLoading = false;
-      });
+      final updated = List<NetworkActivityData>.from(_trafficData.value)
+        ..add(dataPoint);
+      if (updated.length > _maxTrafficPoints) {
+        updated.removeAt(0);
+      }
+
+      _trafficData.value = updated;
+      _isTrafficLoading.value = false;
     } catch (_) {
       if (!mounted) return;
-      setState(() {
-        _isTrafficLoading = false;
-      });
+      _isTrafficLoading.value = false;
     }
   }
 
@@ -156,33 +183,50 @@ class _DashboardScreenState extends State<DashboardScreen> {
         locationId: _resolveSelectedLocationId(),
       );
       if (!mounted) return;
-      setState(() {
-        _uptimeTrendData
-          ..clear()
-          ..addAll(trend.data);
-        _isUptimeLoading = false;
-      });
+
+      _uptimeTrendData.value = List<UptimeTrendPoint>.from(trend.data);
+      _isUptimeLoading.value = false;
     } catch (_) {
       if (!mounted) return;
-      setState(() {
-        _isUptimeLoading = false;
-      });
+      _isUptimeLoading.value = false;
     }
   }
 
   Future<void> _handleManualRefresh() async {
-    _refreshDashboard();
-    await _refreshTraffic();
-    await _refreshUptimeTrend();
-    await _dashboardStatsFuture;
+    await _refreshDashboard();
+    if (_chartsInitialized) {
+      await _refreshTraffic();
+      await _refreshUptimeTrend();
+    }
   }
 
   void _resetTrafficData() {
-    setState(() {
-      _trafficData.clear();
-      _isTrafficLoading = true;
-    });
-    _refreshTraffic();
+    _trafficData.value = [];
+    _isTrafficLoading.value = true;
+    if (_chartsInitialized) {
+      _refreshTraffic();
+    }
+  }
+
+  void _checkLazyLoadTargets() {
+    if (!_chartsVisible.value && _isKeyVisible(_chartsKey)) {
+      _chartsVisible.value = true;
+      _startChartData();
+    }
+    if (!_topDownVisible.value && _isKeyVisible(_topDownKey)) {
+      _topDownVisible.value = true;
+    }
+  }
+
+  bool _isKeyVisible(GlobalKey key) {
+    final ctx = key.currentContext;
+    if (ctx == null) return false;
+    final box = ctx.findRenderObject() as RenderBox?;
+    if (box == null || !box.hasSize) return false;
+
+    final position = box.localToGlobal(Offset.zero);
+    final viewportHeight = MediaQuery.of(ctx).size.height;
+    return position.dy < viewportHeight;
   }
 
   @override
@@ -191,105 +235,26 @@ class _DashboardScreenState extends State<DashboardScreen> {
     _trafficTimer?.cancel();
     _statusSubscription?.cancel();
     _connectionSubscription?.cancel();
+    _scrollController.dispose();
+
+    _chartsVisible.dispose();
+    _topDownVisible.dispose();
+    _locations.dispose();
+    _isLoadingLocations.dispose();
+    _selectedLocationName.dispose();
+    _trafficData.dispose();
+    _uptimeTrendData.dispose();
+    _topDownWindowDays.dispose();
+    _isTrafficLoading.dispose();
+    _isUptimeLoading.dispose();
+    _isStatsLoading.dispose();
+    _dashboardStats.dispose();
+    _statsError.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return RefreshIndicator(
-        onRefresh: _handleManualRefresh,
-        child: ScrollConfiguration(
-          behavior: ScrollConfiguration.of(context).copyWith(
-            scrollbars: false,
-          ),
-          child: SingleChildScrollView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: FutureBuilder<DashboardStats>(
-                future: _dashboardStatsFuture,
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting &&
-                      !snapshot.hasData) {
-                    return const Center(child: CircularProgressIndicator());
-                  }
-
-                  if (snapshot.hasError) {
-                    return AsyncErrorWidget(
-                      error: snapshot.error!,
-                      onRetry: _handleManualRefresh,
-                    );
-                  }
-
-                  if (!snapshot.hasData) {
-                    return const EmptyStateWidget(
-                      message: "No dashboard data available",
-                      icon: Icons.dashboard_customize_outlined,
-                    );
-                  }
-
-                  final stats = snapshot.data!;
-                  final offlineCount = stats.totalDevices - stats.onlineDevices;
-
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        "Overview",
-                        style: TextStyle(
-                            fontSize: 24, fontWeight: FontWeight.bold),
-                      ),
-                      const SizedBox(height: 24),
-                      DashboardFilters(
-                        isLoading: _isLoadingLocations,
-                        locations: _locations,
-                        selectedLocationName: _selectedLocationName,
-                        onLocationChanged: (value) {
-                          setState(() {
-                            _selectedLocationName = value;
-                            _dashboardStatsFuture =
-                                _dashboardService.getDashboardStats(
-                              locationId: _resolveSelectedLocationId(),
-                              topDownWindowDays: _topDownWindowDays,
-                            );
-                          });
-                          _resetTrafficData();
-                          _refreshUptimeTrend();
-                        },
-                      ),
-                      const SizedBox(height: 20),
-                      DashboardSummaryGrid(
-                        stats: stats,
-                        offlineCount: offlineCount,
-                      ),
-                      const SizedBox(height: 30),
-                      DashboardCharts(
-                        trafficData: _trafficData,
-                        isTrafficLoading: _isTrafficLoading,
-                        uptimeData: _uptimeTrendData,
-                        isUptimeLoading: _isUptimeLoading,
-                      ),
-                      const SizedBox(height: 30),
-                      DashboardTopDown(
-                        stats: stats,
-                        selectedWindowDays: _topDownWindowDays,
-                        onWindowChanged: (window) {
-                          setState(() {
-                            _topDownWindowDays = window;
-                            _dashboardStatsFuture =
-                                _dashboardService.getDashboardStats(
-                              locationId: _resolveSelectedLocationId(),
-                              topDownWindowDays: _topDownWindowDays,
-                            );
-                          });
-                        },
-                      ),
-                    ],
-                  );
-                },
-              ),
-            ),
-          ),
-        ));
+    return buildDashboardScreen(context);
   }
 }

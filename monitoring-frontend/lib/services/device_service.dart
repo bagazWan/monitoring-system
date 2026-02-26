@@ -137,10 +137,20 @@ class DeviceService {
   }
 
   Future<List<Location>> getLocations() async {
-    final response = await http.get(Uri.parse(ApiConfig.locations));
+    final response = await http.get(
+      Uri.parse(ApiConfig.locations),
+      headers: await _getHeaders(),
+    );
+
     if (response.statusCode == 200) {
-      final List<dynamic> data = jsonDecode(response.body);
-      return data.map((j) => Location.fromJson(j)).toList();
+      final data = jsonDecode(response.body);
+      if (data is List) {
+        return data.map((j) => Location.fromJson(j)).toList();
+      }
+      if (data is Map<String, dynamic>) {
+        final items = data['items'] as List? ?? [];
+        return items.map((j) => Location.fromJson(j)).toList();
+      }
     }
     throw Exception('Failed to load locations');
   }
@@ -152,11 +162,16 @@ class DeviceService {
     );
 
     if (response.statusCode == 200) {
-      final List<dynamic> data = json.decode(response.body);
-      return data.map((json) => NetworkNode.fromJson(json)).toList();
-    } else {
-      throw Exception('Failed to load network nodes');
+      final data = json.decode(response.body);
+      if (data is List) {
+        return data.map((json) => NetworkNode.fromJson(json)).toList();
+      }
+      if (data is Map<String, dynamic>) {
+        final items = data['items'] as List? ?? [];
+        return items.map((json) => NetworkNode.fromJson(json)).toList();
+      }
     }
+    throw Exception('Failed to load network nodes');
   }
 
   Future<List<SwitchSummary>> getSwitches() async {

@@ -152,6 +152,14 @@ async def process_librenms_alerts(librenms_alerts: List[Dict[str, Any]]) -> int:
                     )
                     continue
 
+                device_name = target_device.name if target_device else None
+                switch_name = target_switch.name if target_switch else None
+                location_name = None
+                if target_device and target_device.location:
+                    location_name = target_device.location.name
+                if target_switch and target_switch.location:
+                    location_name = target_switch.location.name
+
                 # Determine whether to create/update SwitchAlert or Alert
                 Model = SwitchAlert if target_switch else Alert
 
@@ -214,6 +222,9 @@ async def process_librenms_alerts(librenms_alerts: List[Dict[str, Any]]) -> int:
                                         "switch_id": getattr(
                                             existing, "switch_id", None
                                         ),
+                                        "device_name": device_name,
+                                        "switch_name": switch_name,
+                                        "location_name": location_name,
                                         "alert_type": existing.alert_type,
                                         "severity": existing.severity,
                                         "message": existing.message,
@@ -272,6 +283,9 @@ async def process_librenms_alerts(librenms_alerts: List[Dict[str, Any]]) -> int:
                                 "librenms_alert_id": librenms_alert_id_int,
                                 "device_id": getattr(new_alert, "device_id", None),
                                 "switch_id": getattr(new_alert, "switch_id", None),
+                                "device_name": device_name,
+                                "switch_name": switch_name,
+                                "location_name": location_name,
                                 "alert_type": new_alert.alert_type,
                                 "severity": new_alert.severity,
                                 "message": new_alert.message,

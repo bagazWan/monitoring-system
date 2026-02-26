@@ -16,7 +16,10 @@ class AlertNotification {
     // Remove existing notification if any
     dismiss();
 
-    final overlay = Overlay.of(context);
+    final overlay = Overlay.maybeOf(context);
+    if (overlay == null) {
+      return;
+    }
 
     _currentEntry = OverlayEntry(
       builder: (context) => Positioned(

@@ -45,21 +45,36 @@ class _MainLayoutState extends State<MainLayout> {
       final severity = (alertData['severity'] ?? 'info').toString();
       final message = (alertData['message'] ?? 'New System Alert').toString();
 
+      final deviceName = alertData['device_name']?.toString();
+      final switchName = alertData['switch_name']?.toString();
+      final locationName = alertData['location_name']?.toString();
+
       final deviceId = alertData['device_id'];
       final switchId = alertData['switch_id'];
 
-      AlertNotification.show(
-        context,
-        message: message,
-        severity: severity,
-        deviceName: deviceId != null
-            ? 'Device ID: $deviceId'
-            : (switchId != null ? 'Switch ID: $switchId' : null),
-        onTap: () {
-          AlertNotification.dismiss();
-          setState(() => _currentPageIndex = 3);
-        },
-      );
+      final label = deviceName ??
+          switchName ??
+          (deviceId != null
+              ? 'Device ID: $deviceId'
+              : (switchId != null ? 'Switch ID: $switchId' : null));
+
+      final displayLabel = locationName != null && locationName.isNotEmpty
+          ? '$label • $locationName'
+          : label;
+
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        AlertNotification.show(
+          context,
+          message: message,
+          severity: severity,
+          deviceName: displayLabel,
+          onTap: () {
+            AlertNotification.dismiss();
+            setState(() => _currentPageIndex = 3);
+          },
+        );
+      });
     });
   }
 

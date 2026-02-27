@@ -155,6 +155,19 @@ class DeviceService {
     throw Exception('Failed to load locations');
   }
 
+  Future<List<String>> getLocationsWithNodes() async {
+    final response = await http.get(
+      Uri.parse('${ApiConfig.locations}/with-nodes'),
+      headers: await _getHeaders(),
+    );
+
+    if (response.statusCode == 200) {
+      final List data = jsonDecode(response.body);
+      return data.map((e) => e.toString()).toList();
+    }
+    throw Exception('Failed to load locations with nodes');
+  }
+
   Future<List<NetworkNode>> getNetworkNodes() async {
     final response = await http.get(
       Uri.parse(ApiConfig.networkNodes),

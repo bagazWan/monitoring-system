@@ -19,7 +19,9 @@ class UserManagementScreen extends StatefulWidget {
 class _UserManagementScreenState extends State<UserManagementScreen> {
   final UserService _userService = UserService();
   StreamSubscription<StatusChangeEvent>? _statusSubscription;
+
   bool _isLoading = true;
+  bool _isFetching = false;
   List<User> _users = [];
   int _totalItems = 0;
   String? _error;
@@ -32,7 +34,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
   @override
   void initState() {
     super.initState();
-    _fetchUsers();
+    _fetchUsers(initial: true);
     _initWebSocket();
     _searchController.addListener(_onSearchChanged);
   }
@@ -70,11 +72,19 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
     });
   }
 
-  Future<void> _fetchUsers() async {
-    setState(() {
-      _isLoading = true;
-      _error = null;
-    });
+  Future<void> _fetchUsers({bool initial = false}) async {
+    if (initial) {
+      setState(() {
+        _isLoading = true;
+        _error = null;
+      });
+    } else {
+      setState(() {
+        _isFetching = true;
+        _error = null;
+      });
+    }
+
     try {
       final page = await _userService.getUsers(
         page: _currentPage,
@@ -89,6 +99,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
           _users = page.items;
           _totalItems = page.total;
           _isLoading = false;
+          _isFetching = false;
         });
 
         final totalPages = (_totalItems / _itemsPerPage).ceil().clamp(1, 9999);
@@ -103,6 +114,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
         setState(() {
           _error = e.toString();
           _isLoading = false;
+          _isFetching = false;
         });
       }
     }
@@ -131,129 +143,148 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
     if (_error != null) {
       return AsyncErrorWidget(
         error: _error!,
-        onRetry: _fetchUsers,
+        onRetry: () => _fetchUsers(initial: true),
         message: 'Failed to load users',
       );
     }
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+    return Scaffold(
+      backgroundColor: Colors.grey[50],
+      body: RefreshIndicator(
+        onRefresh: () => _fetchUsers(initial: true),
+        child: CustomScrollView(
+          slivers: [
+            SliverToBoxAdapter(child: _buildHeader()),
+            _buildUsersTable(),
+            SliverToBoxAdapter(child: _buildPagination()),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHeader() {
+    return Padding(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            "User Management",
+            style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 24),
+          Row(
             children: [
-              const Text(
-                "User Management",
-                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+              Expanded(
+                child: SearchBarWidget(
+                  controller: _searchController,
+                  hintText: 'Search by username or name',
+                ),
               ),
-              const SizedBox(height: 24),
-              Row(
-                children: [
-                  Expanded(
-                    child: SearchBarWidget(
-                      controller: _searchController,
-                      hintText: 'Search by username or name',
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  ElevatedButton.icon(
-                    onPressed: () => _openUserDialog(),
-                    icon: const Icon(Icons.add),
-                    label: const Text('Add User'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.blueAccent,
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8)),
-                    ),
-                  ),
-                ],
+              const SizedBox(width: 16),
+              ElevatedButton.icon(
+                onPressed: () => _openUserDialog(),
+                icon: const Icon(Icons.add),
+                label: const Text('Add User'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.blueAccent,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8)),
+                ),
               ),
             ],
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildUsersTable() {
+    if (_users.isEmpty) {
+      return SliverFillRemaining(
+        child: EmptyStateWidget.searching(
+          isSearching: _searchController.text.isNotEmpty,
+          searchQuery: _searchController.text,
+          label: 'users',
+          defaultIcon: Icons.people_outline,
         ),
-        Expanded(
-          child: _users.isEmpty
-              ? EmptyStateWidget.searching(
-                  isSearching: _searchController.text.isNotEmpty,
-                  searchQuery: _searchController.text,
-                  label: 'users',
-                  defaultIcon: Icons.people_outline,
-                )
-              : SingleChildScrollView(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: CustomDataTable(
-                    columns: const [
-                      DataColumn(
-                          label: Expanded(
-                              child: Text("Username",
-                                  style:
-                                      TextStyle(fontWeight: FontWeight.bold)))),
-                      DataColumn(
-                          label: Expanded(
-                              child: Text("Full Name",
-                                  style:
-                                      TextStyle(fontWeight: FontWeight.bold)))),
-                      DataColumn(
-                          label: Expanded(
-                              child: Text("Email",
-                                  style:
-                                      TextStyle(fontWeight: FontWeight.bold)))),
-                      DataColumn(
-                          label: Expanded(
-                              child: Text("Role",
-                                  textAlign: TextAlign.center,
-                                  style:
-                                      TextStyle(fontWeight: FontWeight.bold)))),
-                      DataColumn(
-                          label: Expanded(
-                              child: Text("Actions",
-                                  textAlign: TextAlign.center,
-                                  style:
-                                      TextStyle(fontWeight: FontWeight.bold)))),
+      );
+    }
+
+    return SliverPadding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      sliver: SliverToBoxAdapter(
+        child: Column(
+          children: [
+            CustomDataTable(
+              columns: const [
+                DataColumn(
+                    label: Expanded(
+                        child: Text("Username",
+                            style: TextStyle(fontWeight: FontWeight.bold)))),
+                DataColumn(
+                    label: Expanded(
+                        child: Text("Full Name",
+                            style: TextStyle(fontWeight: FontWeight.bold)))),
+                DataColumn(
+                    label: Expanded(
+                        child: Text("Email",
+                            style: TextStyle(fontWeight: FontWeight.bold)))),
+                DataColumn(
+                    label: Expanded(
+                        child: Text("Role",
+                            textAlign: TextAlign.center,
+                            style: TextStyle(fontWeight: FontWeight.bold)))),
+                DataColumn(
+                    label: Expanded(
+                        child: Text("Actions",
+                            textAlign: TextAlign.center,
+                            style: TextStyle(fontWeight: FontWeight.bold)))),
+              ],
+              rows: _users.map((user) {
+                return DataRow(cells: [
+                  DataCell(Text(user.username,
+                      style: const TextStyle(fontWeight: FontWeight.w500))),
+                  DataCell(Text(user.fullName)),
+                  DataCell(Text(user.email)),
+                  DataCell(Center(child: _buildRoleBadge(user.role))),
+                  DataCell(Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      IconButton(
+                        tooltip: 'Edit',
+                        icon: const Icon(Icons.edit, color: Colors.blue),
+                        onPressed: () => _openUserDialog(user: user),
+                      ),
+                      IconButton(
+                        tooltip: 'Delete',
+                        icon: const Icon(Icons.delete, color: Colors.red),
+                        onPressed: () => _deleteUser(user.id),
+                      ),
                     ],
-                    rows: _users.map((user) {
-                      return DataRow(cells: [
-                        DataCell(Text(user.username,
-                            style:
-                                const TextStyle(fontWeight: FontWeight.w500))),
-                        DataCell(Text(user.fullName)),
-                        DataCell(Text(user.email)),
-                        DataCell(Center(child: _buildRoleBadge(user.role))),
-                        DataCell(Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            IconButton(
-                              tooltip: 'Edit',
-                              icon: const Icon(Icons.edit, color: Colors.blue),
-                              onPressed: () => _openUserDialog(user: user),
-                            ),
-                            IconButton(
-                              tooltip: 'Delete',
-                              icon: const Icon(Icons.delete, color: Colors.red),
-                              onPressed: () => _deleteUser(user.id),
-                            ),
-                          ],
-                        )),
-                      ]);
-                    }).toList(),
-                  ),
-                ),
+                  )),
+                ]);
+              }).toList(),
+            ),
+          ],
         ),
-        Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: PaginationWidget(
-            currentPage: _currentPage,
-            totalPages: _totalPages,
-            onPageChanged: (page) {
-              setState(() => _currentPage = page);
-              _fetchUsers();
-            },
-          ),
-        ),
-      ],
+      ),
+    );
+  }
+
+  Widget _buildPagination() {
+    return Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: PaginationWidget(
+        currentPage: _currentPage,
+        totalPages: _totalPages,
+        onPageChanged: (page) {
+          setState(() => _currentPage = page);
+          _fetchUsers();
+        },
+      ),
     );
   }
 

@@ -31,6 +31,24 @@ class AlertService {
     }
   }
 
+  Future<List<String>> getAlertLocations({String? status}) async {
+    final params = <String, String>{};
+    if (status != null && status.isNotEmpty) {
+      params['status_filter'] = status;
+    }
+
+    final uri = Uri.parse('${ApiConfig.alerts}/locations')
+        .replace(queryParameters: params.isEmpty ? null : params);
+
+    final response = await http.get(uri, headers: await _getHeaders());
+
+    if (response.statusCode == 200) {
+      final List data = json.decode(response.body);
+      return data.map((e) => e.toString()).toList();
+    }
+    throw Exception('Failed to load alert locations');
+  }
+
   Future<AlertPage> getAlertLogs({
     DateTime? startDate,
     DateTime? endDate,

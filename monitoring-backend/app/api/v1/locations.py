@@ -1,8 +1,8 @@
-from typing import Optional
+from typing import List, Optional
 
 from app.api.dependencies import require_admin
 from app.core.database import get_db
-from app.models import Location, User
+from app.models import Device, Location, Switch, User
 from app.schemas.location import (
     LocationCreate,
     LocationPageResponse,
@@ -48,6 +48,25 @@ def get_all_locations(
     )
 
     return {"items": items, "total": total, "page": page, "page_size": limit}
+
+
+@router.get("/with-nodes", response_model=List[str])
+def get_locations_with_nodes(db: Session = Depends(get_db)):
+    device_locations = (
+        db.query(Location.name)
+        .join(Device, Location.location_id == Device.location_id)
+        .distinct()
+        .all()
+    )
+    switch_locations = (
+        db.query(Location.name)
+        .join(Switch, Location.location_id == Switch.location_id)
+        .distinct()
+        .all()
+    )
+
+    names = {name for (name,) in device_locations + switch_locations if name}
+    return sorted(names)
 
 
 # Get single location

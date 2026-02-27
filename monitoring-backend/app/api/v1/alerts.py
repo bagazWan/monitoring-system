@@ -181,6 +181,44 @@ def get_active_alerts(db: Session = Depends(get_db)):
     return results
 
 
+@router.get("/locations", response_model=List[str])
+def get_alert_locations(
+    status_filter: Optional[str] = Query(None, description="Filter by status"),
+    db: Session = Depends(get_db),
+):
+    device_query = db.query(Alert)
+    switch_query = db.query(SwitchAlert)
+
+    device_query, switch_query = _apply_alert_filters(
+        device_query,
+        switch_query,
+        status_filter=status_filter,
+        severity=None,
+        start_date=None,
+        end_date=None,
+        location_name=None,
+    )
+
+    device_locations = (
+        device_query.join(Device)
+        .join(Location)
+        .with_entities(Location.name)
+        .distinct()
+        .all()
+    )
+
+    switch_locations = (
+        switch_query.join(Switch)
+        .join(Location)
+        .with_entities(Location.name)
+        .distinct()
+        .all()
+    )
+
+    names = {name for (name,) in device_locations + switch_locations if name}
+    return sorted(names)
+
+
 @router.get("/{alert_id}", response_model=AlertResponse)
 def get_alert(
     alert_id: int,

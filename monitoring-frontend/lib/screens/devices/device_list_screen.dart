@@ -47,6 +47,7 @@ class _DeviceListScreenState extends State<DeviceListScreen>
   String? _selectedStatus;
   List<String> _deviceTypes = [];
   List<String> _locations = [];
+  static const _noChange = Object();
 
   // Pagination
   int _currentPage = 1;
@@ -61,6 +62,7 @@ class _DeviceListScreenState extends State<DeviceListScreen>
     super.initState();
     _checkUserRole();
     _loadDeviceTypes();
+    _loadLocations();
     _fetchNodes();
     _initWebSocket();
     _searchController.addListener(_onSearchChanged);
@@ -119,20 +121,18 @@ class _DeviceListScreenState extends State<DeviceListScreen>
     } catch (_) {}
   }
 
-  List<String> _deriveLocationNames(List<BaseNode> items) {
-    final names = items
-        .map((n) => n.locationName)
-        .whereType<String>()
-        .where((n) => n.isNotEmpty)
-        .toSet()
-        .toList()
-      ..sort();
+  Future<void> _loadLocations() async {
+    try {
+      final names = await DeviceService().getLocationsWithNodes();
+      if (!mounted) return;
 
-    if (_selectedLocation != null && !names.contains(_selectedLocation)) {
-      names.insert(0, _selectedLocation!);
-    }
+      names.sort();
+      if (_selectedLocation != null && !names.contains(_selectedLocation)) {
+        names.insert(0, _selectedLocation!);
+      }
 
-    return names;
+      setState(() => _locations = names);
+    } catch (_) {}
   }
 
   Future<void> _fetchNodes() async {
@@ -166,7 +166,6 @@ class _DeviceListScreenState extends State<DeviceListScreen>
       if (!mounted) return;
       setState(() {
         _nodes = page.items;
-        _locations = _deriveLocationNames(page.items);
         _totalItems = page.total;
         _isLoading = false;
       });
@@ -182,8 +181,8 @@ class _DeviceListScreenState extends State<DeviceListScreen>
           () => ValueNotifier<Map<String, dynamic>?>(_liveStats[key]),
         );
       }
-
       _fetchBatchLiveStats();
+      _loadLocations();
     } catch (e) {
       setState(() {
         _error = e.toString();
@@ -213,13 +212,21 @@ class _DeviceListScreenState extends State<DeviceListScreen>
     }
   }
 
-  void _updateFilter({String? type, String? location, String? status}) {
+  void _updateFilter({
+    Object? type = _noChange,
+    Object? location = _noChange,
+    Object? status = _noChange,
+  }) {
     setState(() {
-      if (type != null || _selectedType != null) _selectedType = type;
-      if (location != null || _selectedLocation != null) {
-        _selectedLocation = location;
+      if (type != _noChange) {
+        _selectedType = type as String?;
       }
-      if (status != null || _selectedStatus != null) _selectedStatus = status;
+      if (location != _noChange) {
+        _selectedLocation = location as String?;
+      }
+      if (status != _noChange) {
+        _selectedStatus = status as String?;
+      }
       _currentPage = 1;
     });
     _fetchNodes();

@@ -31,6 +31,7 @@ class _ActiveAlertsTabState extends State<ActiveAlertsTab> {
   @override
   void initState() {
     super.initState();
+    _loadLocations();
     _fetchAlerts();
     _alertsRefreshSub = WebSocketService().alertsRefresh.listen((_) {
       if (mounted) _fetchAlerts();
@@ -41,6 +42,14 @@ class _ActiveAlertsTabState extends State<ActiveAlertsTab> {
   void dispose() {
     _alertsRefreshSub?.cancel();
     super.dispose();
+  }
+
+  Future<void> _loadLocations() async {
+    try {
+      final names = await AlertService().getAlertLocations(status: 'active');
+      if (!mounted) return;
+      setState(() => _locations = names);
+    } catch (_) {}
   }
 
   Future<void> _fetchAlerts() async {
@@ -58,11 +67,11 @@ class _ActiveAlertsTabState extends State<ActiveAlertsTab> {
             if (a.severity != 'critical' && b.severity == 'critical') return 1;
             return b.createdAt.compareTo(a.createdAt);
           });
-          _extractLocations();
           _applyFilters();
           _isLoading = false;
         });
       }
+      _loadLocations();
     } catch (e) {
       if (mounted) {
         setState(() {
@@ -71,15 +80,6 @@ class _ActiveAlertsTabState extends State<ActiveAlertsTab> {
         });
       }
     }
-  }
-
-  void _extractLocations() {
-    _locations = _allAlerts
-        .map((a) => a.locationName)
-        .where((loc) => loc.isNotEmpty && loc != ' - ')
-        .toSet()
-        .toList()
-      ..sort();
   }
 
   void _applyFilters() {

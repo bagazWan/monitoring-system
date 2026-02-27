@@ -40,6 +40,7 @@ class _AlertLogTabState extends State<AlertLogTab> {
   void initState() {
     super.initState();
     _loadUser();
+    _loadLocations();
     _fetchLogs();
     _alertsRefreshSub = WebSocketService().alertsRefresh.listen((_) {
       if (mounted) _fetchLogs();
@@ -60,13 +61,12 @@ class _AlertLogTabState extends State<AlertLogTab> {
     } catch (_) {}
   }
 
-  List<String> _deriveAlertLocations(List<Alert> logs) {
-    return logs
-        .map((l) => l.locationName)
-        .where((n) => n.trim().isNotEmpty && n.trim() != "-")
-        .toSet()
-        .toList()
-      ..sort();
+  Future<void> _loadLocations() async {
+    try {
+      final names = await AlertService().getAlertLocations();
+      if (!mounted) return;
+      setState(() => _locations = names);
+    } catch (_) {}
   }
 
   Future<void> _fetchLogs() async {
@@ -88,7 +88,6 @@ class _AlertLogTabState extends State<AlertLogTab> {
       if (!mounted) return;
       setState(() {
         _logs = page.items;
-        _locations = _deriveAlertLocations(page.items);
         _totalItems = page.total;
       });
     } catch (e) {
@@ -125,7 +124,6 @@ class _AlertLogTabState extends State<AlertLogTab> {
     setState(() {
       _logs.removeWhere((item) => item.alertId == alert.alertId);
       _totalItems = (_totalItems - 1).clamp(0, _totalItems);
-      _locations = _deriveAlertLocations(_logs);
     });
 
     if (_logs.isEmpty && _currentPage > 1) {
@@ -133,6 +131,7 @@ class _AlertLogTabState extends State<AlertLogTab> {
     }
 
     await _fetchLogs();
+    _loadLocations();
   }
 
   Future<void> _confirmDeleteAll() async {
@@ -157,6 +156,7 @@ class _AlertLogTabState extends State<AlertLogTab> {
     );
     _currentPage = 1;
     await _fetchLogs();
+    _loadLocations();
   }
 
   @override

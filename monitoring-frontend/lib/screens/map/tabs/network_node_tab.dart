@@ -10,7 +10,8 @@ import '../../../widgets/pagination.dart';
 import '../dialogs/network_node_form_dialog.dart';
 
 class NetworkNodeTab extends StatefulWidget {
-  const NetworkNodeTab({super.key});
+  final VoidCallback? onChanged;
+  const NetworkNodeTab({super.key, this.onChanged});
 
   @override
   State<NetworkNodeTab> createState() => _NetworkNodeTabState();
@@ -86,7 +87,10 @@ class _NetworkNodeTabState extends State<NetworkNodeTab> {
       context: context,
       builder: (context) => NetworkNodeFormDialog(node: networkNode),
     );
-    if (result == true) _fetchData(showLoader: true);
+    if (result == true) {
+      widget.onChanged?.call();
+      _fetchData(showLoader: true);
+    }
   }
 
   Future<void> _delete(NetworkNode networkNode) async {
@@ -94,6 +98,7 @@ class _NetworkNodeTabState extends State<NetworkNodeTab> {
     if (confirm == true) {
       try {
         await _service.deleteNetworkNode(networkNode.id);
+        widget.onChanged?.call();
         _fetchData(showLoader: true);
       } catch (e) {
         ScaffoldMessenger.of(context)

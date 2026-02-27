@@ -214,8 +214,11 @@ class _MapScreenState extends State<MapScreen> {
                     if (_isAdmin) ...[
                       ElevatedButton.icon(
                         onPressed: () async {
-                          await Navigator.pushNamed(
+                          final updated = await Navigator.pushNamed(
                               context, '/location-management');
+                          if (mounted && updated == true) {
+                            await _load();
+                          }
                         },
                         icon: const Icon(Icons.dataset, size: 18),
                         label: const Text("Location Master Data"),

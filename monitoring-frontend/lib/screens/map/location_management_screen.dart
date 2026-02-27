@@ -14,6 +14,13 @@ class LocationManagementScreen extends StatefulWidget {
 class _LocationManagementScreenState extends State<LocationManagementScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  bool _hasChanges = false;
+
+  void _markChanged() {
+    if (!_hasChanges) {
+      setState(() => _hasChanges = true);
+    }
+  }
 
   @override
   void initState() {
@@ -27,31 +34,39 @@ class _LocationManagementScreenState extends State<LocationManagementScreen>
     super.dispose();
   }
 
+  Future<bool> _handleExit() async {
+    Navigator.pop(context, _hasChanges);
+    return false;
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.grey[50],
-      appBar: AppBar(
-        title: const Text("Location Master Data",
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-        bottom: TabBar(
+    return WillPopScope(
+      onWillPop: _handleExit,
+      child: Scaffold(
+        backgroundColor: Colors.grey[50],
+        appBar: AppBar(
+          title: const Text("Location Master Data",
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+          bottom: TabBar(
+            controller: _tabController,
+            labelColor: Colors.blue[700],
+            indicatorColor: Colors.blue[700],
+            tabs: const [
+              Tab(text: "Locations", icon: Icon(Icons.location_on)),
+              Tab(text: "Network Nodes", icon: Icon(Icons.lan)),
+              Tab(text: "FO Routes", icon: Icon(Icons.route)),
+            ],
+          ),
+        ),
+        body: TabBarView(
           controller: _tabController,
-          labelColor: Colors.blue[700],
-          indicatorColor: Colors.blue[700],
-          tabs: const [
-            Tab(text: "Locations", icon: Icon(Icons.location_on)),
-            Tab(text: "Network Nodes", icon: Icon(Icons.lan)),
-            Tab(text: "FO Routes", icon: Icon(Icons.route)),
+          children: [
+            LocationTab(onChanged: _markChanged),
+            NetworkNodeTab(onChanged: _markChanged),
+            FORouteTab(onChanged: _markChanged),
           ],
         ),
-      ),
-      body: TabBarView(
-        controller: _tabController,
-        children: const [
-          LocationTab(),
-          NetworkNodeTab(),
-          FORouteTab(),
-        ],
       ),
     );
   }

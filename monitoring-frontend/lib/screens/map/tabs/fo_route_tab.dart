@@ -10,7 +10,8 @@ import '../../../widgets/pagination.dart';
 import '../dialogs/fo_route_form_dialog.dart';
 
 class FORouteTab extends StatefulWidget {
-  const FORouteTab({super.key});
+  final VoidCallback? onChanged;
+  const FORouteTab({super.key, this.onChanged});
 
   @override
   State<FORouteTab> createState() => _FORouteTabState();
@@ -93,7 +94,10 @@ class _FORouteTabState extends State<FORouteTab> {
       context: context,
       builder: (context) => FORouteFormDialog(route: route),
     );
-    if (result == true) _fetchData(showLoader: true);
+    if (result == true) {
+      widget.onChanged?.call();
+      _fetchData(showLoader: true);
+    }
   }
 
   Future<void> _delete(FORoute route) async {
@@ -119,6 +123,7 @@ class _FORouteTabState extends State<FORouteTab> {
     if (confirm == true) {
       try {
         await _service.deleteFORoute(route.id);
+        widget.onChanged?.call();
         _fetchData(showLoader: true);
       } catch (e) {
         ScaffoldMessenger.of(context)

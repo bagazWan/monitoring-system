@@ -9,7 +9,8 @@ import '../../../widgets/pagination.dart';
 import '../dialogs/location_form_dialog.dart';
 
 class LocationTab extends StatefulWidget {
-  const LocationTab({super.key});
+  final VoidCallback? onChanged;
+  const LocationTab({super.key, this.onChanged});
 
   @override
   State<LocationTab> createState() => _LocationTabState();
@@ -81,7 +82,10 @@ class _LocationTabState extends State<LocationTab> {
       context: context,
       builder: (context) => LocationFormDialog(location: location),
     );
-    if (result == true) _fetchData(showLoader: true);
+    if (result == true) {
+      widget.onChanged?.call();
+      _fetchData(showLoader: true);
+    }
   }
 
   Future<void> _delete(Location location) async {
@@ -89,6 +93,7 @@ class _LocationTabState extends State<LocationTab> {
     if (confirm == true) {
       try {
         await _service.deleteLocation(location.id);
+        widget.onChanged?.call();
         _fetchData(showLoader: true);
       } catch (e) {
         ScaffoldMessenger.of(context)

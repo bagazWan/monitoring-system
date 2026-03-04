@@ -19,6 +19,8 @@ _status_poller_stop_event: Optional[asyncio.Event] = None
 # Cache to track previous status and detect changes
 _device_status_cache: Dict[int, str] = {}
 _switch_status_cache: Dict[int, str] = {}
+_device_failure_count: Dict[int, int] = {}
+_switch_failure_count: Dict[int, int] = {}
 
 
 def _open_db() -> Session:
@@ -57,8 +59,18 @@ async def poll_and_broadcast_status(libre_service: LibreNMSService) -> int:
                 continue
 
             lnms_data = librenms_status_map[lnms_id]
-            new_status = lnms_data["status"]
+            raw_status = lnms_data["status"]
             old_status = _device_status_cache.get(device.device_id)
+
+            failure_count = _device_failure_count.get(device.device_id, 0)
+
+            if raw_status == "offline":
+                failure_count += 1
+                _device_failure_count[device.device_id] = failure_count
+                new_status = "offline" if failure_count >= 3 else "online"
+            else:
+                _device_failure_count[device.device_id] = 0
+                new_status = "online"
 
             # Check if status changed
             if old_status is None:
@@ -110,8 +122,18 @@ async def poll_and_broadcast_status(libre_service: LibreNMSService) -> int:
                 continue
 
             lnms_data = librenms_status_map[lnms_id]
-            new_status = lnms_data["status"]
+            raw_status = lnms_data["status"]
             old_status = _switch_status_cache.get(switch.switch_id)
+
+            failure_count = _switch_failure_count.get(switch.switch_id, 0)
+
+            if raw_status == "offline":
+                failure_count += 1
+                _switch_failure_count[switch.switch_id] = failure_count
+                new_status = "offline" if failure_count >= 3 else "online"
+            else:
+                _switch_failure_count[switch.switch_id] = 0
+                new_status = "online"
 
             if old_status is None:
                 _switch_status_cache[switch.switch_id] = new_status

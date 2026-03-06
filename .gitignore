@@ -4,3 +4,5 @@
 **/venv/
 *.pyc
 Target.md
+librenms_data/
+librenms_db_data/

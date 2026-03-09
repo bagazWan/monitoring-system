@@ -6,3 +6,6 @@
 Target.md
 librenms_data/
 librenms_db_data/
+rrd/
+rrd_journal/
+postgres_db_data/

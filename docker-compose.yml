@@ -8,7 +8,7 @@ services:
       - POSTGRES_PASSWORD=${DB_PASSWORD}
       - POSTGRES_DB=${DB}
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - "./postgres_db_data:/var/lib/postgresql/data"
     ports:
       - "5434:5432"
 
@@ -42,8 +42,8 @@ services:
     image: crazymax/rrdcached
     container_name: librenms_rrdcached
     volumes:
-      - "./rrd/db:/data/db"
-      - "./rrd/journal:/data/journal"
+      - "./rrd:/data/db"
+      - "./rrd_journal:/data/journal"
     environment:
       - "TZ=${TZ}"
       - "LOG_LEVEL=LOG_INFO"
@@ -74,6 +74,7 @@ services:
       - msmtpd
     volumes:
       - "./librenms_data:/data"
+      - "./rrd:/data/rrd"
     environment:
       - "TZ=${TZ}"
       - "DB_HOST=db"
@@ -101,6 +102,7 @@ services:
       - redis
     volumes:
       - "./librenms_data:/data"
+      - "./rrd:/data/rrd"
     environment:
       - "TZ=${TZ}"
       - "DB_HOST=db"
@@ -116,6 +118,3 @@ services:
       - "REDIS_PORT=6379"
       - "RRDCACHED_SERVER=rrdcached:42217"
     restart: always
-
-volumes:
-  postgres_data:

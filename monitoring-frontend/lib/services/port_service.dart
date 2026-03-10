@@ -45,4 +45,22 @@ class PortsService {
       throw Exception('Failed to update port: ${response.body}');
     }
   }
+
+  Future<void> resyncPorts({
+    int? deviceId,
+    int? switchId,
+  }) async {
+    final query =
+        deviceId != null ? '?device_id=$deviceId' : '?switch_id=$switchId';
+
+    final response = await http.post(
+      Uri.parse(
+          '${ApiConfig.baseUrl}${ApiConfig.apiVersion}/librenms-ports/resync$query'),
+      headers: await _getHeaders(),
+    );
+
+    if (response.statusCode != 202 && response.statusCode != 200) {
+      throw Exception('Failed to resync ports: ${response.body}');
+    }
+  }
 }

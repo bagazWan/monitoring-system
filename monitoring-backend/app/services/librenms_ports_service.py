@@ -12,7 +12,7 @@ def should_enable_port(port: dict) -> bool:
     - Only consider ports with operStatus up (if present)
     - Prefer ifType ethernetCsmacd
     - Fallback to ifName prefixes typical for physical ports
-    - Exclude common logical interfaces (bridge/vlan/lo)
+    - Exclude common logical interfaces (bridge/vlan/lo/docker/veth)
     """
     if_name = (port.get("ifName") or port.get("if_name") or "").lower()
     if_type = (port.get("ifType") or port.get("if_type") or "").lower()
@@ -23,12 +23,18 @@ def should_enable_port(port: dict) -> bool:
 
     if if_type in {"bridge", "l2vlan", "softwareloopback"}:
         return False
-    if if_name.startswith(("bridge", "vlan", "lo")):
+
+    if if_name.startswith(
+        ("bridge", "vlan", "lo", "docker", "veth", "br-", "virbr", "tun", "tap")
+    ):
         return False
 
     if if_type == "ethernetcsmacd":
         return True
-    if if_name.startswith(("ether", "eth", "gi", "fa")):
+
+    if if_name.startswith(
+        ("ether", "eth", "enp", "eno", "ens", "wl", "wlan", "wlp", "wifi", "gi", "fa")
+    ):
         return True
 
     return False

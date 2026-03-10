@@ -16,6 +16,7 @@ class DevicePortsTab extends StatefulWidget {
 class _DevicePortsTabState extends State<DevicePortsTab> {
   final _portService = PortsService();
   bool _loadingPorts = true;
+  bool _resyncing = false;
   List<LibreNMSPort> _ports = [];
 
   @override
@@ -37,6 +38,26 @@ class _DevicePortsTabState extends State<DevicePortsTab> {
       debugPrint("Error loading ports: $e");
     } finally {
       if (mounted) setState(() => _loadingPorts = false);
+    }
+  }
+
+  Future<void> _resyncPorts() async {
+    if (widget.deviceId == null && widget.switchId == null) return;
+    setState(() => _resyncing = true);
+    try {
+      await _portService.resyncPorts(
+        deviceId: widget.deviceId,
+        switchId: widget.switchId,
+      );
+      await _fetchPorts();
+    } catch (e) {
+      debugPrint("Resync failed: $e");
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text("Resync failed: $e")));
+      }
+    } finally {
+      if (mounted) setState(() => _resyncing = false);
     }
   }
 
@@ -72,10 +93,30 @@ class _DevicePortsTabState extends State<DevicePortsTab> {
   @override
   Widget build(BuildContext context) {
     if (_loadingPorts) return const Center(child: CircularProgressIndicator());
+
     if (_ports.isEmpty) {
-      return const EmptyStateWidget(
-        message: "No ports found",
-        icon: Icons.router_outlined,
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const EmptyStateWidget(
+              message: "No ports found",
+              icon: Icons.router_outlined,
+            ),
+            const SizedBox(height: 12),
+            ElevatedButton.icon(
+              onPressed: _resyncing ? null : _resyncPorts,
+              icon: _resyncing
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.sync, size: 18),
+              label: const Text("Resync Ports"),
+            ),
+          ],
+        ),
       );
     }
 
@@ -102,8 +143,8 @@ class _DevicePortsTabState extends State<DevicePortsTab> {
             ),
             title: Text(port.ifName,
                 style: const TextStyle(fontWeight: FontWeight.bold)),
-            subtitle: Text("${port.ifType ?? 'Unknown'} • ${port.ifOperStatus}",
-                style: const TextStyle(fontSize: 12)),
+            subtitle:
+                Text("${port.ifType ?? "-"} • ${port.ifOperStatus ?? "-"}"),
             trailing: Row(
               mainAxisSize: MainAxisSize.min,
               children: [

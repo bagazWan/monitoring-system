@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
@@ -36,6 +36,7 @@ class FORouteCreate(BaseModel):
     end_node_id: int = Field(..., gt=0)
     length_m: Optional[float] = Field(None, ge=0)
     description: Optional[str] = None
+    waypoints: Optional[List[Dict[str, float]]] = None
 
 
 class FORouteUpdate(BaseModel):
@@ -43,6 +44,7 @@ class FORouteUpdate(BaseModel):
     end_node_id: Optional[int] = Field(None, gt=0)
     length_m: Optional[float] = Field(None, ge=0)
     description: Optional[str] = None
+    waypoints: Optional[List[Dict[str, float]]] = None
 
 
 class FORouteResponse(BaseModel):
@@ -51,6 +53,7 @@ class FORouteResponse(BaseModel):
     end_node_id: int
     length_m: Optional[float]
     description: Optional[str]
+    waypoints: Optional[List[Dict[str, float]]] = None
     created_at: datetime
     updated_at: datetime
 

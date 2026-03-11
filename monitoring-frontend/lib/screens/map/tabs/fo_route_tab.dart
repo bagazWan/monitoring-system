@@ -1,13 +1,16 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:latlong2/latlong.dart';
 import '../../../models/fo_route.dart';
 import '../../../models/network_node.dart';
+import '../../../models/location.dart';
 import '../../../services/map_service.dart';
 import '../../../widgets/data_table.dart';
 import '../../../widgets/visual_feedback.dart';
 import '../../../widgets/search_bar.dart';
 import '../../../widgets/pagination.dart';
 import '../dialogs/fo_route_form_dialog.dart';
+import '../route_editor_screen.dart';
 
 class FORouteTab extends StatefulWidget {
   final VoidCallback? onChanged;
@@ -22,6 +25,7 @@ class _FORouteTabState extends State<FORouteTab> {
   bool _isLoading = true;
   List<FORoute> _routes = [];
   Map<int, String> _nodeNameLookup = {};
+  Map<int, LatLng> _nodeLocationLookup = {};
   int _totalItems = 0;
   String? _error;
 
@@ -64,18 +68,32 @@ class _FORouteTabState extends State<FORouteTab> {
           search: _searchController.text.trim(),
         ),
         _service.getNetworkNodes(),
+        _service.getLocations(),
       ]);
 
       final page = results[0] as FORoutePage;
       final nodes = results[1] as List<NetworkNode>;
+      final locations = results[2] as List<Location>;
 
       if (mounted) {
         setState(() {
           _routes = page.items;
           _totalItems = page.total;
+
           _nodeNameLookup = {
             for (var n in nodes) n.id: n.name ?? "Node #${n.id}"
           };
+
+          final locMap = {for (var loc in locations) loc.id: loc};
+          _nodeLocationLookup = {};
+          for (var node in nodes) {
+            final loc = locMap[node.locationId];
+            if (loc != null) {
+              _nodeLocationLookup[node.id] =
+                  LatLng(loc.latitude, loc.longitude);
+            }
+          }
+
           _isLoading = false;
         });
       }
@@ -94,6 +112,35 @@ class _FORouteTabState extends State<FORouteTab> {
       context: context,
       builder: (context) => FORouteFormDialog(route: route),
     );
+    if (result == true) {
+      widget.onChanged?.call();
+      _fetchData(showLoader: true);
+    }
+  }
+
+  Future<void> _openMapEditor(FORoute route) async {
+    final startLoc = _nodeLocationLookup[route.startNodeId];
+    final endLoc = _nodeLocationLookup[route.endNodeId];
+
+    if (startLoc == null || endLoc == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text("Error: Cannot find physical location for nodes.")),
+      );
+      return;
+    }
+
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => RouteEditorScreen(
+          route: route,
+          startLocation: startLoc,
+          endLocation: endLoc,
+        ),
+      ),
+    );
+
     if (result == true) {
       widget.onChanged?.call();
       _fetchData(showLoader: true);
@@ -224,6 +271,11 @@ class _FORouteTabState extends State<FORouteTab> {
                                   icon: const Icon(Icons.edit,
                                       color: Colors.blue),
                                   onPressed: () => _openForm(route: route)),
+                              IconButton(
+                                  tooltip: "Edit Shape",
+                                  icon: const Icon(Icons.map,
+                                      color: Colors.green),
+                                  onPressed: () => _openMapEditor(route)),
                               IconButton(
                                   icon: const Icon(Icons.delete,
                                       color: Colors.red),

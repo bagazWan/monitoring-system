@@ -71,17 +71,28 @@ class _MapViewState extends State<MapView> {
       return LatLng(loc.latitude, loc.longitude);
     }
 
-    // Polylines (still green for now)
+    // Polylines (set to static color for now)
     final polylines = <Polyline>[];
     for (final r in topo.foRoutes) {
       final start = nodeLatLng(r.startNodeId);
       final end = nodeLatLng(r.endNodeId);
       if (start == null || end == null) continue;
+
+      // Extract waypoints if they exist, otherwise fallback to straight line
+      List<LatLng> path = [start, end];
+
+      if (r.waypoints != null && r.waypoints!.isNotEmpty) {
+        path = r.waypoints!;
+      }
+
       polylines.add(
         Polyline(
-          points: [start, end],
+          points: path,
           strokeWidth: 4,
-          color: Colors.green,
+          color: Colors.lightBlue,
+          useStrokeWidthInMeter: false,
+          borderColor: Colors.black45,
+          borderStrokeWidth: 2.0,
         ),
       );
     }

@@ -1,4 +1,4 @@
-from sqlalchemy import Column, DateTime, Float, ForeignKey, Integer, Text, func
+from sqlalchemy import JSON, Column, DateTime, Float, ForeignKey, Integer, Text, func
 from sqlalchemy.orm import relationship
 
 from app.core.database import Base
@@ -12,6 +12,7 @@ class FORoute(Base):
     end_node_id = Column(Integer, ForeignKey("network_nodes.node_id"), nullable=False)
     length_m = Column(Float)
     description = Column(Text)
+    waypoints = Column(JSON, nullable=True)
     created_at = Column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

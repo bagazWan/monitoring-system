@@ -123,11 +123,11 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   const SizedBox(height: 16),
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
+                    mainAxisAlignment: MainAxisAlignment.end,
                     children: [
-                      const Text("Don't have an account?"),
                       HoverLink(
                         text: "Register",
+                        icon: Icons.arrow_forward_sharp,
                         onTap: () => Navigator.pushNamed(context, '/register'),
                       ),
                     ],

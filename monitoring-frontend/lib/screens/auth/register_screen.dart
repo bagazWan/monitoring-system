@@ -131,11 +131,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   ),
                   const SizedBox(height: 16),
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
+                    mainAxisAlignment: MainAxisAlignment.start,
                     children: [
-                      const Text("Already have an account? "),
                       HoverLink(
                         text: "Login",
+                        icon: Icons.arrow_back_sharp,
                         onTap: () => Navigator.pop(context),
                       ),
                     ],

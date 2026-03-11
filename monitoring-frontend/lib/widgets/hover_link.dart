@@ -3,12 +3,10 @@ import 'package:flutter/material.dart';
 class HoverLink extends StatefulWidget {
   final String text;
   final VoidCallback onTap;
+  final IconData? icon;
 
-  const HoverLink({
-    super.key,
-    required this.text,
-    required this.onTap,
-  });
+  const HoverLink(
+      {super.key, required this.text, required this.onTap, this.icon});
 
   @override
   State<HoverLink> createState() => _HoverLinkState();
@@ -38,7 +36,16 @@ class _HoverLinkState extends State<HoverLink> {
         }),
         overlayColor: WidgetStateProperty.all(Colors.transparent),
       ),
-      child: Text(widget.text),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(widget.text),
+          if (widget.icon != null) ...[
+            const SizedBox(width: 4),
+            Icon(widget.icon, size: 16),
+          ],
+        ],
+      ),
     );
   }
 }

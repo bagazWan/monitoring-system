@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../models/dashboard_stats.dart';
 import '../../../widgets/summary_card.dart';
+import '../../../utils/bandwidth_formatter.dart';
 
 class DashboardSummaryGrid extends StatelessWidget {
   final DashboardStats stats;
@@ -55,7 +56,7 @@ class DashboardSummaryGrid extends StatelessWidget {
               title: "Total Bandwidth",
               value: stats.totalBandwidth == null
                   ? "N/A"
-                  : "${stats.totalBandwidth!.toStringAsFixed(2)} Mbps",
+                  : BandwidthFormatter.format(stats.totalBandwidth!),
               icon: Icons.speed,
               iconColor: Colors.purple,
               subtitle: stats.totalBandwidth == null

@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
+import '../../../utils/bandwidth_formatter.dart';
 
 class NetworkActivityData {
   final DateTime timestamp;
-  final double inbound; // Mbps
-  final double outbound; // Mbps
+  final double inbound;
+  final double outbound;
 
   NetworkActivityData({
     required this.timestamp,
@@ -146,13 +147,13 @@ class _NetworkActivityChartState extends State<NetworkActivityChart> {
       children: [
         _buildStatChip(
           icon: Icons.arrow_downward,
-          value: '${latest.inbound.toStringAsFixed(1)} Mbps',
+          value: BandwidthFormatter.format(latest.inbound, mbpsDecimals: 1),
           color: Colors.blue,
         ),
         const SizedBox(width: 8),
         _buildStatChip(
           icon: Icons.arrow_upward,
-          value: '${latest.outbound.toStringAsFixed(1)} Mbps',
+          value: BandwidthFormatter.format(latest.outbound, mbpsDecimals: 1),
           color: Colors.green,
         ),
       ],
@@ -229,7 +230,7 @@ class _NetworkActivityChartState extends State<NetworkActivityChart> {
           leftTitles: AxisTitles(
             sideTitles: SideTitles(
               showTitles: true,
-              reservedSize: 40,
+              reservedSize: 50,
               interval: _calculateInterval(),
               getTitlesWidget: (value, meta) => _buildLeftTitle(value, meta),
             ),
@@ -246,17 +247,49 @@ class _NetworkActivityChartState extends State<NetworkActivityChart> {
         ],
         lineTouchData: LineTouchData(
           touchTooltipData: LineTouchTooltipData(
-            getTooltipColor: (spot) => Colors.blueGrey.withOpacity(0.8),
-            getTooltipItems: (touchedSpots) {
+            getTooltipColor: (spot) => Colors.blueGrey.withOpacity(0.9),
+            fitInsideHorizontally: true,
+            tooltipPadding:
+                const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            getTooltipItems: (List<LineBarSpot> touchedSpots) {
+              final index = touchedSpots.first.x.toInt();
+              final DateTime time = widget.data[index].timestamp.toLocal();
+              final String timeStr =
+                  '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
+
               return touchedSpots.map((spot) {
-                final isInbound = spot.barIndex == 0 && _showInbound;
+                final isInbound = spot.bar.color == Colors.blue;
+                final label = isInbound ? "Inbound: " : "Outbound: ";
+                final textColor =
+                    isInbound ? Colors.blue[100]! : Colors.green[100]!;
+                final formatted =
+                    BandwidthFormatter.formatParts(spot.y, mbpsDecimals: 1);
+
+                final bool isFirst = spot == touchedSpots.first;
+
                 return LineTooltipItem(
-                  '${spot.y.toStringAsFixed(1)} Mbps',
-                  TextStyle(
-                    color: isInbound ? Colors.blue[100] : Colors.green[100],
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
-                  ),
+                  '',
+                  const TextStyle(fontSize: 12),
+                  children: [
+                    if (isFirst) ...[
+                      TextSpan(
+                        text: '$timeStr\n',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.normal,
+                        ),
+                      ),
+                    ],
+                    TextSpan(
+                      text: '$label${formatted["value"]} ${formatted["unit"]}',
+                      style: TextStyle(
+                        color: textColor,
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
                 );
               }).toList();
             },
@@ -310,6 +343,7 @@ class _NetworkActivityChartState extends State<NetworkActivityChart> {
       if (d.inbound > maxValue) maxValue = d.inbound;
       if (d.outbound > maxValue) maxValue = d.outbound;
     }
+    if (maxValue <= 1) return 0.2;
     if (maxValue <= 10) return 2;
     if (maxValue <= 50) return 10;
     if (maxValue <= 100) return 20;
@@ -343,10 +377,11 @@ class _NetworkActivityChartState extends State<NetworkActivityChart> {
   }
 
   Widget _buildLeftTitle(double value, TitleMeta meta) {
+    final formatted = BandwidthFormatter.formatParts(value, mbpsDecimals: 1);
     return Padding(
       padding: const EdgeInsets.only(right: 4),
       child: Text(
-        value.toInt().toString(),
+        '${formatted["value"]} ${formatted["unit"]}',
         style: TextStyle(fontSize: 10, color: Colors.grey[600]),
       ),
     );

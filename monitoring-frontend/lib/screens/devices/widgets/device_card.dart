@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../../../models/device.dart';
 import '../node_config_screen.dart';
+import '../../../utils/bandwidth_formatter.dart';
 
 class DeviceCard extends StatelessWidget {
   final BaseNode node;
@@ -77,7 +78,7 @@ class DeviceCard extends StatelessWidget {
                     isIdle = true;
                   } else {
                     trafficText =
-                        "${inMbps.toStringAsFixed(2)} Mbps In • ${outMbps.toStringAsFixed(2)} Mbps Out";
+                        "${BandwidthFormatter.format(inMbps)} In • ${BandwidthFormatter.format(outMbps)} Out";
                     isLive = true;
                   }
                 }

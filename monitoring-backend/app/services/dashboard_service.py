@@ -1,7 +1,5 @@
-import asyncio
-import logging
-from datetime import datetime, time, timedelta, timezone
-from typing import Optional, Tuple
+from datetime import datetime, timedelta, timezone
+from typing import Optional
 
 from sqlalchemy import and_, func, or_
 from sqlalchemy.orm import Session
@@ -9,98 +7,12 @@ from sqlalchemy.orm import Session
 from app.models import (
     Alert,
     Device,
-    LibreNMSPort,
     Location,
     StatusHistory,
     Switch,
     SwitchAlert,
 )
-from app.services.librenms_service import LibreNMSService
-
-logger = logging.getLogger(__name__)
-
-
-def _to_float(value) -> Optional[float]:
-    try:
-        if value is None:
-            return None
-        return float(value)
-    except (TypeError, ValueError):
-        return None
-
-
-def _extract_port_rate_parts_mbps(port: dict) -> Tuple[float, float, bool]:
-    in_candidates = [
-        "ifInOctets_rate",
-        "ifinoctets_rate",
-        "ifInOctetsRate",
-        "in_rate",
-    ]
-    out_candidates = [
-        "ifOutOctets_rate",
-        "ifoutoctets_rate",
-        "ifOutOctetsRate",
-        "out_rate",
-    ]
-
-    in_rate = None
-    out_rate = None
-
-    for key in in_candidates:
-        v = _to_float(port.get(key))
-        if v is not None:
-            in_rate = v
-            break
-
-    for key in out_candidates:
-        v = _to_float(port.get(key))
-        if v is not None:
-            out_rate = v
-            break
-
-    if in_rate is None and out_rate is None:
-        return 0.0, 0.0, False
-
-    in_mbps = (in_rate or 0.0) * 8 / 1_000_000
-    out_mbps = (out_rate or 0.0) * 8 / 1_000_000
-    return in_mbps, out_mbps, True
-
-
-def _get_ports_for_location(db: Session, location_id: Optional[int]):
-    ports_query = db.query(LibreNMSPort)
-
-    if location_id:
-        ports_query = ports_query.outerjoin(
-            Device, LibreNMSPort.device_id == Device.device_id
-        ).outerjoin(Switch, LibreNMSPort.switch_id == Switch.switch_id)
-        ports_query = ports_query.filter(
-            or_(Device.location_id == location_id, Switch.location_id == location_id)
-        )
-
-    enabled_ports = ports_query.filter(LibreNMSPort.enabled.is_(True)).all()
-    if enabled_ports:
-        return enabled_ports
-
-    return ports_query.all()
-
-
-def _add_interval(day_map, start: datetime, end: datetime, is_online: bool):
-    if end <= start:
-        return
-
-    current = start
-    while current < end:
-        day_start = datetime.combine(current.date(), time.min, tzinfo=current.tzinfo)
-        day_end = day_start + timedelta(days=1)
-        slice_end = min(day_end, end)
-        seconds = (slice_end - current).total_seconds()
-
-        if current.date() in day_map:
-            day_map[current.date()]["total"] += seconds
-            if is_online:
-                day_map[current.date()]["online"] += seconds
-
-        current = slice_end
+from app.services.metrics_service import add_interval, aggregate_port_rates
 
 
 def build_uptime_trend(
@@ -213,11 +125,11 @@ def build_uptime_trend(
             cursor = window_start
 
         for ev in events:
-            _add_interval(day_map, cursor, ev.changed_at, status == "online")
+            add_interval(day_map, cursor, ev.changed_at, status == "online")
             status = ev.status
             cursor = ev.changed_at
 
-        _add_interval(day_map, cursor, now, status == "online")
+        add_interval(day_map, cursor, now, status == "online")
 
     data = []
     for day in sorted(day_map.keys()):
@@ -231,42 +143,6 @@ def build_uptime_trend(
         data.append({"date": day.strftime("%Y-%m-%d"), "uptime_percentage": uptime})
 
     return {"days": len(data), "data": data}
-
-
-async def _aggregate_port_rates(
-    db: Session, location_id: Optional[int]
-) -> Tuple[float, float, bool]:
-    ports = _get_ports_for_location(db, location_id)
-    if not ports:
-        return 0.0, 0.0, False
-
-    librenms = LibreNMSService()
-    tasks = [
-        librenms.get_port_by_id(int(p.port_id)) for p in ports if p.port_id is not None
-    ]
-    results = await asyncio.gather(*tasks, return_exceptions=True)
-
-    total_in = 0.0
-    total_out = 0.0
-    data_found = False
-
-    for idx, res in enumerate(results):
-        if isinstance(res, Exception):
-            logger.warning(
-                "Dashboard port fetch failed for port_index=%s: %s", idx, res
-            )
-            continue
-        if not isinstance(res, dict):
-            continue
-
-        port_list = res.get("port", []) or []
-        for port in port_list:
-            in_mbps, out_mbps, has_valid = _extract_port_rate_parts_mbps(port)
-            total_in += in_mbps
-            total_out += out_mbps
-            data_found = data_found or has_valid
-
-    return total_in, total_out, data_found
 
 
 async def build_dashboard_stats(
@@ -298,7 +174,7 @@ async def build_dashboard_stats(
     cctv_online = dev_query.filter(cctv_filter, Device.status == "online").count()
     cctv_uptime = (cctv_online / cctv_total * 100) if cctv_total > 0 else 0.0
 
-    total_in, total_out, data_found = await _aggregate_port_rates(db, location_id)
+    total_in, total_out, data_found = await aggregate_port_rates(db, location_id)
     total_bandwidth_mbps = total_in + total_out
 
     top_down = []
@@ -383,9 +259,11 @@ async def build_dashboard_stats(
             }
         merged[loc_id]["offline_count"] += int(row.offline_count or 0)
 
-    top_down = sorted(merged.values(), key=lambda x: x["offline_count"], reverse=True)[
-        :10
-    ]
+    top_down = sorted(
+        merged.values(),
+        key=lambda item: item["offline_count"],
+        reverse=True,
+    )[:10]
 
     active_alerts = (
         db.query(Alert)
@@ -414,7 +292,7 @@ async def build_dashboard_stats(
 
 
 async def build_dashboard_traffic(*, db: Session, location_id: Optional[int]) -> dict:
-    total_in, total_out, data_found = await _aggregate_port_rates(db, location_id)
+    total_in, total_out, data_found = await aggregate_port_rates(db, location_id)
     return {
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "inbound_mbps": round(total_in, 2) if data_found else None,

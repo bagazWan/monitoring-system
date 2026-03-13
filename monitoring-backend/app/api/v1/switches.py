@@ -3,7 +3,6 @@ from typing import List, Optional
 from app.api.dependencies import require_admin, require_technician_or_admin
 from app.core.database import get_db
 from app.models import Location, Switch, User
-from app.models.librenms_port import LibreNMSPort
 from app.schemas.switch import (
     BulkSwitchDetailsRequest,
     SwitchResponse,
@@ -11,76 +10,11 @@ from app.schemas.switch import (
     SwitchWithLocation,
 )
 from app.services.librenms_service import LibreNMSService
+from app.services.node_metrics import calculate_switch_metrics
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 router = APIRouter(prefix="/switches", tags=["Switches"])
-
-
-async def _calculate_switch_metrics(
-    switch: Switch, db: Session, librenms: LibreNMSService
-) -> dict:
-    default_response = {
-        "switch_id": switch.switch_id,
-        "status": switch.status or "offline",
-        "in_mbps": 0.0,
-        "out_mbps": 0.0,
-    }
-
-    if not switch.librenms_device_id:
-        return default_response
-
-    try:
-        uplink_ports = (
-            db.query(LibreNMSPort)
-            .filter(
-                LibreNMSPort.switch_id == switch.switch_id,
-                LibreNMSPort.enabled.is_(True),
-                LibreNMSPort.is_uplink.is_(True),
-            )
-            .all()
-        )
-
-        used_ports = uplink_ports
-        if not used_ports:
-            used_ports = (
-                db.query(LibreNMSPort)
-                .filter(
-                    LibreNMSPort.switch_id == switch.switch_id,
-                    LibreNMSPort.enabled.is_(True),
-                )
-                .all()
-            )
-
-        total_in = 0.0
-        total_out = 0.0
-
-        if used_ports:
-            for port_row in used_ports:
-                try:
-                    port_detail = await librenms.get_port_by_id(int(port_row.port_id))
-                    p_list = port_detail.get("port", [])
-                    if p_list:
-                        p_data = p_list[0]
-                        if (
-                            int(p_data.get("disabled", 0) or 0) == 1
-                            or int(p_data.get("ignore", 0) or 0) == 1
-                        ):
-                            continue
-                        total_in += float(p_data.get("ifInOctets_rate", 0) or 0)
-                        total_out += float(p_data.get("ifOutOctets_rate", 0) or 0)
-                except:
-                    continue
-
-        return {
-            "switch_id": switch.switch_id,
-            "status": switch.status,
-            "in_mbps": round((total_in * 8) / 1_000_000, 2),
-            "out_mbps": round((total_out * 8) / 1_000_000, 2),
-        }
-
-    except Exception:
-        return default_response
 
 
 @router.get("", response_model=List[SwitchResponse])
@@ -109,7 +43,7 @@ async def get_switch_live_details(switch_id: int, db: Session = Depends(get_db))
         raise HTTPException(status_code=404, detail="Switch not found")
 
     librenms = LibreNMSService()
-    return await _calculate_switch_metrics(switch, db, librenms)
+    return await calculate_switch_metrics(switch, db, librenms)
 
 
 @router.post("/bulk-live-details")
@@ -126,7 +60,7 @@ async def get_bulk_switch_details(
         switch = switch_map.get(switch_id)
         if not switch:
             continue
-        metrics = await _calculate_switch_metrics(switch, db, librenms)
+        metrics = await calculate_switch_metrics(switch, db, librenms)
         results.append(metrics)
 
     return results

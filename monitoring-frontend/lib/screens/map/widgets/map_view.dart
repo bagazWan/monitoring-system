@@ -37,6 +37,17 @@ class _MapViewState extends State<MapView> {
   StreamSubscription<MapEvent>? _mapSub;
   double _currentZoom = 0;
 
+  String _nodeSeverity(BaseNode node) {
+    final status = (node.status ?? '').toLowerCase();
+    if (status == 'offline') return 'red';
+    if (status == 'warning') return 'yellow';
+
+    final sev = (node.severity ?? '').toLowerCase();
+    if (sev == 'red' || sev == 'critical') return 'red';
+    if (sev == 'yellow' || sev == 'warning') return 'yellow';
+    return 'green';
+  }
+
   @override
   void initState() {
     super.initState();
@@ -105,17 +116,15 @@ class _MapViewState extends State<MapView> {
       if (nodesAtLoc.isEmpty) {
         statusColor = Colors.grey;
       } else {
-        final bool allOffline = nodesAtLoc
-            .every((n) => (n.status ?? '').toLowerCase() == 'offline');
-        final bool allOnline =
-            nodesAtLoc.every((n) => (n.status ?? '').toLowerCase() == 'online');
+        final anyRed = nodesAtLoc.any((n) => _nodeSeverity(n) == 'red');
+        final anyYellow = nodesAtLoc.any((n) => _nodeSeverity(n) == 'yellow');
 
-        if (allOffline) {
+        if (anyRed) {
           statusColor = Colors.red;
-        } else if (allOnline) {
-          statusColor = Colors.green;
-        } else {
+        } else if (anyYellow) {
           statusColor = Colors.orange;
+        } else {
+          statusColor = Colors.green;
         }
       }
 

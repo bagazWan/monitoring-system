@@ -32,7 +32,7 @@ DEVICE_THRESHOLDS = {
     "switch": {"utilization": UtilizationThreshold(warning=70.0, critical=90.0)},
     "router": {"utilization": UtilizationThreshold(warning=70.0, critical=90.0)},
     "access point": {"utilization": UtilizationThreshold(warning=50.0, critical=75.0)},
-    "pc": {"throughput_drop": 0.5},
+    # "pc": {"throughput_drop": 0.5}, #Server rule is workload-dependent; leave for now.#
 }
 
 

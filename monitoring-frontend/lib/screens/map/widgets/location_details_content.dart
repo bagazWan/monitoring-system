@@ -14,15 +14,14 @@ class LocationDetailsContent extends StatelessWidget {
     this.isSheet = false,
   });
 
-  Color _statusColor(String status) {
-    switch (status.toLowerCase()) {
-      case 'online':
-        return Colors.green;
-      case 'offline':
-        return Colors.red;
-      default:
-        return Colors.orange;
-    }
+  Color _statusColor(String status, String? severity) {
+    if (status == 'offline') return Colors.red;
+    if (status == 'warning') return Colors.orange;
+
+    final sev = (severity ?? '').toLowerCase();
+    if (sev == 'red' || sev == 'critical') return Colors.red;
+    if (sev == 'yellow' || sev == 'warning') return Colors.orange;
+    return Colors.green;
   }
 
   @override
@@ -55,7 +54,7 @@ class LocationDetailsContent extends StatelessWidget {
                 width: 10,
                 height: 10,
                 decoration: BoxDecoration(
-                  color: _statusColor(status),
+                  color: _statusColor(status, n.severity),
                   shape: BoxShape.circle,
                 ),
               ),

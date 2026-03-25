@@ -8,7 +8,13 @@ from sqlalchemy.orm import Session
 from app.core.database import SessionLocal
 from app.models import Device, StatusHistory, Switch
 from app.services.librenms_service import LibreNMSService
+from app.services.metrics_service import aggregate_port_metrics_by_node
+from app.services.threshold_alerts import (
+    sync_device_threshold_alert,
+    sync_switch_threshold_alert,
+)
 from app.services.websocket_manager import ws_manager
+from app.utils.thresholds import evaluate_device_severity, evaluate_switch_severity
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +31,93 @@ _switch_failure_count: Dict[int, int] = {}
 
 def _open_db() -> Session:
     return SessionLocal()
+
+
+async def _sync_threshold_alerts(
+    db: Session, devices: list[Device], switches: list[Switch]
+):
+    (
+        device_totals,
+        switch_totals,
+        device_capacity,
+        switch_capacity,
+        _,
+    ) = await aggregate_port_metrics_by_node(db, None)
+
+    for device in devices:
+        status = (device.status or "").lower()
+        if status != "online":
+            # clear threshold alerts if device is not online
+            sync_device_threshold_alert(
+                db,
+                device_id=device.device_id,
+                severity="green",
+                message="Device not online",
+                data_found=True,
+            )
+            continue
+
+        if device.device_id not in device_totals:
+            # no data -> do not create threshold alert
+            sync_device_threshold_alert(
+                db,
+                device_id=device.device_id,
+                severity="green",
+                message="No valid rate data",
+                data_found=False,
+            )
+            continue
+
+        in_mbps, out_mbps = device_totals.get(device.device_id, (0.0, 0.0))
+        severity = evaluate_device_severity(device.device_type, in_mbps, out_mbps)
+
+        sync_device_threshold_alert(
+            db,
+            device_id=device.device_id,
+            severity=severity,
+            message=f"Throughput: {in_mbps:.2f} Mbps in / {out_mbps:.2f} Mbps out",
+            data_found=True,
+        )
+
+    for switch in switches:
+        status = (switch.status or "").lower()
+        if status != "online":
+            sync_switch_threshold_alert(
+                db,
+                switch_id=switch.switch_id,
+                severity="green",
+                message="Switch not online",
+                data_found=True,
+            )
+            continue
+
+        if switch.switch_id not in switch_totals:
+            sync_switch_threshold_alert(
+                db,
+                switch_id=switch.switch_id,
+                severity="green",
+                message="No valid rate data",
+                data_found=False,
+            )
+            continue
+
+        in_mbps, out_mbps = switch_totals.get(switch.switch_id, (0.0, 0.0))
+        capacity = switch_capacity.get(switch.switch_id, 0.0)
+        utilization = ((in_mbps + out_mbps) / capacity) * 100 if capacity > 0 else None
+
+        severity = evaluate_switch_severity(utilization, "switch")
+
+        sync_switch_threshold_alert(
+            db,
+            switch_id=switch.switch_id,
+            severity=severity,
+            message=(
+                f"Utilization: {utilization:.2f}%"
+                if utilization is not None
+                else "Utilization unavailable"
+            ),
+            data_found=True,
+        )
 
 
 async def poll_and_broadcast_status(libre_service: LibreNMSService) -> int:
@@ -67,19 +160,20 @@ async def poll_and_broadcast_status(libre_service: LibreNMSService) -> int:
             if raw_status == "offline":
                 failure_count += 1
                 _device_failure_count[device.device_id] = failure_count
-                new_status = "offline" if failure_count >= 3 else "online"
+                if failure_count >= 3:
+                    new_status = "offline"
+                else:
+                    new_status = "warning"
             else:
                 _device_failure_count[device.device_id] = 0
                 new_status = "online"
 
-            # Check if status changed
             if old_status is None:
                 _device_status_cache[device.device_id] = new_status
             elif old_status != new_status:
                 _device_status_cache[device.device_id] = new_status
                 changes_detected += 1
 
-                # Update database
                 device.status = new_status
                 device.librenms_last_synced = datetime.now()
 
@@ -92,7 +186,6 @@ async def poll_and_broadcast_status(libre_service: LibreNMSService) -> int:
                     )
                 )
 
-                # Broadcast status change
                 await ws_manager.broadcast(
                     {
                         "type": "status_change",
@@ -106,15 +199,6 @@ async def poll_and_broadcast_status(libre_service: LibreNMSService) -> int:
                     }
                 )
 
-                logger.info(
-                    "Device %s (%s) status changed:  %s -> %s",
-                    device.name,
-                    device.ip_address,
-                    old_status,
-                    new_status,
-                )
-
-        # Check switches
         switches = db.query(Switch).filter(Switch.librenms_device_id.isnot(None)).all()
         for switch in switches:
             lnms_id = switch.librenms_device_id
@@ -130,7 +214,10 @@ async def poll_and_broadcast_status(libre_service: LibreNMSService) -> int:
             if raw_status == "offline":
                 failure_count += 1
                 _switch_failure_count[switch.switch_id] = failure_count
-                new_status = "offline" if failure_count >= 3 else "online"
+                if failure_count >= 3:
+                    new_status = "offline"
+                else:
+                    new_status = "warning"
             else:
                 _switch_failure_count[switch.switch_id] = 0
                 new_status = "online"
@@ -141,7 +228,6 @@ async def poll_and_broadcast_status(libre_service: LibreNMSService) -> int:
                 _switch_status_cache[switch.switch_id] = new_status
                 changes_detected += 1
 
-                # Update database
                 switch.status = new_status
                 switch.librenms_last_synced = datetime.now()
 
@@ -154,7 +240,6 @@ async def poll_and_broadcast_status(libre_service: LibreNMSService) -> int:
                     )
                 )
 
-                # Broadcast status change
                 await ws_manager.broadcast(
                     {
                         "type": "status_change",
@@ -168,13 +253,7 @@ async def poll_and_broadcast_status(libre_service: LibreNMSService) -> int:
                     }
                 )
 
-                logger.info(
-                    "Switch %s (%s) status changed: %s -> %s",
-                    switch.name,
-                    switch.ip_address,
-                    old_status,
-                    new_status,
-                )
+        await _sync_threshold_alerts(db, devices, switches)
 
         db.commit()
 

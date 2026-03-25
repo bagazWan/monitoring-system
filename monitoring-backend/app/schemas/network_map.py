@@ -80,6 +80,7 @@ class MapDevice(BaseModel):
     location_id: Optional[int]
     switch_id: Optional[int]
     description: Optional[str]
+    severity: Optional[str] = None
 
 
 class MapSwitch(BaseModel):
@@ -90,6 +91,7 @@ class MapSwitch(BaseModel):
     location_id: Optional[int]
     node_id: Optional[int]
     description: Optional[str]
+    severity: Optional[str] = None
 
 
 class MapTopologyResponse(BaseModel):

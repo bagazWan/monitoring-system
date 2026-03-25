@@ -13,23 +13,24 @@ class BaseNode {
   final String? description;
   final String? lastReplacedAt;
   final int? librenmsId;
+  final String? severity;
 
-  BaseNode({
-    required this.id,
-    required this.name,
-    required this.ipAddress,
-    this.macAddress,
-    this.deviceType,
-    required this.nodeKind,
-    this.status,
-    this.locationName,
-    this.locationId,
-    this.switchId,
-    this.nodeId,
-    this.description,
-    this.lastReplacedAt,
-    this.librenmsId,
-  });
+  BaseNode(
+      {required this.id,
+      required this.name,
+      required this.ipAddress,
+      this.macAddress,
+      this.deviceType,
+      required this.nodeKind,
+      this.status,
+      this.locationName,
+      this.locationId,
+      this.switchId,
+      this.nodeId,
+      this.description,
+      this.lastReplacedAt,
+      this.librenmsId,
+      this.severity});
 
   factory BaseNode.fromDeviceJson(Map<String, dynamic> json) {
     return BaseNode(
@@ -45,7 +46,8 @@ class BaseNode {
         switchId: json['switch_id'],
         description: json['description'],
         lastReplacedAt: json['last_replaced_at'],
-        librenmsId: json['librenms_device_id']);
+        librenmsId: json['librenms_device_id'],
+        severity: json['severity']);
   }
 
   Map<String, dynamic> toDeviceCreateJson() {
@@ -75,7 +77,8 @@ class BaseNode {
         nodeId: json['node_id'],
         description: json['description'],
         lastReplacedAt: json['last_replaced_at'],
-        librenmsId: json['librenms_device_id']);
+        librenmsId: json['librenms_device_id'],
+        severity: json['severity']);
   }
 
   Map<String, dynamic> toSwitchCreateJson() {

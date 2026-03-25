@@ -20,6 +20,19 @@ class DeviceCard extends StatelessWidget {
     this.liveStatsListenable,
   });
 
+  Color _resolveStatusColor(String? status, String? severity) {
+    final s = (status ?? '').toLowerCase();
+    final sev = (severity ?? '').toLowerCase();
+
+    if (s == 'offline') return Colors.red;
+    if (s == 'warning') return Colors.orange;
+
+    if (sev == 'red' || sev == 'critical') return Colors.red;
+    if (sev == 'yellow' || sev == 'warning') return Colors.orange;
+
+    return Colors.green;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Card(
@@ -37,12 +50,18 @@ class DeviceCard extends StatelessWidget {
         tilePadding: const EdgeInsets.symmetric(horizontal: 16),
         childrenPadding:
             const EdgeInsets.only(left: 16, right: 16, bottom: 16, top: 0),
-        leading: ValueListenableBuilder<String?>(
-          valueListenable: statusListenable ?? ValueNotifier(node.status),
-          builder: (context, value, _) {
-            final color =
-                (value?.toLowerCase() == 'online') ? Colors.green : Colors.red;
-            return _buildStatusDot(color);
+        leading: ValueListenableBuilder<Map<String, dynamic>?>(
+          valueListenable:
+              liveStatsListenable ?? ValueNotifier<Map<String, dynamic>?>(null),
+          builder: (context, liveStats, _) {
+            return ValueListenableBuilder<String?>(
+              valueListenable: statusListenable ?? ValueNotifier(node.status),
+              builder: (context, value, __) {
+                final severity = liveStats?['severity']?.toString();
+                final color = _resolveStatusColor(value, severity);
+                return _buildStatusDot(color);
+              },
+            );
           },
         ),
         title: Text(

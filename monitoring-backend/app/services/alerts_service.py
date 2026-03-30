@@ -1,8 +1,7 @@
 import asyncio
 import logging
 from datetime import datetime, timezone
-from hashlib import sha1
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional, Set
 
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
@@ -45,6 +44,13 @@ def _normalize_status(raw_status: Any) -> str:
     return s
 
 
+def _is_device_down_alert(message: str, rule: str) -> bool:
+    msg = (message or "").lower()
+    r = (rule or "").lower()
+    keywords = ["device down", "no response", "unreachable", "icmp", "ping"]
+    return any(k in msg for k in keywords) or any(k in r for k in keywords)
+
+
 async def process_librenms_alerts(librenms_alerts: List[Dict[str, Any]]) -> int:
     """
     Process a list of raw alerts returned from LibreNMS.
@@ -52,11 +58,6 @@ async def process_librenms_alerts(librenms_alerts: List[Dict[str, Any]]) -> int:
     - Map to either `Alert` (device) or `SwitchAlert` (switch)
     - Persist new alerts or update existing alert status/severity/message
     - Trigger notifications (if notify_all_channels exists)
-
-    PS:
-    If a single librenms_device_id exists in both devices and switches tables,
-    this is an ambiguous mapping. It will log an error and skip processing the alert
-    to avoid storing incorrect device_name/location_name on the UI.
     """
     processed = 0
     db = _open_db()
@@ -66,7 +67,6 @@ async def process_librenms_alerts(librenms_alerts: List[Dict[str, Any]]) -> int:
 
         for raw in librenms_alerts or []:
             try:
-                # canonicalize fields from LibreNMS payload
                 librenms_alert_id = (
                     raw.get("id") or raw.get("alert_id") or raw.get("alertId")
                 )
@@ -111,12 +111,13 @@ async def process_librenms_alerts(librenms_alerts: List[Dict[str, Any]]) -> int:
                 )
                 cleared_at = datetime.now(timezone.utc) if status == "cleared" else None
 
-                # Lookup whether this librenms device is stored as a Switch or a generic Device
+                if not _is_device_down_alert(message, alert_type):
+                    continue
+
                 target_switch = None
                 target_device = None
 
                 if librenms_device_id is not None:
-                    # Query both to detect ambiguity
                     target_switch = (
                         db.query(Switch)
                         .filter(Switch.librenms_device_id == librenms_device_id)
@@ -128,28 +129,14 @@ async def process_librenms_alerts(librenms_alerts: List[Dict[str, Any]]) -> int:
                         .first()
                     )
 
-                # If both exist => ambiguous mapping (data integrity problem)
                 if target_switch and target_device:
                     logger.error(
-                        "Ambiguous librenms_device_id=%s exists in BOTH switches(switch_id=%s,name=%s) "
-                        "and devices(device_id=%s,name=%s). Skipping alert raw=%s",
+                        "Ambiguous librenms_device_id=%s exists in both switches and devices. Skipping.",
                         librenms_device_id,
-                        getattr(target_switch, "switch_id", None),
-                        getattr(target_switch, "name", None),
-                        getattr(target_device, "device_id", None),
-                        getattr(target_device, "name", None),
-                        raw,
                     )
                     continue
 
-                # If no DB object found, skip processing this alert
                 if not target_switch and not target_device:
-                    logger.debug(
-                        "Skipping alert from LibreNMS because corresponding device not found in DB "
-                        "(librenms_device_id=%s). Raw: %s",
-                        librenms_device_id,
-                        raw,
-                    )
                     continue
 
                 device_name = target_device.name if target_device else None
@@ -160,7 +147,6 @@ async def process_librenms_alerts(librenms_alerts: List[Dict[str, Any]]) -> int:
                 if target_switch and target_switch.location:
                     location_name = target_switch.location.name
 
-                # Determine whether to create/update SwitchAlert or Alert
                 Model = SwitchAlert if target_switch else Alert
 
                 if status == "active" and librenms_alert_id_int is not None:
@@ -178,7 +164,6 @@ async def process_librenms_alerts(librenms_alerts: List[Dict[str, Any]]) -> int:
                     )
 
                 if existing:
-                    # Update existing alert record
                     changed = False
 
                     if existing.status != status:
@@ -203,12 +188,6 @@ async def process_librenms_alerts(librenms_alerts: List[Dict[str, Any]]) -> int:
                     if changed:
                         db.add(existing)
                         processed += 1
-                        logger.debug(
-                            "Updated existing alert %s (librenms_alert_id=%s)",
-                            existing,
-                            librenms_alert_id,
-                        )
-                        # notify update
                         try:
                             if notify_all_channels:
                                 await _maybe_notify(
@@ -266,15 +245,8 @@ async def process_librenms_alerts(librenms_alerts: List[Dict[str, Any]]) -> int:
                         )
 
                     db.add(new_alert)
-                    db.flush()  # ensure PK is available
+                    db.flush()
                     processed += 1
-                    logger.info(
-                        "Created new alert for %s (librenms_alert_id=%s) -> %s",
-                        "switch" if target_switch else "device",
-                        librenms_alert_id_int,
-                        message,
-                    )
-
                     try:
                         if notify_all_channels:
                             payload = {
@@ -351,7 +323,6 @@ async def process_librenms_alerts(librenms_alerts: List[Dict[str, Any]]) -> int:
             except Exception:
                 logger.exception("Notification failed for missing-clear summary")
 
-        # commit once after processing the batch
         db.commit()
     finally:
         db.close()

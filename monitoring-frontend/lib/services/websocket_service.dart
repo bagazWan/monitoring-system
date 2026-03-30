@@ -178,7 +178,10 @@ class WebSocketService {
 
         case 'alert':
           _alertStreamController.add(data);
-          // signal any listening screens to refresh from API
+          _alertsRefreshController.add(null);
+          break;
+
+        case 'alerts_refresh':
           _alertsRefreshController.add(null);
           break;
 

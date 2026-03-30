@@ -2,16 +2,15 @@ from typing import Dict, Optional
 
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.models import Device, LibreNMSPort, Switch
 from app.services.librenms_service import LibreNMSService
 from app.services.metrics_service import (
     extract_port_capacity_mbps,
     extract_port_rate_parts_mbps,
+    to_float,
 )
-from app.services.threshold_alerts import (
-    sync_device_threshold_alert,
-    sync_switch_threshold_alert,
-)
+from app.services.ping_probe import ping_probe
 from app.utils.thresholds import evaluate_device_severity, evaluate_switch_severity
 
 
@@ -34,6 +33,7 @@ async def calculate_device_metrics(
         "out_mbps": 0.0,
         "monitored": False,
         "severity": _status_severity(device.status),
+        "latency_ms": None,
     }
 
     if not device.librenms_device_id:
@@ -49,7 +49,6 @@ async def calculate_device_metrics(
 
     total_in = 0.0
     total_out = 0.0
-    data_found = False
 
     for port_row in enabled_ports:
         try:
@@ -61,10 +60,9 @@ async def calculate_device_metrics(
                     or int(p_data.get("ignore", 0) or 0) == 1
                 ):
                     continue
-                in_mbps, out_mbps, has_valid = extract_port_rate_parts_mbps(p_data)
+                in_mbps, out_mbps, _ = extract_port_rate_parts_mbps(p_data)
                 total_in += in_mbps
                 total_out += out_mbps
-                data_found = data_found or has_valid
         except Exception:
             continue
 
@@ -78,14 +76,16 @@ async def calculate_device_metrics(
     else:
         severity = evaluate_device_severity(device.device_type, in_mbps, out_mbps)
 
-    sync_device_threshold_alert(
-        db,
-        device_id=device.device_id,
-        severity=severity,
-        message=f"Throughput: {in_mbps:.2f} Mbps in / {out_mbps:.2f} Mbps out",
-        data_found=data_found,
-    )
-    db.commit()
+    latency_ms = None
+    if settings.PING_PROBE_ENABLED:
+        latency_ms = await ping_probe.ping(device.ip_address)
+    else:
+        try:
+            detail = await librenms.get_device_by_id(int(device.librenms_device_id))
+            if detail:
+                latency_ms = to_float(detail.get("latency_ms") or detail.get("latency"))
+        except Exception:
+            pass
 
     return {
         "device_id": device.device_id,
@@ -94,6 +94,7 @@ async def calculate_device_metrics(
         "out_mbps": out_mbps,
         "monitored": True,
         "severity": severity,
+        "latency_ms": latency_ms,
     }
 
 
@@ -132,7 +133,6 @@ async def calculate_switch_metrics(
     total_in = 0.0
     total_out = 0.0
     total_capacity = 0.0
-    data_found = False
 
     for port_row in used_ports:
         try:
@@ -144,10 +144,9 @@ async def calculate_switch_metrics(
                     or int(p_data.get("ignore", 0) or 0) == 1
                 ):
                     continue
-                in_mbps, out_mbps, has_valid = extract_port_rate_parts_mbps(p_data)
+                in_mbps, out_mbps, _ = extract_port_rate_parts_mbps(p_data)
                 total_in += in_mbps
                 total_out += out_mbps
-                data_found = data_found or has_valid
 
                 capacity = extract_port_capacity_mbps(p_data)
                 if capacity:
@@ -167,17 +166,6 @@ async def calculate_switch_metrics(
         severity = "yellow"
     else:
         severity = evaluate_switch_severity(utilization, "switch")
-
-    sync_switch_threshold_alert(
-        db,
-        switch_id=switch.switch_id,
-        severity=severity,
-        message=f"Utilization: {utilization:.2f}%"
-        if utilization is not None
-        else "Utilization unavailable",
-        data_found=data_found,
-    )
-    db.commit()
 
     return {
         "switch_id": switch.switch_id,

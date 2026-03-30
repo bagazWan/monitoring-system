@@ -83,14 +83,23 @@ class DeviceCard extends StatelessWidget {
               String trafficText = "Loading...";
               bool isIdle = false;
               bool isLive = false;
+              String latencyText = "-";
 
               if (liveStats != null) {
                 final double inMbps = (liveStats['in_mbps'] ?? 0).toDouble();
                 final double outMbps = (liveStats['out_mbps'] ?? 0).toDouble();
                 final String liveStatus = liveStats['status'] ?? 'unknown';
 
+                final rawLatency =
+                    liveStats['latency_ms'] ?? liveStats['latency'];
+                if (rawLatency != null) {
+                  latencyText =
+                      "${(rawLatency as num).toDouble().toStringAsFixed(2)} ms";
+                }
+
                 if (liveStatus == 'offline') {
                   trafficText = "Device is Offline";
+                  latencyText = "-";
                 } else {
                   if (inMbps == 0 && outMbps == 0) {
                     trafficText = "No Traffic (Idle or Disabled)";
@@ -105,62 +114,80 @@ class DeviceCard extends StatelessWidget {
 
               return Padding(
                 padding: const EdgeInsets.symmetric(vertical: 4),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                child: Column(
                   children: [
-                    Expanded(
-                      child: Row(
-                        children: [
-                          SizedBox(
-                            width: 100,
-                            child: Text("Live Traffic:",
-                                style: TextStyle(
-                                    color: Colors.grey[600], fontSize: 13)),
-                          ),
-                          Expanded(
-                            child: Text(
-                              trafficText,
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: isLive
-                                    ? FontWeight.bold
-                                    : FontWeight.normal,
-                                color: isLive
-                                    ? Colors.blue[700]
-                                    : isIdle
-                                        ? Colors.grey[400]
-                                        : Colors.black87,
-                                fontStyle: isIdle
-                                    ? FontStyle.italic
-                                    : FontStyle.normal,
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(
+                          child: Row(
+                            children: [
+                              SizedBox(
+                                width: 100,
+                                child: Text("Live Traffic:",
+                                    style: TextStyle(
+                                        color: Colors.grey[600], fontSize: 13)),
                               ),
+                              Expanded(
+                                child: Text(
+                                  trafficText,
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: isLive
+                                        ? FontWeight.bold
+                                        : FontWeight.normal,
+                                    color: isLive
+                                        ? Colors.blue[700]
+                                        : isIdle
+                                            ? Colors.grey[400]
+                                            : Colors.black87,
+                                    fontStyle: isIdle
+                                        ? FontStyle.italic
+                                        : FontStyle.normal,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        if (isAdmin)
+                          SizedBox(
+                            height: 32,
+                            width: 32,
+                            child: IconButton(
+                              padding: EdgeInsets.zero,
+                              icon: const Icon(Icons.settings,
+                                  size: 20, color: Colors.grey),
+                              tooltip: "Configure Device",
+                              onPressed: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => DeviceConfigScreen(
+                                      node: node,
+                                    ),
+                                  ),
+                                ).then((_) => onRefresh?.call());
+                              },
                             ),
                           ),
-                        ],
-                      ),
+                      ],
                     ),
-                    if (isAdmin)
-                      SizedBox(
-                        height: 32,
-                        width: 32,
-                        child: IconButton(
-                          padding: EdgeInsets.zero,
-                          icon: const Icon(Icons.settings,
-                              size: 20, color: Colors.grey),
-                          tooltip: "Configure Device",
-                          onPressed: () async {
-                            final shouldRefresh = await Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => DeviceConfigScreen(node: node),
-                              ),
-                            );
-                            if (shouldRefresh == true) {
-                              onRefresh?.call();
-                            }
-                          },
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        SizedBox(
+                          width: 100,
+                          child: Text("Latency:",
+                              style: TextStyle(
+                                  color: Colors.grey[600], fontSize: 13)),
                         ),
-                      ),
+                        Text(
+                          latencyText,
+                          style: const TextStyle(fontSize: 13),
+                        ),
+                      ],
+                    ),
                   ],
                 ),
               );

@@ -12,6 +12,12 @@ class Settings(BaseSettings):
     LIBRENMS_API_TOKEN: str
     POLL_INTERVAL: int = 5
 
+    PING_PROBE_ENABLED: bool = False
+    PING_PROBE_PATH: str = "fping"
+    PING_PROBE_COUNT: int = 3
+    PING_PROBE_TIMEOUT_MS: int = 1000
+    PING_PROBE_CACHE_SECONDS: int = 10
+
     PROJECT_NAME: str = "Device Monitoring System"
     VERSION: str = "1.0"
     API_V1_VERSION: str = "/api/v1"

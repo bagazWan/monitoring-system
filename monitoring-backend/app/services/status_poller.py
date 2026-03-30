@@ -5,16 +5,23 @@ from typing import Any, Dict, Optional
 
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.core.database import SessionLocal
 from app.models import Device, StatusHistory, Switch
 from app.services.librenms_service import LibreNMSService
-from app.services.metrics_service import aggregate_port_metrics_by_node
+from app.services.metrics_service import aggregate_port_metrics_by_node, to_float
+from app.services.ping_probe import ping_probe
 from app.services.threshold_alerts import (
+    sync_device_latency_alert,
     sync_device_threshold_alert,
     sync_switch_threshold_alert,
 )
 from app.services.websocket_manager import ws_manager
-from app.utils.thresholds import evaluate_device_severity, evaluate_switch_severity
+from app.utils.thresholds import (
+    evaluate_device_latency_severity,
+    evaluate_device_severity,
+    evaluate_switch_severity,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +41,10 @@ def _open_db() -> Session:
 
 
 async def _sync_threshold_alerts(
-    db: Session, devices: list[Device], switches: list[Switch]
+    db: Session,
+    devices: list[Device],
+    switches: list[Switch],
+    latency_by_lnms_id: Dict[int, Optional[float]],
 ):
     (
         device_totals,
@@ -47,8 +57,14 @@ async def _sync_threshold_alerts(
     for device in devices:
         status = (device.status or "").lower()
         if status != "online":
-            # clear threshold alerts if device is not online
             sync_device_threshold_alert(
+                db,
+                device_id=device.device_id,
+                severity="green",
+                message="Device not online",
+                data_found=True,
+            )
+            sync_device_latency_alert(
                 db,
                 device_id=device.device_id,
                 severity="green",
@@ -58,7 +74,6 @@ async def _sync_threshold_alerts(
             continue
 
         if device.device_id not in device_totals:
-            # no data -> do not create threshold alert
             sync_device_threshold_alert(
                 db,
                 device_id=device.device_id,
@@ -66,18 +81,40 @@ async def _sync_threshold_alerts(
                 message="No valid rate data",
                 data_found=False,
             )
-            continue
+        else:
+            in_mbps, out_mbps = device_totals.get(device.device_id, (0.0, 0.0))
+            severity = evaluate_device_severity(device.device_type, in_mbps, out_mbps)
 
-        in_mbps, out_mbps = device_totals.get(device.device_id, (0.0, 0.0))
-        severity = evaluate_device_severity(device.device_type, in_mbps, out_mbps)
+            sync_device_threshold_alert(
+                db,
+                device_id=device.device_id,
+                severity=severity,
+                message=f"Throughput: {in_mbps:.2f} Mbps in / {out_mbps:.2f} Mbps out",
+                data_found=True,
+            )
 
-        sync_device_threshold_alert(
-            db,
-            device_id=device.device_id,
-            severity=severity,
-            message=f"Throughput: {in_mbps:.2f} Mbps in / {out_mbps:.2f} Mbps out",
-            data_found=True,
-        )
+        if (device.device_type or "").strip().lower() == "cctv":
+            if settings.PING_PROBE_ENABLED:
+                latency_ms = await ping_probe.ping(device.ip_address)
+            else:
+                lnms_id = device.librenms_device_id
+                latency_ms = latency_by_lnms_id.get(int(lnms_id)) if lnms_id else None
+
+            latency_sev = evaluate_device_latency_severity(
+                device.device_type, latency_ms
+            )
+
+            sync_device_latency_alert(
+                db,
+                device_id=device.device_id,
+                severity=latency_sev,
+                message=(
+                    f"Latency: {latency_ms:.2f} ms"
+                    if latency_ms is not None
+                    else "Latency unavailable"
+                ),
+                data_found=latency_ms is not None,
+            )
 
     for switch in switches:
         status = (switch.status or "").lower()
@@ -134,15 +171,21 @@ async def poll_and_broadcast_status(libre_service: LibreNMSService) -> int:
         librenms_devices = await libre_service.get_devices()
 
         librenms_status_map: Dict[int, Dict[str, Any]] = {}
+        latency_by_lnms_id: Dict[int, Optional[float]] = {}
+
         for lnms_device in librenms_devices:
             device_id = lnms_device.get("device_id")
             if device_id:
-                librenms_status_map[int(device_id)] = {
+                lnms_id = int(device_id)
+                librenms_status_map[lnms_id] = {
                     "status": "online" if lnms_device.get("status") == 1 else "offline",
                     "hostname": lnms_device.get("hostname", ""),
                     "uptime": lnms_device.get("uptime", 0),
                     "last_polled": lnms_device.get("last_polled", ""),
                 }
+                latency_by_lnms_id[lnms_id] = to_float(
+                    lnms_device.get("latency_ms") or lnms_device.get("latency")
+                )
 
         # Check devices
         devices = db.query(Device).filter(Device.librenms_device_id.isnot(None)).all()
@@ -253,7 +296,7 @@ async def poll_and_broadcast_status(libre_service: LibreNMSService) -> int:
                     }
                 )
 
-        await _sync_threshold_alerts(db, devices, switches)
+        await _sync_threshold_alerts(db, devices, switches, latency_by_lnms_id)
 
         db.commit()
 
@@ -309,7 +352,6 @@ async def _run_status_poller(
             except Exception:
                 logger.exception("Error in status poller loop")
 
-            # Wait for interval or stop event
             try:
                 await asyncio.wait_for(
                     _status_poller_stop_event.wait(), timeout=interval_seconds

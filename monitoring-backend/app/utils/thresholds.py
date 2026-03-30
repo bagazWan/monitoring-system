@@ -20,6 +20,12 @@ class UtilizationThreshold:
     critical: float
 
 
+@dataclass(frozen=True)
+class LatencyThreshold:
+    warning: float
+    critical: float
+
+
 DEVICE_THRESHOLDS = {
     "cctv": {
         "throughput": BandwidthThreshold(
@@ -27,7 +33,8 @@ DEVICE_THRESHOLDS = {
             low_critical=0.1,
             high_warning=10.0,
             high_critical=12.0,
-        )
+        ),
+        "latency": LatencyThreshold(warning=30.0, critical=100.0),
     },
     "switch": {"utilization": UtilizationThreshold(warning=70.0, critical=90.0)},
     "router": {"utilization": UtilizationThreshold(warning=70.0, critical=90.0)},
@@ -71,6 +78,18 @@ def evaluate_utilization(
     return "green"
 
 
+def evaluate_latency(
+    latency_ms: Optional[float], threshold: LatencyThreshold
+) -> Severity:
+    if latency_ms is None:
+        return "green"
+    if latency_ms >= threshold.critical:
+        return "red"
+    if latency_ms >= threshold.warning:
+        return "yellow"
+    return "green"
+
+
 def evaluate_device_severity(
     device_type: Optional[str], inbound_mbps: float, outbound_mbps: float
 ) -> Severity:
@@ -88,6 +107,20 @@ def evaluate_device_severity(
         )
 
     return "green"
+
+
+def evaluate_device_latency_severity(
+    device_type: Optional[str], latency_ms: Optional[float]
+) -> Severity:
+    key = _normalize_device_type(device_type)
+    if not key:
+        return "green"
+
+    thresholds = DEVICE_THRESHOLDS.get(key)
+    if not thresholds or "latency" not in thresholds:
+        return "green"
+
+    return evaluate_latency(latency_ms, thresholds["latency"])
 
 
 def evaluate_switch_severity(

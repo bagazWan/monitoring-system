@@ -1,4 +1,5 @@
 .env
+**/seed_data.py
 **/.env
 **/__pycache__/
 **/venv/

@@ -2,6 +2,7 @@
 **/.env
 **/__pycache__/
 **/venv/
+**/seed_data.py
 *.pyc
 Target.md
 librenms_data/

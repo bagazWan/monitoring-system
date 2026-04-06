@@ -8,6 +8,7 @@ from app.services.librenms_service import LibreNMSService
 from app.services.metrics_service import (
     extract_port_capacity_mbps,
     extract_port_rate_parts_mbps,
+    to_finite_float,
     to_float,
 )
 from app.services.ping_probe import ping_probe
@@ -90,11 +91,11 @@ async def calculate_device_metrics(
     return {
         "device_id": device.device_id,
         "status": device.status,
-        "in_mbps": in_mbps,
-        "out_mbps": out_mbps,
+        "in_mbps": to_finite_float(round(in_mbps, 2)) or 0.0,
+        "out_mbps": to_finite_float(round(out_mbps, 2)) or 0.0,
         "monitored": True,
         "severity": severity,
-        "latency_ms": latency_ms,
+        "latency_ms": to_finite_float(latency_ms),
     }
 
 
@@ -170,7 +171,7 @@ async def calculate_switch_metrics(
     return {
         "switch_id": switch.switch_id,
         "status": switch.status,
-        "in_mbps": in_mbps,
-        "out_mbps": out_mbps,
+        "in_mbps": to_finite_float(round(in_mbps, 2)) or 0.0,
+        "out_mbps": to_finite_float(round(out_mbps, 2)) or 0.0,
         "severity": severity,
     }

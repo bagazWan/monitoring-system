@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import math
 from datetime import datetime, timedelta
 from typing import Dict, Optional, Tuple
 
@@ -18,6 +19,15 @@ def to_float(value) -> Optional[float]:
         return float(value)
     except (TypeError, ValueError):
         return None
+
+
+def to_finite_float(value) -> Optional[float]:
+    v = to_float(value)
+    if v is None:
+        return None
+    if math.isnan(v) or math.isinf(v):
+        return None
+    return v
 
 
 def extract_port_rate_parts_mbps(port: dict) -> Tuple[float, float, bool]:

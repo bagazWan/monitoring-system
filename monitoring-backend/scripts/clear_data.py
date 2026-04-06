@@ -16,6 +16,7 @@ from app.models import (
     Location,
     NetworkNode,
     ProblemCategory,
+    StatusHistory,
     Switch,
     SwitchAlert,
     SwitchBandwidth,
@@ -47,6 +48,7 @@ def clear_data():
                 "locations",
                 "problem_categories",
                 "users",
+                "status_history",
             ]
 
             tables_string = ", ".join(tables)

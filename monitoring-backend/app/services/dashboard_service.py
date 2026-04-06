@@ -23,8 +23,8 @@ def build_uptime_trend(
         hour=0, minute=0, second=0, microsecond=0
     )
 
-    dev_query = db.query(Device.device_id, Device.status)
-    sw_query = db.query(Switch.switch_id, Switch.status)
+    dev_query = db.query(Device.device_id)
+    sw_query = db.query(Switch.switch_id)
 
     if location_id:
         dev_query = dev_query.filter(Device.location_id == location_id)
@@ -33,10 +33,9 @@ def build_uptime_trend(
     devices = dev_query.all()
     switches = sw_query.all()
 
-    node_keys = [("device", d.device_id, d.status) for d in devices] + [
-        ("switch", s.switch_id, s.status) for s in switches
+    node_keys = [("device", d.device_id) for d in devices] + [
+        ("switch", s.switch_id) for s in switches
     ]
-
     if not node_keys:
         return {"days": 0, "data": []}
 
@@ -58,7 +57,6 @@ def build_uptime_trend(
                 StatusHistory.node_id.in_(switch_ids),
             )
         )
-
     if not filters:
         return {"days": 0, "data": []}
 
@@ -67,15 +65,22 @@ def build_uptime_trend(
         for i in range(days)
     }
 
+    first_seen_row = (
+        db.query(StatusHistory.changed_at)
+        .filter(or_(*filters))
+        .order_by(StatusHistory.changed_at.asc())
+        .first()
+    )
+    first_seen_at = first_seen_row[0] if first_seen_row else None
+
     history_rows = (
         db.query(StatusHistory)
         .filter(StatusHistory.changed_at >= window_start)
+        .filter(StatusHistory.changed_at <= now)
         .filter(or_(*filters))
         .order_by(StatusHistory.changed_at.asc())
         .all()
     )
-
-    days_with_events = {row.changed_at.date() for row in history_rows}
 
     last_sub = (
         db.query(
@@ -101,19 +106,17 @@ def build_uptime_trend(
         )
         .all()
     )
-
-    last_status_map = {(row.node_type, row.node_id): row.status for row in last_rows}
+    last_status_map = {(r.node_type, r.node_id): r.status for r in last_rows}
 
     history_map = {}
     for row in history_rows:
-        key = (row.node_type, row.node_id)
-        history_map.setdefault(key, []).append(row)
+        history_map.setdefault((row.node_type, row.node_id), []).append(row)
 
-    for node_type, node_id, current_status in node_keys:
+    for node_type, node_id in node_keys:
         key = (node_type, node_id)
         events = history_map.get(key, [])
-
         last_status = last_status_map.get(key)
+
         if last_status is None:
             if not events:
                 continue
@@ -135,10 +138,11 @@ def build_uptime_trend(
     for day in sorted(day_map.keys()):
         total = day_map[day]["total"]
         online = day_map[day]["online"]
-        uptime = round((online / total * 100), 2) if total > 0 else None
 
-        if day not in days_with_events:
+        if first_seen_at is None or day < first_seen_at.date():
             uptime = None
+        else:
+            uptime = round((online / total * 100), 2) if total > 0 else None
 
         data.append({"date": day.strftime("%Y-%m-%d"), "uptime_percentage": uptime})
 

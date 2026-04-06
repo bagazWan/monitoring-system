@@ -11,6 +11,7 @@ from app.models import Device, StatusHistory, Switch
 from app.services.librenms_service import LibreNMSService
 from app.services.metrics_service import aggregate_port_metrics_by_node, to_float
 from app.services.ping_probe import ping_probe
+from app.services.status_tracking_service import StatusTrackingService
 from app.services.threshold_alerts import (
     sync_device_latency_alert,
     sync_device_threshold_alert,
@@ -220,15 +221,6 @@ async def poll_and_broadcast_status(libre_service: LibreNMSService) -> int:
                 device.status = new_status
                 device.librenms_last_synced = datetime.now()
 
-                db.add(
-                    StatusHistory(
-                        node_type="device",
-                        node_id=device.device_id,
-                        status=new_status,
-                        changed_at=datetime.now(),
-                    )
-                )
-
                 await ws_manager.broadcast(
                     {
                         "type": "status_change",
@@ -273,15 +265,6 @@ async def poll_and_broadcast_status(libre_service: LibreNMSService) -> int:
 
                 switch.status = new_status
                 switch.librenms_last_synced = datetime.now()
-
-                db.add(
-                    StatusHistory(
-                        node_type="switch",
-                        node_id=switch.switch_id,
-                        status=new_status,
-                        changed_at=datetime.now(),
-                    )
-                )
 
                 await ws_manager.broadcast(
                     {
@@ -399,3 +382,19 @@ async def stop_status_poller_task() -> None:
             pass
         _status_poller_task = None
         _status_poller_stop_event = None
+
+
+async def run_status_tracking() -> None:
+    while True:
+        db = SessionLocal()
+        try:
+            service = StatusTrackingService(db)
+            summary = await service.poll_and_track_all()
+            logger.info("Status poll summary: %s", summary)
+        except Exception as e:
+            logger.exception("Status poll failed: %s", e)
+            db.rollback()
+        finally:
+            db.close()
+
+        await asyncio.sleep(max(1, int(settings.POLL_INTERVAL)))

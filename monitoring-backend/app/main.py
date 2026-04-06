@@ -28,6 +28,7 @@ from app.services.alerts_service import (
 )
 from app.services.librenms_service import LibreNMSService
 from app.services.status_poller import (
+    run_status_tracking,
     start_status_poller_task,
     stop_status_poller_task,
 )
@@ -54,6 +55,7 @@ libre_service: LibreNMSService = LibreNMSService()
 # Background poller task handle
 _alerts_poller_task: Optional[asyncio.Task] = None
 _status_poller_task: Optional[asyncio.Task] = None
+_status_tracking_task: Optional[asyncio.Task] = None
 
 
 @app.on_event("startup")
@@ -61,7 +63,7 @@ async def on_startup():
     """
     Application startup: start LibreNMS alerts poller as a background asyncio Task
     """
-    global _alerts_poller_task, _status_poller_task
+    global _alerts_poller_task, _status_tracking_task
     # alerts poller
     _alerts_poller_task = start_alerts_poller_task(
         libre_service, interval_seconds=getattr(settings, "POLL_INTERVAL", 5)
@@ -69,10 +71,8 @@ async def on_startup():
     logger.info("Started alerts poller task")
 
     # status poller
-    _status_poller_task = start_status_poller_task(
-        libre_service, interval_seconds=getattr(settings, "POLL_INTERVAL", 5)
-    )
-    logger.info("Started status poller task for WebSocket")
+    _status_tracking_task = asyncio.create_task(run_status_tracking())
+    logger.info("Started status tracking loop")
 
 
 @app.on_event("shutdown")
@@ -80,8 +80,18 @@ async def on_shutdown():
     """
     Application shutdown:  stop all background tasks
     """
+    global _status_tracking_task
     await stop_alerts_poller_task()
     await stop_status_poller_task()
+
+    if _status_tracking_task:
+        _status_tracking_task.cancel()
+        try:
+            await _status_tracking_task
+        except asyncio.CancelledError:
+            pass
+        _status_tracking_task = None
+
     logger.info("Stopped all background poller tasks")
 
 

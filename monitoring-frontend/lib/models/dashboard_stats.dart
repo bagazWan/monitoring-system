@@ -103,11 +103,19 @@ class UptimeTrendPoint {
   });
 
   factory UptimeTrendPoint.fromJson(Map<String, dynamic> json) {
+    final raw = json['uptime_percentage'];
+
+    double? parsed;
+    if (raw == null) {
+      parsed = null;
+    } else if (raw is num) {
+      parsed = raw.toDouble();
+    } else {
+      parsed = double.tryParse(raw.toString());
+    }
     return UptimeTrendPoint(
-      date: DateTime.parse(json['date']),
-      uptimePercentage: json['uptime_percentage'] != null
-          ? (json['uptime_percentage'] as num).toDouble()
-          : null,
+      date: DateTime.parse(json['date'].toString()),
+      uptimePercentage: parsed,
     );
   }
 }

@@ -62,7 +62,6 @@ class DashboardCharts extends StatelessWidget {
             }
 
             const double stackedHeight = 320;
-
             return Column(
               children: [
                 SizedBox(
@@ -129,19 +128,31 @@ class _UptimeTrendChart extends StatelessWidget {
   Widget _buildChart() {
     if (data.isEmpty) {
       return Center(
-        child: Text(
-          "No uptime data",
-          style: TextStyle(color: Colors.grey[500]),
-        ),
+        child:
+            Text("No uptime data", style: TextStyle(color: Colors.grey[500])),
+      );
+    }
+
+    final spots = data.asMap().entries.map((e) {
+      final y = e.value.uptimePercentage;
+      return y == null ? FlSpot.nullSpot : FlSpot(e.key.toDouble(), y);
+    }).toList();
+
+    final hasAnyRealPoint = data.any((e) => e.uptimePercentage != null);
+
+    if (!hasAnyRealPoint) {
+      return Center(
+        child: Text("No tracked uptime yet",
+            style: TextStyle(color: Colors.grey[500])),
       );
     }
 
     return LineChart(
       LineChartData(
-        gridData: const FlGridData(show: true),
-        borderData: FlBorderData(show: false),
         minY: 0,
         maxY: 100,
+        gridData: const FlGridData(show: true),
+        borderData: FlBorderData(show: false),
         titlesData: FlTitlesData(
           leftTitles: AxisTitles(
             sideTitles: SideTitles(
@@ -165,10 +176,8 @@ class _UptimeTrendChart extends StatelessWidget {
                   return const SizedBox.shrink();
                 }
                 final label = data[idx].date.toIso8601String().substring(5, 10);
-                return Text(
-                  label,
-                  style: TextStyle(fontSize: 9, color: Colors.grey[600]),
-                );
+                return Text(label,
+                    style: TextStyle(fontSize: 9, color: Colors.grey[600]));
               },
             ),
           ),
@@ -179,14 +188,8 @@ class _UptimeTrendChart extends StatelessWidget {
         ),
         lineBarsData: [
           LineChartBarData(
-            spots: data.asMap().entries.map((e) {
-              final value = e.value.uptimePercentage;
-              return value == null
-                  ? FlSpot.nullSpot
-                  : FlSpot(e.key.toDouble(), value);
-            }).toList(),
-            isCurved: true,
-            curveSmoothness: 0.3,
+            spots: spots,
+            isCurved: false,
             color: Colors.green,
             barWidth: 2,
             dotData: FlDotData(
@@ -200,10 +203,8 @@ class _UptimeTrendChart extends StatelessWidget {
                 strokeColor: Colors.white,
               ),
             ),
-            belowBarData: BarAreaData(
-              show: true,
-              color: Colors.green.withOpacity(0.1),
-            ),
+            belowBarData:
+                BarAreaData(show: true, color: Colors.green.withOpacity(0.1)),
           ),
         ],
       ),

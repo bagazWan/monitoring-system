@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import List, Optional
 
 from app.api.dependencies import require_admin, require_technician_or_admin
@@ -26,11 +27,9 @@ def get_all_switches(
 ):
     query = db.query(Switch)
 
-    # Apply filters if provided
     if status:
         query = query.filter(Switch.status == status)
 
-    # Get switches with pagination
     switches = query.offset(skip).limit(limit).all()
 
     return switches
@@ -66,10 +65,8 @@ async def get_bulk_switch_details(
     return results
 
 
-# get switch by location for map display
 @router.get("/with-locations", response_model=List[SwitchWithLocation])
 def get_switch_with_locations(db: Session = Depends(get_db)):
-    # Join Switch and Location tables
     results = (
         db.query(Switch, Location)
         .join(Location, Switch.location_id == Location.location_id)
@@ -95,7 +92,6 @@ def get_switch_with_locations(db: Session = Depends(get_db)):
     return switches_with_locations
 
 
-# Get single switch
 @router.get("/{switch_id}", response_model=SwitchResponse)
 def get_switch(switch_id: int, db: Session = Depends(get_db)):
     switch = db.query(Switch).filter(Switch.switch_id == switch_id).first()
@@ -109,7 +105,7 @@ def get_switch(switch_id: int, db: Session = Depends(get_db)):
 
 
 @router.patch("/{switch_id}", response_model=SwitchResponse)
-def update_switch(
+async def update_switch(
     switch_id: int,
     switch_data: SwitchUpdate,
     db: Session = Depends(get_db),
@@ -123,8 +119,29 @@ def update_switch(
             detail=f"Switch with id {switch_id} not found",
         )
 
-    # Update only provided fields
     update_data = switch_data.model_dump(exclude_unset=True)
+
+    if "ip_address" in update_data and update_data["ip_address"] is not None:
+        new_ip = update_data["ip_address"]
+
+        if switch.librenms_device_id:
+            librenms = LibreNMSService()
+            updated = await librenms.update_device_hostname(
+                int(switch.librenms_device_id), new_ip
+            )
+            if not updated:
+                raise HTTPException(
+                    status_code=status.HTTP_502_BAD_GATEWAY,
+                    detail="Failed to update IP in LibreNMS. Local database was not changed.",
+                )
+
+            refreshed = await librenms.get_device_by_id(int(switch.librenms_device_id))
+            if refreshed:
+                switch.librenms_hostname = refreshed.get("hostname") or new_ip
+                switch.librenms_last_synced = datetime.utcnow()
+            else:
+                switch.librenms_hostname = new_ip
+                switch.librenms_last_synced = datetime.utcnow()
 
     for field, value in update_data.items():
         setattr(switch, field, value)
@@ -154,7 +171,6 @@ async def delete_switch(
             librenms = LibreNMSService()
             await librenms.delete_device(int(switch.librenms_device_id))
         except Exception as e:
-            # Log error but proceed with DB deletion
             print(f"Warning: Failed to delete from LibreNMS: {e}")
 
     db.delete(switch)

@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import List, Optional
 
 from app.api.dependencies import require_admin, require_technician_or_admin
@@ -180,17 +181,14 @@ def get_device_types(db: Session = Depends(get_db)):
     return sorted(device_types)
 
 
-# Get devices with location data for map display
 @router.get("/with-locations", response_model=List[DeviceWithLocation])
 def get_devices_with_locations(db: Session = Depends(get_db)):
-    # Join Device and Location tables
     results = (
         db.query(Device, Location)
         .join(Location, Device.location_id == Location.location_id)
         .all()
     )
 
-    # Format response
     devices_with_locations = []
     for device, location in results:
         devices_with_locations.append(
@@ -212,7 +210,6 @@ def get_devices_with_locations(db: Session = Depends(get_db)):
     return devices_with_locations
 
 
-# Get single device
 @router.get("/{device_id}", response_model=DeviceResponse)
 def get_device(device_id: int, db: Session = Depends(get_db)):
     device = db.query(Device).filter(Device.device_id == device_id).first()
@@ -227,7 +224,7 @@ def get_device(device_id: int, db: Session = Depends(get_db)):
 
 
 @router.patch("/{device_id}", response_model=DeviceResponse)
-def update_device(
+async def update_device(
     device_id: int,
     device_data: DeviceUpdate,
     db: Session = Depends(get_db),
@@ -241,8 +238,29 @@ def update_device(
             detail=f"Device with id {device_id} not found",
         )
 
-    # Update only provided fields
     update_data = device_data.model_dump(exclude_unset=True)
+
+    if "ip_address" in update_data and update_data["ip_address"] is not None:
+        new_ip = update_data["ip_address"]
+
+        if device.librenms_device_id:
+            librenms = LibreNMSService()
+            updated = await librenms.update_device_hostname(
+                int(device.librenms_device_id), new_ip
+            )
+            if not updated:
+                raise HTTPException(
+                    status_code=status.HTTP_502_BAD_GATEWAY,
+                    detail="Failed to update IP in LibreNMS. Local database was not changed.",
+                )
+
+            refreshed = await librenms.get_device_by_id(int(device.librenms_device_id))
+            if refreshed:
+                device.librenms_hostname = refreshed.get("hostname") or new_ip
+                device.librenms_last_synced = datetime.utcnow()
+            else:
+                device.librenms_hostname = new_ip
+                device.librenms_last_synced = datetime.utcnow()
 
     for field, value in update_data.items():
         setattr(device, field, value)
@@ -272,7 +290,6 @@ async def delete_device(
             librenms = LibreNMSService()
             await librenms.delete_device(int(device.librenms_device_id))
         except Exception as e:
-            # Log error but proceed with DB deletion
             print(f"Warning: Failed to delete from LibreNMS: {e}")
 
     db.delete(device)

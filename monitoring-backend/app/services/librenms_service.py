@@ -98,6 +98,18 @@ class LibreNMSService:
 
             return None
 
+    # IP address = hostname
+    async def update_device_hostname(self, hostname: int, new_hostname: str) -> bool:
+        payload = {"field": ["hostname"], "data": [new_hostname]}
+        async with httpx.AsyncClient() as client:
+            response = await client.patch(
+                f"{self.base_url}/api/v0/devices/{hostname}/rename/{new_hostname}",
+                headers=self.headers,
+                json=payload,
+                timeout=30.0,
+            )
+            return response.status_code in [200, 201]
+
     async def delete_device(self, device_id: int) -> bool:
         async with httpx.AsyncClient() as client:
             response = await client.delete(

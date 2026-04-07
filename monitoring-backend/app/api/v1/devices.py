@@ -240,27 +240,29 @@ async def update_device(
 
     update_data = device_data.model_dump(exclude_unset=True)
 
-    if "ip_address" in update_data and update_data["ip_address"] is not None:
-        new_ip = update_data["ip_address"]
+    ip_in_payload = (
+        "ip_address" in update_data and update_data["ip_address"] is not None
+    )
+    old_ip = (device.ip_address or "").strip()
+    new_ip = str(update_data.get("ip_address") or "").strip()
+    ip_changed = ip_in_payload and (new_ip != old_ip)
 
-        if device.librenms_device_id:
-            librenms = LibreNMSService()
-            updated = await librenms.update_device_hostname(
-                int(device.librenms_device_id), new_ip
+    if ip_changed and device.librenms_device_id:
+        librenms = LibreNMSService()
+        updated = await librenms.update_device_hostname(
+            int(device.librenms_device_id), new_ip
+        )
+        if not updated:
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="Failed to update IP in LibreNMS. Local database was not changed.",
             )
-            if not updated:
-                raise HTTPException(
-                    status_code=status.HTTP_502_BAD_GATEWAY,
-                    detail="Failed to update IP in LibreNMS. Local database was not changed.",
-                )
 
-            refreshed = await librenms.get_device_by_id(int(device.librenms_device_id))
-            if refreshed:
-                device.librenms_hostname = refreshed.get("hostname") or new_ip
-                device.librenms_last_synced = datetime.utcnow()
-            else:
-                device.librenms_hostname = new_ip
-                device.librenms_last_synced = datetime.utcnow()
+        refreshed = await librenms.get_device_by_id(int(device.librenms_device_id))
+        device.librenms_hostname = (
+            (refreshed or {}).get("hostname") if refreshed else None
+        ) or new_ip
+        device.librenms_last_synced = datetime.utcnow()
 
     for field, value in update_data.items():
         setattr(device, field, value)

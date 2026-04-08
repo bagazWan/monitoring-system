@@ -5,39 +5,59 @@ from sqlalchemy.orm import Session
 from app.models import Device, LibreNMSPort, Switch
 from app.services.librenms_service import LibreNMSService
 
+VOLATILE_PREFIXES = ("veth", "br-", "virbr", "tun", "tap")
+
+
+def is_volatile_ifname(if_name: str) -> bool:
+    return (if_name or "").lower().startswith(VOLATILE_PREFIXES)
+
 
 def should_enable_port(port: dict) -> bool:
-    """
-    Default port-selection rule
-    - Only consider ports with operStatus up (if present)
-    - Prefer ifType ethernetCsmacd
-    - Fallback to ifName prefixes typical for physical ports
-    - Exclude common logical interfaces (bridge/vlan/lo/docker/veth)
-    """
     if_name = (port.get("ifName") or port.get("if_name") or "").lower()
     if_type = (port.get("ifType") or port.get("if_type") or "").lower()
     if_oper = (port.get("ifOperStatus") or port.get("if_oper_status") or "").lower()
 
     if if_oper and if_oper != "up":
         return False
-
     if if_type in {"bridge", "l2vlan", "softwareloopback"}:
         return False
 
-    if if_name.startswith(
-        ("bridge", "vlan", "lo", "docker", "veth", "br-", "virbr", "tun", "tap")
-    ):
+    if is_volatile_ifname(if_name):
         return False
 
     if if_type == "ethernetcsmacd":
         return True
 
     if if_name.startswith(
-        ("ether", "eth", "enp", "eno", "ens", "wl", "wlan", "wlp", "wifi", "gi", "fa")
+        (
+            "ether",
+            "eth",
+            "enp",
+            "eno",
+            "ens",
+            "wl",
+            "wlan",
+            "wlp",
+            "wifi",
+            "gi",
+            "fa",
+            "lo",
+            "tailscale",
+            "docker",
+        )
     ):
         return True
 
     return False
+
+
+def _owner_rows(db: Session, device: Device | None, switch: Switch | None):
+    q = db.query(LibreNMSPort)
+    if device is not None:
+        q = q.filter(LibreNMSPort.device_id == device.device_id)
+    else:
+        q = q.filter(LibreNMSPort.switch_id == switch.switch_id)
+    return q
 
 
 async def discover_and_store_ports_for(
@@ -48,95 +68,119 @@ async def discover_and_store_ports_for(
     device: Device | None = None,
     switch: Switch | None = None,
 ) -> None:
-    """
-    Discover mapping to port_id and store in librenms_ports table.
-    - /devices/{id}/ports -> only ifName list
-    - /ports -> port_id + ifName list (might not include device_id)
-    - /ports/{port_id} -> includes device_id + ifType + ifOperStatus + rates
-    """
     if device is None and switch is None:
         return
 
+    # Hard cleanup legacy volatile rows
+    owner_existing = _owner_rows(db, device, switch).all()
+    for row in owner_existing:
+        if is_volatile_ifname(row.if_name):
+            db.delete(row)
+    db.flush()
+
+    # Device-scoped source of truth
     dev_ports_payload = await librenms.get_device_port_stats(int(librenms_device_id))
-    if_names = [
-        p.get("ifName") for p in dev_ports_payload.get("ports", []) if p.get("ifName")
-    ]
-    if not if_names:
+    dev_ports = dev_ports_payload.get("ports", [])
+
+    current_ifnames: list[str] = []
+    for p in dev_ports:
+        if_name = p.get("ifName")
+        if not if_name:
+            continue
+        if is_volatile_ifname(if_name):
+            continue
+        current_ifnames.append(if_name)
+
+    current_if_set = set(current_ifnames)
+
+    # if no current non-volatile interfaces, remove owner rows to stay in sync
+    owner_existing = _owner_rows(db, device, switch).all()
+    if not current_if_set:
+        for old in owner_existing:
+            db.delete(old)
+        db.flush()
         return
 
+    # Build ifName->port_id map using global ports list
     ports_payload = await librenms.get_ports()
     global_ports = ports_payload.get("ports", [])
 
-    if_name_set = set(if_names)
-
-    candidates = []
+    if_to_port: dict[str, int] = {}
     for gp in global_ports:
-        if gp.get("ifName") in if_name_set and gp.get("port_id") is not None:
-            candidates.append(
-                {"port_id": int(gp["port_id"]), "ifName": gp.get("ifName")}
-            )
+        if_name = gp.get("ifName")
+        port_id = gp.get("port_id")
+        if if_name in current_if_set and port_id is not None:
+            if_to_port[if_name] = int(port_id)
 
-    if not candidates:
-        return
-
+    owner_existing = _owner_rows(db, device, switch).all()
+    existing_by_if = {r.if_name: r for r in owner_existing}
+    seen_ifnames: set[str] = set()
     stored: list[LibreNMSPort] = []
 
-    for c in candidates:
-        port_id = int(c["port_id"])
+    for if_name, port_id in if_to_port.items():
+        try:
+            detail = await librenms.get_port_by_id(port_id)
+            p_list = detail.get("port", [])
+            if not p_list:
+                continue
+            pd = p_list[0]
 
-        port_detail = await librenms.get_port_by_id(port_id)
-        port_list = port_detail.get("port", [])
-        if not port_list:
+            if int(pd.get("device_id", -1)) != int(librenms_device_id):
+                continue
+
+            real_if = pd.get("ifName") or if_name
+            if is_volatile_ifname(real_if):
+                continue
+
+            seen_ifnames.add(real_if)
+
+            row = existing_by_if.get(real_if)
+            if row:
+                row.port_id = int(port_id)
+                row.librenms_device_id = int(librenms_device_id)
+                row.if_type = pd.get("ifType")
+                row.if_oper_status = pd.get("ifOperStatus")
+                stored.append(row)
+            else:
+                row = LibreNMSPort(
+                    device_id=device.device_id if device else None,
+                    switch_id=switch.switch_id if switch else None,
+                    librenms_device_id=int(librenms_device_id),
+                    port_id=int(port_id),
+                    if_name=real_if,
+                    if_type=pd.get("ifType"),
+                    if_oper_status=pd.get("ifOperStatus"),
+                    enabled=False,
+                )
+                db.add(row)
+                stored.append(row)
+        except Exception:
             continue
-        pd = port_list[0]
 
-        # Ensure this port belongs to this device in LibreNMS
-        if int(pd.get("device_id", -1)) != int(librenms_device_id):
-            continue
-
-        existing = (
-            db.query(LibreNMSPort).filter(LibreNMSPort.port_id == port_id).first()
-        )
-        if existing:
-            existing.device_id = device.device_id if device else None
-            existing.switch_id = switch.switch_id if switch else None
-            existing.librenms_device_id = int(librenms_device_id)
-            existing.if_name = pd.get("ifName") or c["ifName"]
-            existing.if_type = pd.get("ifType")
-            existing.if_oper_status = pd.get("ifOperStatus")
-            stored.append(existing)
-        else:
-            lp = LibreNMSPort(
-                device_id=device.device_id if device else None,
-                switch_id=switch.switch_id if switch else None,
-                librenms_device_id=int(librenms_device_id),
-                port_id=port_id,
-                if_name=pd.get("ifName") or c["ifName"],
-                if_type=pd.get("ifType"),
-                if_oper_status=pd.get("ifOperStatus"),
-                enabled=False,
-                # is_uplink defaults to false at DB level
-            )
-            db.add(lp)
-            stored.append(lp)
+    # Remove stale rows not seen in current snapshot
+    for old in owner_existing:
+        if old.if_name not in seen_ifnames:
+            db.delete(old)
 
     db.flush()
 
     enabled_any = False
-    for port_row in stored:
-        port_like = {
-            "ifName": port_row.if_name,
-            "ifType": port_row.if_type,
-            "ifOperStatus": port_row.if_oper_status,
-        }
-        port_row.enabled = bool(should_enable_port(port_like))
-        if port_row.enabled:
+    for row in stored:
+        row.enabled = bool(
+            should_enable_port(
+                {
+                    "ifName": row.if_name,
+                    "ifType": row.if_type,
+                    "ifOperStatus": row.if_oper_status,
+                }
+            )
+        )
+        if row.enabled:
             enabled_any = True
 
-    # fallback: enable all "up" ports if none enabled
     if not enabled_any:
-        for port_row in stored:
-            if (port_row.if_oper_status or "").lower() == "up":
-                port_row.enabled = True
+        for row in stored:
+            if (row.if_oper_status or "").lower() == "up":
+                row.enabled = True
 
     db.flush()

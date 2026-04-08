@@ -18,6 +18,8 @@ class Settings(BaseSettings):
     PING_PROBE_TIMEOUT_MS: int = 1000
     PING_PROBE_CACHE_SECONDS: int = 10
 
+    PORT_RESYNC_TTL_SECONDS: int = 300
+
     PROJECT_NAME: str = "Device Monitoring System"
     VERSION: str = "1.0"
     API_V1_VERSION: str = "/api/v1"

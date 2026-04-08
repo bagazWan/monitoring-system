@@ -1,9 +1,11 @@
+from datetime import datetime, timedelta, timezone
 from typing import Dict, Optional
 
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.models import Device, LibreNMSPort, Switch
+from app.services.librenms_ports_service import discover_and_store_ports_for
 from app.services.librenms_service import LibreNMSService
 from app.services.metrics_service import (
     extract_port_capacity_mbps,
@@ -14,6 +16,8 @@ from app.services.metrics_service import (
 from app.services.ping_probe import ping_probe
 from app.utils.thresholds import evaluate_device_severity, evaluate_switch_severity
 
+_LAST_RESYNC_AT: dict[str, datetime] = {}
+
 
 def _status_severity(status: Optional[str]) -> str:
     s = (status or "").lower()
@@ -22,6 +26,26 @@ def _status_severity(status: Optional[str]) -> str:
     if s == "warning":
         return "yellow"
     return "green"
+
+
+def _resync_key_device(device_id: int) -> str:
+    return f"device:{device_id}"
+
+
+def _resync_key_switch(switch_id: int) -> str:
+    return f"switch:{switch_id}"
+
+
+def _can_resync(key: str) -> bool:
+    now = datetime.now(timezone.utc)
+    last = _LAST_RESYNC_AT.get(key)
+    if last is None:
+        return True
+    return (now - last) >= timedelta(seconds=settings.PORT_RESYNC_TTL_SECONDS)
+
+
+def _mark_resynced(key: str) -> None:
+    _LAST_RESYNC_AT[key] = datetime.now(timezone.utc)
 
 
 async def calculate_device_metrics(
@@ -40,42 +64,70 @@ async def calculate_device_metrics(
     if not device.librenms_device_id:
         return default_response
 
-    enabled_ports = (
-        db.query(LibreNMSPort)
-        .filter(
-            LibreNMSPort.device_id == device.device_id, LibreNMSPort.enabled.is_(True)
+    async def _compute_once():
+        enabled_ports = (
+            db.query(LibreNMSPort)
+            .filter(
+                LibreNMSPort.device_id == device.device_id,
+                LibreNMSPort.enabled.is_(True),
+            )
+            .all()
         )
-        .all()
-    )
+        total_in, total_out, ok_count = 0.0, 0.0, 0
 
-    total_in = 0.0
-    total_out = 0.0
+        for row in enabled_ports:
+            try:
+                d = await librenms.get_port_by_id(int(row.port_id))
+                p = d.get("port") or []
+                if not p:
+                    continue
+                pd = p[0]
 
-    for port_row in enabled_ports:
-        try:
-            port_detail = await librenms.get_port_by_id(int(port_row.port_id))
-            p_list = port_detail.get("port", [])
-            for p_data in p_list:
+                if int(pd.get("device_id", -1)) != int(device.librenms_device_id):
+                    continue
                 if (
-                    int(p_data.get("disabled", 0) or 0) == 1
-                    or int(p_data.get("ignore", 0) or 0) == 1
+                    int(pd.get("disabled", 0) or 0) == 1
+                    or int(pd.get("ignore", 0) or 0) == 1
                 ):
                     continue
-                in_mbps, out_mbps, _ = extract_port_rate_parts_mbps(p_data)
-                total_in += in_mbps
-                total_out += out_mbps
-        except Exception:
-            continue
 
-    in_mbps = round(total_in, 2)
-    out_mbps = round(total_out, 2)
+                i, o, _ = extract_port_rate_parts_mbps(pd)
+                total_in += i
+                total_out += o
+                ok_count += 1
+            except Exception:
+                continue
 
-    if (device.status or "").lower() == "offline":
-        severity = "red"
-    elif (device.status or "").lower() == "warning":
-        severity = "yellow"
-    else:
-        severity = evaluate_device_severity(device.device_type, in_mbps, out_mbps)
+        return total_in, total_out, ok_count, len(enabled_ports)
+
+    total_in, total_out, ok_count, enabled_count = await _compute_once()
+
+    is_offline = (device.status or "").lower() == "offline"
+    should_try_repair = (
+        not is_offline
+        and enabled_count > 0
+        and (
+            ok_count == 0 or (round(total_in, 4) == 0.0 and round(total_out, 4) == 0.0)
+        )
+    )
+
+    if should_try_repair:
+        key = _resync_key_device(device.device_id)
+        if _can_resync(key):
+            try:
+                await discover_and_store_ports_for(
+                    db=db,
+                    librenms=librenms,
+                    librenms_device_id=int(device.librenms_device_id),
+                    device=device,
+                )
+                db.commit()
+                _mark_resynced(key)
+                total_in, total_out, ok_count, enabled_count = await _compute_once()
+            except Exception:
+                pass
+
+    in_mbps, out_mbps = round(total_in, 2), round(total_out, 2)
 
     latency_ms = None
     if settings.PING_PROBE_ENABLED:
@@ -88,12 +140,20 @@ async def calculate_device_metrics(
         except Exception:
             pass
 
+    severity = (
+        "red"
+        if (device.status or "").lower() == "offline"
+        else "yellow"
+        if (device.status or "").lower() == "warning"
+        else evaluate_device_severity(device.device_type, in_mbps, out_mbps)
+    )
+
     return {
         "device_id": device.device_id,
         "status": device.status,
-        "in_mbps": to_finite_float(round(in_mbps, 2)) or 0.0,
-        "out_mbps": to_finite_float(round(out_mbps, 2)) or 0.0,
-        "monitored": True,
+        "in_mbps": to_finite_float(in_mbps) or 0.0,
+        "out_mbps": to_finite_float(out_mbps) or 0.0,
+        "monitored": enabled_count > 0,
         "severity": severity,
         "latency_ms": to_finite_float(latency_ms),
     }
@@ -113,47 +173,90 @@ async def calculate_switch_metrics(
     if not switch.librenms_device_id:
         return default_response
 
-    uplink_ports = (
-        db.query(LibreNMSPort)
-        .filter(
-            LibreNMSPort.switch_id == switch.switch_id,
-            LibreNMSPort.enabled.is_(True),
-            LibreNMSPort.is_uplink.is_(True),
+    async def _compute_once():
+        uplink_ports = (
+            db.query(LibreNMSPort)
+            .filter(
+                LibreNMSPort.switch_id == switch.switch_id,
+                LibreNMSPort.enabled.is_(True),
+                LibreNMSPort.is_uplink.is_(True),
+            )
+            .all()
         )
-        .all()
-    )
-
-    used_ports = uplink_ports or (
-        db.query(LibreNMSPort)
-        .filter(
-            LibreNMSPort.switch_id == switch.switch_id, LibreNMSPort.enabled.is_(True)
+        used_ports = uplink_ports or (
+            db.query(LibreNMSPort)
+            .filter(
+                LibreNMSPort.switch_id == switch.switch_id,
+                LibreNMSPort.enabled.is_(True),
+            )
+            .all()
         )
-        .all()
-    )
 
-    total_in = 0.0
-    total_out = 0.0
-    total_capacity = 0.0
+        total_in = 0.0
+        total_out = 0.0
+        total_capacity = 0.0
+        ok_count = 0
 
-    for port_row in used_ports:
-        try:
-            port_detail = await librenms.get_port_by_id(int(port_row.port_id))
-            p_list = port_detail.get("port", [])
-            for p_data in p_list:
+        for row in used_ports:
+            try:
+                detail = await librenms.get_port_by_id(int(row.port_id))
+                p_list = detail.get("port", [])
+                if not p_list:
+                    continue
+                pd = p_list[0]
+
+                if int(pd.get("device_id", -1)) != int(switch.librenms_device_id):
+                    continue
                 if (
-                    int(p_data.get("disabled", 0) or 0) == 1
-                    or int(p_data.get("ignore", 0) or 0) == 1
+                    int(pd.get("disabled", 0) or 0) == 1
+                    or int(pd.get("ignore", 0) or 0) == 1
                 ):
                     continue
-                in_mbps, out_mbps, _ = extract_port_rate_parts_mbps(p_data)
-                total_in += in_mbps
-                total_out += out_mbps
 
-                capacity = extract_port_capacity_mbps(p_data)
-                if capacity:
-                    total_capacity += capacity
-        except Exception:
-            continue
+                i, o, _ = extract_port_rate_parts_mbps(pd)
+                total_in += i
+                total_out += o
+                cap = extract_port_capacity_mbps(pd)
+                if cap:
+                    total_capacity += cap
+                ok_count += 1
+            except Exception:
+                continue
+
+        return total_in, total_out, total_capacity, ok_count, len(used_ports)
+
+    total_in, total_out, total_capacity, ok_count, used_count = await _compute_once()
+
+    is_offline = (switch.status or "").lower() == "offline"
+    should_try_repair = (
+        not is_offline
+        and used_count > 0
+        and (
+            ok_count == 0 or (round(total_in, 4) == 0.0 and round(total_out, 4) == 0.0)
+        )
+    )
+
+    if should_try_repair:
+        key = _resync_key_switch(switch.switch_id)
+        if _can_resync(key):
+            try:
+                await discover_and_store_ports_for(
+                    db=db,
+                    librenms=librenms,
+                    librenms_device_id=int(switch.librenms_device_id),
+                    switch=switch,
+                )
+                db.commit()
+                _mark_resynced(key)
+                (
+                    total_in,
+                    total_out,
+                    total_capacity,
+                    ok_count,
+                    used_count,
+                ) = await _compute_once()
+            except Exception:
+                pass
 
     in_mbps = round(total_in, 2)
     out_mbps = round(total_out, 2)
@@ -171,7 +274,7 @@ async def calculate_switch_metrics(
     return {
         "switch_id": switch.switch_id,
         "status": switch.status,
-        "in_mbps": to_finite_float(round(in_mbps, 2)) or 0.0,
-        "out_mbps": to_finite_float(round(out_mbps, 2)) or 0.0,
+        "in_mbps": to_finite_float(in_mbps) or 0.0,
+        "out_mbps": to_finite_float(out_mbps) or 0.0,
         "severity": severity,
     }

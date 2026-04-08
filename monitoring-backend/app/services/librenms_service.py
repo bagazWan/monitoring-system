@@ -51,7 +51,6 @@ class LibreNMSService:
 
                 data = response.json()
                 return data.get("devices", [None])[0]
-
         return None
 
     async def add_device(
@@ -62,35 +61,68 @@ class LibreNMSService:
         port: int = 161,
         transport: str = "udp",
         force_add: bool = False,
+        snmp_enabled: bool = True,
     ) -> Optional[int]:
-        payload = {
-            "hostname": hostname,
-            "community": community,
-            "version": snmp_version,
-            "port": port,
-            "transport": transport,
-            "force_add": force_add,
-        }
-
         async with httpx.AsyncClient() as client:
-            response = await client.post(
-                f"{self.base_url}/api/v0/devices",
-                headers=self.headers,
-                json=payload,
-                timeout=30.0,
-            )
+            candidates = []
 
-            if response.status_code in (200, 201):
-                data = response.json()
+            if snmp_enabled:
+                candidates.append(
+                    {
+                        "hostname": hostname,
+                        "community": community,
+                        "version": snmp_version,
+                        "port": port,
+                        "transport": transport,
+                        "force_add": force_add,
+                    }
+                )
+            else:
+                candidates.extend(
+                    [
+                        {
+                            "hostname": hostname,
+                            "snmp_disable": True,
+                            "force_add": force_add,
+                        },
+                        {
+                            "hostname": hostname,
+                            "disable_snmp": True,
+                            "force_add": force_add,
+                        },
+                        {
+                            "hostname": hostname,
+                            "community": community or "public",
+                            "version": "v2c",
+                            "port": 161,
+                            "transport": transport or "udp",
+                            "force_add": force_add,
+                        },
+                    ]
+                )
 
-                if data.get("device_id") is not None:
-                    return int(data["device_id"])
+            for payload in candidates:
+                try:
+                    response = await client.post(
+                        f"{self.base_url}/api/v0/devices",
+                        headers=self.headers,
+                        json=payload,
+                        timeout=30.0,
+                    )
+                except Exception:
+                    continue
 
-                devices = data.get("devices") or []
-                if devices:
-                    dev0 = devices[0]
-                    if dev0 and dev0.get("device_id") is not None:
-                        return int(dev0["device_id"])
+                if response.status_code in (200, 201):
+                    data = response.json()
+
+                    if data.get("device_id") is not None:
+                        return int(data["device_id"])
+
+                    devices = data.get("devices") or []
+                    if devices:
+                        dev0 = devices[0]
+                        if dev0 and dev0.get("device_id") is not None:
+                            return int(dev0["device_id"])
 
             existing = await self.get_device_by_hostname(hostname)
             if existing and existing.get("device_id") is not None:

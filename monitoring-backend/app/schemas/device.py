@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 
 class LibreNMSRegisterRequest(BaseModel):
     hostname: str = Field(..., description="IP or hostname to add into LibreNMS")
+    snmp_enabled: bool = Field(default=True)
     community: str = Field(default="public")
     snmp_version: str = Field(default="v2c")
     port: int = Field(default=161)
@@ -25,15 +26,12 @@ class LibreNMSRegisterRequest(BaseModel):
     description: Optional[str] = None
 
 
-# Syncing all devices (include switch) from LibreNMS
 class AllDevicesSyncConfig(BaseModel):
     default_location_id: int = Field(1, description="Default location for new devices")
     update_existing: bool = Field(True, description="Update already-synced devices")
 
 
 class AllDevicesSyncReport(BaseModel):
-    """Sync result report"""
-
     created: list[dict]
     updated: list[dict]
     errors: list[dict]
@@ -70,14 +68,13 @@ class DeviceResponse(BaseModel):
     last_replaced_at: Optional[datetime]
 
     class Config:
-        from_attributes = True  # Allows conversion from SQLAlchemy model
+        from_attributes = True
 
 
 class BulkLiveDetailsRequest(BaseModel):
     device_ids: List[int]
 
 
-# Schema for device with location info for map display
 class DeviceWithLocation(BaseModel):
     device_id: int
     name: str
@@ -87,7 +84,6 @@ class DeviceWithLocation(BaseModel):
     status: str
     description: Optional[str]
     last_replaced_at: Optional[datetime]
-    # Location info
     latitude: float
     longitude: float
     location_name: str

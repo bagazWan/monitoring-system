@@ -35,7 +35,6 @@ async def register_in_librenms(
 ):
     librenms = LibreNMSService()
 
-    # 1) Add device to LibreNMS
     librenms_device_id = await librenms.add_device(
         hostname=payload.hostname,
         community=payload.community,
@@ -43,6 +42,7 @@ async def register_in_librenms(
         port=payload.port,
         transport=payload.transport,
         force_add=payload.force_add,
+        snmp_enabled=payload.snmp_enabled,
     )
     if not librenms_device_id:
         raise HTTPException(
@@ -50,7 +50,6 @@ async def register_in_librenms(
             detail="Failed to add device to LibreNMS",
         )
 
-    # 2) Fetch details from LibreNMS
     lnms_device = await librenms.get_device_by_id(librenms_device_id)
     if not lnms_device:
         raise HTTPException(
@@ -66,7 +65,6 @@ async def register_in_librenms(
     inferred_type = _infer_node_type_from_sysdescr(sys_descr)
     node_type = _normalize_node_type(payload.node_type) or inferred_type
 
-    # Validate location if provided
     if payload.location_id is not None:
         loc = (
             db.query(Location)
@@ -83,7 +81,6 @@ async def register_in_librenms(
         payload.name or sys_name or hostname or ip or ""
     ).strip() or f"LNMS-{librenms_device_id}"
 
-    # 3) Upsert into correct table
     if node_type == "switch":
         existing = (
             db.query(Switch)
@@ -116,13 +113,14 @@ async def register_in_librenms(
             db.commit()
             db.refresh(existing)
 
-            await discover_and_store_ports_for(
-                db=db,
-                librenms=librenms,
-                librenms_device_id=int(librenms_device_id),
-                switch=existing,
-            )
-            db.commit()
+            if payload.snmp_enabled:
+                await discover_and_store_ports_for(
+                    db=db,
+                    librenms=librenms,
+                    librenms_device_id=int(librenms_device_id),
+                    switch=existing,
+                )
+                db.commit()
 
             return {
                 "node_type": "switch",
@@ -147,13 +145,14 @@ async def register_in_librenms(
         db.commit()
         db.refresh(new_switch)
 
-        await discover_and_store_ports_for(
-            db=db,
-            librenms=librenms,
-            librenms_device_id=int(librenms_device_id),
-            switch=new_switch,
-        )
-        db.commit()
+        if payload.snmp_enabled:
+            await discover_and_store_ports_for(
+                db=db,
+                librenms=librenms,
+                librenms_device_id=int(librenms_device_id),
+                switch=new_switch,
+            )
+            db.commit()
 
         return {
             "node_type": "switch",
@@ -163,7 +162,6 @@ async def register_in_librenms(
             "ip_address": new_switch.ip_address,
         }
 
-    # node_type == "device"
     existing = (
         db.query(Device)
         .filter(Device.librenms_device_id == int(librenms_device_id))
@@ -200,13 +198,14 @@ async def register_in_librenms(
         db.commit()
         db.refresh(existing)
 
-        await discover_and_store_ports_for(
-            db=db,
-            librenms=librenms,
-            librenms_device_id=int(librenms_device_id),
-            device=existing,
-        )
-        db.commit()
+        if payload.snmp_enabled:
+            await discover_and_store_ports_for(
+                db=db,
+                librenms=librenms,
+                librenms_device_id=int(librenms_device_id),
+                device=existing,
+            )
+            db.commit()
 
         return {
             "node_type": "device",
@@ -233,13 +232,14 @@ async def register_in_librenms(
     db.commit()
     db.refresh(new_device)
 
-    await discover_and_store_ports_for(
-        db=db,
-        librenms=librenms,
-        librenms_device_id=int(librenms_device_id),
-        device=new_device,
-    )
-    db.commit()
+    if payload.snmp_enabled:
+        await discover_and_store_ports_for(
+            db=db,
+            librenms=librenms,
+            librenms_device_id=int(librenms_device_id),
+            device=new_device,
+        )
+        db.commit()
 
     return {
         "node_type": "device",
@@ -278,7 +278,6 @@ async def unregister_from_librenms(
             )
 
         lnms_id = int(sw.librenms_device_id)
-
         deleted = await librenms.delete_device(lnms_id)
         if not deleted:
             raise HTTPException(
@@ -302,7 +301,6 @@ async def unregister_from_librenms(
             "message": "Unregistered from LibreNMS",
         }
 
-    # device
     dev = db.query(Device).filter(Device.device_id == local_id).first()
     if not dev:
         raise HTTPException(status_code=404, detail="Device not found")
@@ -314,7 +312,6 @@ async def unregister_from_librenms(
         )
 
     lnms_id = int(dev.librenms_device_id)
-
     deleted = await librenms.delete_device(lnms_id)
     if not deleted:
         raise HTTPException(

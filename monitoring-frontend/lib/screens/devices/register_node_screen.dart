@@ -27,6 +27,7 @@ class _RegisterNodeScreenState extends State<RegisterNodeScreen> {
   late TextEditingController _transportController;
   late TextEditingController _deviceTypeController;
   late TextEditingController _descriptionController;
+  bool _snmpEnabled = true;
 
   String _nodeType = "device";
   bool _forceAdd = false;
@@ -86,10 +87,7 @@ class _RegisterNodeScreenState extends State<RegisterNodeScreen> {
     try {
       final payload = {
         "hostname": _hostnameController.text.trim(),
-        "community": _communityController.text.trim(),
-        "snmp_version": _snmpController.text.trim(),
-        "port": int.tryParse(_portController.text) ?? 161,
-        "transport": _transportController.text.trim(),
+        "snmp_enabled": _snmpEnabled,
         "force_add": _forceAdd,
         "node_type": _nodeType,
         "name": _nameController.text.trim().isEmpty
@@ -99,6 +97,12 @@ class _RegisterNodeScreenState extends State<RegisterNodeScreen> {
             ? null
             : _descriptionController.text.trim(),
         "location_id": _selectedLocationId,
+        if (_snmpEnabled) ...{
+          "community": _communityController.text.trim(),
+          "snmp_version": _snmpController.text.trim(),
+          "port": int.tryParse(_portController.text) ?? 161,
+          "transport": _transportController.text.trim(),
+        },
         if (_nodeType == 'device') ...{
           "device_type": _deviceTypeController.text.trim().isEmpty
               ? null
@@ -177,21 +181,33 @@ class _RegisterNodeScreenState extends State<RegisterNodeScreen> {
                     children: [
                       _buildTextField("Hostname / IP", _hostnameController,
                           required: true),
-                      _buildTextField("Port", _portController,
-                          keyboard: TextInputType.number),
+                      _buildSnmpToggle(),
                     ],
                   ),
-                  const SizedBox(height: 16),
-                  _buildResponsiveRow(
-                    isNarrow: isNarrow,
-                    children: [
-                      _buildTextField("Transport", _transportController),
-                      _buildTextField("SNMP Version", _snmpController),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  _buildTextField("Community String", _communityController,
-                      required: true, icon: Icons.vpn_key),
+                  if (_snmpEnabled) ...[
+                    const SizedBox(height: 16),
+                    _buildResponsiveRow(
+                      isNarrow: isNarrow,
+                      children: [
+                        _buildTextField("Port", _portController,
+                            keyboard: TextInputType.number),
+                        _buildTextField("Transport", _transportController),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    _buildResponsiveRow(
+                      isNarrow: isNarrow,
+                      children: [
+                        _buildTextField("SNMP Version", _snmpController),
+                        _buildTextField(
+                          "Community String",
+                          _communityController,
+                          required: true,
+                          icon: Icons.vpn_key,
+                        ),
+                      ],
+                    ),
+                  ],
                 ]),
                 const SizedBox(height: 24),
                 _buildSectionHeader("Identity & Location", Icons.info_outline),
@@ -464,6 +480,42 @@ class _RegisterNodeScreenState extends State<RegisterNodeScreen> {
           border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
               borderSide: BorderSide(color: Colors.grey[300]!))),
+    );
+  }
+
+  Widget _buildSnmpToggle() {
+    return InputDecorator(
+      decoration: InputDecoration(
+        labelText: "SNMP",
+        filled: true,
+        fillColor: Colors.grey[50],
+        isDense: true,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide(color: Colors.grey[300]!),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide(color: Colors.grey[300]!),
+        ),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            _snmpEnabled ? "ON" : "OFF",
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              color: _snmpEnabled ? Colors.green[700] : Colors.grey[700],
+            ),
+          ),
+          Switch(
+            value: _snmpEnabled,
+            onChanged: (v) => setState(() => _snmpEnabled = v),
+          ),
+        ],
+      ),
     );
   }
 }

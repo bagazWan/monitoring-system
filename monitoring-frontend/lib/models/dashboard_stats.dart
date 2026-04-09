@@ -22,12 +22,13 @@ class DashboardTraffic {
   final DateTime timestamp;
   final double? inboundMbps;
   final double? outboundMbps;
+  final double? latencyMs;
 
-  DashboardTraffic({
-    required this.timestamp,
-    required this.inboundMbps,
-    required this.outboundMbps,
-  });
+  DashboardTraffic(
+      {required this.timestamp,
+      required this.inboundMbps,
+      required this.outboundMbps,
+      this.latencyMs});
 
   factory DashboardTraffic.fromJson(Map<String, dynamic> json) {
     return DashboardTraffic(
@@ -38,6 +39,9 @@ class DashboardTraffic {
       outboundMbps: json['outbound_mbps'] == null
           ? null
           : (json['outbound_mbps'] as num).toDouble(),
+      latencyMs: json['latency_ms'] == null
+          ? null
+          : (json['latency_ms'] as num).toDouble(),
     );
   }
 }
@@ -54,6 +58,7 @@ class DashboardStats {
   final int cctvTotal;
   final int cctvOnline;
   final double cctvUptimePercentage;
+  final double? averageLatency;
 
   DashboardStats({
     required this.totalDevices,
@@ -67,6 +72,7 @@ class DashboardStats {
     required this.cctvTotal,
     required this.cctvOnline,
     required this.cctvUptimePercentage,
+    this.averageLatency,
   });
 
   factory DashboardStats.fromJson(Map<String, dynamic> json) {
@@ -89,6 +95,9 @@ class DashboardStats {
       cctvTotal: json['cctv_total'] ?? 0,
       cctvOnline: json['cctv_online'] ?? 0,
       cctvUptimePercentage: (json['cctv_uptime_percentage'] ?? 0.0).toDouble(),
+      averageLatency: json['average_latency'] == null
+          ? null
+          : (json['average_latency'] as num).toDouble(),
     );
   }
 }

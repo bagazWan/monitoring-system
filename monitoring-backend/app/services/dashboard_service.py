@@ -1,3 +1,6 @@
+import asyncio
+import math
+import time
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
@@ -13,6 +16,45 @@ from app.models import (
     SwitchAlert,
 )
 from app.services.metrics_service import add_interval, aggregate_port_rates
+from app.services.ping_probe import ping_probe
+
+
+async def get_current_average_latency(
+    db: Session, location_id: Optional[int]
+) -> Optional[float]:
+    dev_query = db.query(Device.ip_address).filter(
+        Device.ip_address.isnot(None), Device.ip_address != ""
+    )
+    sw_query = db.query(Switch.ip_address).filter(
+        Switch.ip_address.isnot(None), Switch.ip_address != ""
+    )
+
+    if location_id:
+        dev_query = dev_query.filter(Device.location_id == location_id)
+        sw_query = sw_query.filter(Switch.location_id == location_id)
+
+    ips = [row[0] for row in dev_query.all()] + [row[0] for row in sw_query.all()]
+
+    if not ips:
+        return None
+
+    await asyncio.gather(*[ping_probe.ping(ip) for ip in ips], return_exceptions=True)
+
+    latencies = []
+
+    for ip in ips:
+        cached = ping_probe._cache.get(ip)
+        if cached and cached[1] is not None and not math.isnan(cached[1]):
+            latencies.append(cached[1])
+
+    if not latencies:
+        return None
+
+    avg_latency = sum(latencies) / len(latencies)
+    if math.isnan(avg_latency):
+        return None
+
+    return avg_latency
 
 
 def build_uptime_trend(
@@ -181,6 +223,8 @@ async def build_dashboard_stats(
     total_in, total_out, data_found = await aggregate_port_rates(db, location_id)
     total_bandwidth_mbps = total_in + total_out
 
+    avg_latency = await get_current_average_latency(db, location_id)
+
     top_down = []
     window_start = datetime.now(timezone.utc) - timedelta(days=top_down_window)
     critical_filter = func.lower(func.coalesce(Alert.severity, "")) == "critical"
@@ -292,13 +336,21 @@ async def build_dashboard_stats(
         "cctv_online": cctv_online,
         "cctv_uptime_percentage": round(cctv_uptime, 2),
         "device_type_stats": device_type_stats,
+        "average_latency": round(avg_latency, 2)
+        if (avg_latency is not None and not math.isnan(avg_latency))
+        else None,
     }
 
 
 async def build_dashboard_traffic(*, db: Session, location_id: Optional[int]) -> dict:
     total_in, total_out, data_found = await aggregate_port_rates(db, location_id)
+    avg_latency = await get_current_average_latency(db, location_id)
+
     return {
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "inbound_mbps": round(total_in, 2) if data_found else None,
         "outbound_mbps": round(total_out, 2) if data_found else None,
+        "latency_ms": round(avg_latency, 2)
+        if (avg_latency is not None and not math.isnan(avg_latency))
+        else None,
     }

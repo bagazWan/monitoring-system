@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'network_activity_chart.dart';
+import 'latency_chart.dart';
 import '../../../models/dashboard_stats.dart';
 
 class DashboardCharts extends StatelessWidget {
   final List<NetworkActivityData> trafficData;
+  final List<DashboardTraffic> rawTrafficData;
   final bool isTrafficLoading;
   final List<UptimeTrendPoint> uptimeData;
   final bool isUptimeLoading;
@@ -12,6 +14,7 @@ class DashboardCharts extends StatelessWidget {
   const DashboardCharts({
     super.key,
     required this.trafficData,
+    required this.rawTrafficData,
     required this.isTrafficLoading,
     required this.uptimeData,
     required this.isUptimeLoading,
@@ -23,60 +26,78 @@ class DashboardCharts extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          "Performance Chart",
+          "Performance Charts",
           style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 16),
         LayoutBuilder(
           builder: (context, constraints) {
             final isWide = constraints.maxWidth >= 1000;
 
             if (isWide) {
-              const double cardHeight = 312;
-              return Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              return Column(
                 children: [
-                  Expanded(
-                    flex: 2,
-                    child: SizedBox(
-                      height: cardHeight,
-                      child: NetworkActivityChart(
-                        data: trafficData,
-                        isLoading: isTrafficLoading,
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        flex: 2,
+                        child: SizedBox(
+                          height: 280,
+                          child: LatencyChart(
+                            data: rawTrafficData,
+                            isLoading: isTrafficLoading,
+                          ),
+                        ),
                       ),
-                    ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        flex: 1,
+                        child: SizedBox(
+                          height: 280,
+                          child: _UptimeTrendChart(
+                            data: uptimeData,
+                            isLoading: isUptimeLoading,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    flex: 1,
-                    child: SizedBox(
-                      height: cardHeight,
-                      child: _UptimeTrendChart(
-                        data: uptimeData,
-                        isLoading: isUptimeLoading,
-                      ),
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    height: 312,
+                    child: NetworkActivityChart(
+                      data: trafficData,
+                      isLoading: isTrafficLoading,
                     ),
                   ),
                 ],
               );
             }
 
-            const double stackedHeight = 320;
             return Column(
               children: [
                 SizedBox(
-                  height: stackedHeight,
-                  child: NetworkActivityChart(
-                    data: trafficData,
+                  height: 260,
+                  child: LatencyChart(
+                    data: rawTrafficData,
                     isLoading: isTrafficLoading,
                   ),
                 ),
                 const SizedBox(height: 16),
                 SizedBox(
-                  height: stackedHeight,
+                  height: 260,
                   child: _UptimeTrendChart(
                     data: uptimeData,
                     isLoading: isUptimeLoading,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                SizedBox(
+                  height: 320,
+                  child: NetworkActivityChart(
+                    data: trafficData,
+                    isLoading: isTrafficLoading,
                   ),
                 ),
               ],

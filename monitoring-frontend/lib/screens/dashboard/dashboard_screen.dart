@@ -42,6 +42,8 @@ class _DashboardScreenState extends State<DashboardScreen>
   final ValueNotifier<List<Location>> _locations = ValueNotifier([]);
   final ValueNotifier<bool> _isLoadingLocations = ValueNotifier(true);
   final ValueNotifier<String?> _selectedLocationName = ValueNotifier(null);
+  final ValueNotifier<List<DashboardTraffic>> _rawTrafficData =
+      ValueNotifier([]);
 
   final ValueNotifier<List<NetworkActivityData>> _trafficData =
       ValueNotifier([]);
@@ -135,11 +137,18 @@ class _DashboardScreenState extends State<DashboardScreen>
         locationId: _resolveSelectedLocationId(),
         topDownWindowDays: _topDownWindowDays.value,
       );
+
+      if (!mounted) return;
+
       _dashboardStats.value = stats;
     } catch (e) {
+      if (!mounted) return;
+
       _statsError.value = e;
     } finally {
-      _isStatsLoading.value = false;
+      if (mounted) {
+        _isStatsLoading.value = false;
+      }
     }
   }
 
@@ -151,7 +160,9 @@ class _DashboardScreenState extends State<DashboardScreen>
 
       if (!mounted) return;
 
-      if (traffic.inboundMbps == null && traffic.outboundMbps == null) {
+      if (traffic.inboundMbps == null &&
+          traffic.outboundMbps == null &&
+          traffic.latencyMs == null) {
         _isTrafficLoading.value = false;
         return;
       }
@@ -167,8 +178,15 @@ class _DashboardScreenState extends State<DashboardScreen>
       if (updated.length > _maxTrafficPoints) {
         updated.removeAt(0);
       }
-
       _trafficData.value = updated;
+
+      final updatedRaw = List<DashboardTraffic>.from(_rawTrafficData.value)
+        ..add(traffic);
+      if (updatedRaw.length > _maxTrafficPoints) {
+        updatedRaw.removeAt(0);
+      }
+      _rawTrafficData.value = updatedRaw;
+
       _isTrafficLoading.value = false;
     } catch (_) {
       if (!mounted) return;
@@ -202,6 +220,7 @@ class _DashboardScreenState extends State<DashboardScreen>
 
   void _resetTrafficData() {
     _trafficData.value = [];
+    _rawTrafficData.value = [];
     _isTrafficLoading.value = true;
     if (_chartsInitialized) {
       _refreshTraffic();
@@ -242,6 +261,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     _locations.dispose();
     _isLoadingLocations.dispose();
     _selectedLocationName.dispose();
+    _rawTrafficData.dispose();
     _trafficData.dispose();
     _uptimeTrendData.dispose();
     _topDownWindowDays.dispose();

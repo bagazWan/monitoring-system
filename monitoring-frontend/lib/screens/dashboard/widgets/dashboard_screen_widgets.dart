@@ -145,11 +145,17 @@ mixin DashboardScreenWidgets on State<DashboardScreen> {
                       return ValueListenableBuilder<bool>(
                         valueListenable: state._isUptimeLoading,
                         builder: (context, uptimeLoading, _) {
-                          return DashboardCharts(
-                            trafficData: traffic,
-                            isTrafficLoading: trafficLoading,
-                            uptimeData: uptime,
-                            isUptimeLoading: uptimeLoading,
+                          return ValueListenableBuilder<List<DashboardTraffic>>(
+                            valueListenable: state._rawTrafficData,
+                            builder: (context, rawTraffic, _) {
+                              return DashboardCharts(
+                                trafficData: traffic,
+                                rawTrafficData: rawTraffic,
+                                isTrafficLoading: trafficLoading,
+                                uptimeData: uptime,
+                                isUptimeLoading: uptimeLoading,
+                              );
+                            },
                           );
                         },
                       );

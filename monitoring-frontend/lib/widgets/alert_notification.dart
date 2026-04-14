@@ -11,15 +11,13 @@ class AlertNotification {
     required String message,
     required String severity,
     String? deviceName,
+    String? event,
     VoidCallback? onTap,
   }) {
-    // Remove existing notification if any
     dismiss();
 
     final overlay = Overlay.maybeOf(context);
-    if (overlay == null) {
-      return;
-    }
+    if (overlay == null) return;
 
     _currentEntry = OverlayEntry(
       builder: (context) => Positioned(
@@ -29,7 +27,8 @@ class AlertNotification {
           message: message,
           severity: severity,
           deviceName: deviceName,
-          onTap: onTap ?? () => dismiss(),
+          event: event,
+          onTap: onTap ?? dismiss,
           onDismiss: dismiss,
         ),
       ),
@@ -43,7 +42,6 @@ class AlertNotification {
     });
   }
 
-  /// Dismiss current notification
   static void dismiss() {
     _dismissTimer?.cancel();
     _currentEntry?.remove();
@@ -55,6 +53,7 @@ class _AlertNotificationWidget extends StatefulWidget {
   final String message;
   final String severity;
   final String? deviceName;
+  final String? event;
   final VoidCallback onTap;
   final VoidCallback onDismiss;
 
@@ -62,6 +61,7 @@ class _AlertNotificationWidget extends StatefulWidget {
     required this.message,
     required this.severity,
     this.deviceName,
+    this.event,
     required this.onTap,
     required this.onDismiss,
   });
@@ -77,6 +77,8 @@ class _AlertNotificationWidgetState extends State<_AlertNotificationWidget>
   late Animation<Offset> _slideAnimation;
   late Animation<double> _fadeAnimation;
 
+  bool get _isCleared => (widget.event ?? '').toLowerCase() == 'cleared';
+
   @override
   void initState() {
     super.initState();
@@ -88,15 +90,9 @@ class _AlertNotificationWidgetState extends State<_AlertNotificationWidget>
     _slideAnimation = Tween<Offset>(
       begin: const Offset(1.5, 0),
       end: Offset.zero,
-    ).animate(CurvedAnimation(
-      parent: _controller,
-      curve: Curves.easeOut,
-    ));
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOut));
 
-    _fadeAnimation = Tween<double>(
-      begin: 0.0,
-      end: 1.0,
-    ).animate(_controller);
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(_controller);
 
     _controller.forward();
   }
@@ -108,6 +104,8 @@ class _AlertNotificationWidgetState extends State<_AlertNotificationWidget>
   }
 
   Color _getSeverityColor() {
+    if (_isCleared) return Colors.blue;
+
     switch (widget.severity.toLowerCase()) {
       case 'critical':
         return Colors.red;
@@ -121,6 +119,7 @@ class _AlertNotificationWidgetState extends State<_AlertNotificationWidget>
   }
 
   IconData _getSeverityIcon() {
+    if (_isCleared) return Icons.info;
     switch (widget.severity.toLowerCase()) {
       case 'critical':
         return Icons.error;
@@ -133,8 +132,12 @@ class _AlertNotificationWidgetState extends State<_AlertNotificationWidget>
     }
   }
 
+  String _title() => _isCleared ? 'Recovered' : 'New Alert';
+
   @override
   Widget build(BuildContext context) {
+    final color = _getSeverityColor();
+
     return SlideTransition(
       position: _slideAnimation,
       child: FadeTransition(
@@ -148,10 +151,7 @@ class _AlertNotificationWidgetState extends State<_AlertNotificationWidget>
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: _getSeverityColor(),
-                width: 2,
-              ),
+              border: Border.all(color: color, width: 2),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -159,19 +159,15 @@ class _AlertNotificationWidgetState extends State<_AlertNotificationWidget>
               children: [
                 Row(
                   children: [
-                    Icon(
-                      _getSeverityIcon(),
-                      color: _getSeverityColor(),
-                      size: 24,
-                    ),
+                    Icon(_getSeverityIcon(), color: color, size: 24),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        'New Alert',
+                        _title(),
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
-                          color: _getSeverityColor(),
+                          color: color,
                         ),
                       ),
                     ),
@@ -188,18 +184,13 @@ class _AlertNotificationWidgetState extends State<_AlertNotificationWidget>
                   Text(
                     widget.deviceName!,
                     style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                    ),
+                        fontSize: 14, fontWeight: FontWeight.w600),
                   ),
                   const SizedBox(height: 4),
                 ],
                 Text(
                   widget.message,
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: Colors.grey[700],
-                  ),
+                  style: TextStyle(fontSize: 13, color: Colors.grey[700]),
                   maxLines: 3,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -208,9 +199,7 @@ class _AlertNotificationWidgetState extends State<_AlertNotificationWidget>
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
                     TextButton(
-                      onPressed: widget.onTap,
-                      child: const Text('View'),
-                    ),
+                        onPressed: widget.onTap, child: const Text('View')),
                   ],
                 ),
               ],

@@ -11,14 +11,16 @@ from app.models import Device, StatusHistory, Switch
 from app.services.librenms_service import LibreNMSService
 from app.services.metrics_service import aggregate_port_metrics_by_node, to_float
 from app.services.ping_probe import ping_probe
-from app.services.status_tracking_service import StatusTrackingService
 from app.services.threshold_alerts import (
     sync_device_latency_alert,
+    sync_device_offline_alert,
     sync_device_threshold_alert,
+    sync_switch_offline_alert,
     sync_switch_threshold_alert,
 )
 from app.services.websocket_manager import ws_manager
 from app.utils.thresholds import (
+    DEVICE_THRESHOLDS,
     evaluate_device_latency_severity,
     evaluate_device_severity,
     evaluate_switch_severity,
@@ -26,19 +28,42 @@ from app.utils.thresholds import (
 
 logger = logging.getLogger(__name__)
 
-# Module-level poller control
 _status_poller_task: Optional[asyncio.Task] = None
 _status_poller_stop_event: Optional[asyncio.Event] = None
 
-# Cache to track previous status and detect changes
 _device_status_cache: Dict[int, str] = {}
 _switch_status_cache: Dict[int, str] = {}
 _device_failure_count: Dict[int, int] = {}
 _switch_failure_count: Dict[int, int] = {}
+_device_success_count: Dict[int, int] = {}
+_switch_success_count: Dict[int, int] = {}
+
+OFFLINE_FAIL_REQUIRED = 3
+RECOVERY_SUCCESS_REQUIRED = 2
 
 
 def _open_db() -> Session:
     return SessionLocal()
+
+
+def _append_status_history_if_changed(
+    db: Session,
+    *,
+    node_type: str,
+    node_id: int,
+    old_status: Optional[str],
+    new_status: str,
+) -> None:
+    if old_status is None or old_status == new_status:
+        return
+    db.add(
+        StatusHistory(
+            node_type=node_type,
+            node_id=node_id,
+            status=new_status,
+            changed_at=datetime.now(),
+        )
+    )
 
 
 async def _sync_threshold_alerts(
@@ -85,7 +110,6 @@ async def _sync_threshold_alerts(
         else:
             in_mbps, out_mbps = device_totals.get(device.device_id, (0.0, 0.0))
             severity = evaluate_device_severity(device.device_type, in_mbps, out_mbps)
-
             sync_device_threshold_alert(
                 db,
                 device_id=device.device_id,
@@ -94,7 +118,13 @@ async def _sync_threshold_alerts(
                 data_found=True,
             )
 
-        if (device.device_type or "").strip().lower() == "cctv":
+        device_type_key = (device.device_type or "").strip().lower().replace("_", " ")
+        has_latency_rule = (
+            device_type_key in DEVICE_THRESHOLDS
+            and "latency" in DEVICE_THRESHOLDS[device_type_key]
+        )
+
+        if has_latency_rule:
             if settings.PING_PROBE_ENABLED:
                 latency_ms = await ping_probe.ping(device.ip_address)
             else:
@@ -115,6 +145,15 @@ async def _sync_threshold_alerts(
                     else "Latency unavailable"
                 ),
                 data_found=latency_ms is not None,
+            )
+        else:
+            # Ensure old latency alert gets cleared if device type no longer has latency policy
+            sync_device_latency_alert(
+                db,
+                device_id=device.device_id,
+                severity="green",
+                message="Latency rule not configured for this device type",
+                data_found=True,
             )
 
     for switch in switches:
@@ -142,7 +181,6 @@ async def _sync_threshold_alerts(
         in_mbps, out_mbps = switch_totals.get(switch.switch_id, (0.0, 0.0))
         capacity = switch_capacity.get(switch.switch_id, 0.0)
         utilization = ((in_mbps + out_mbps) / capacity) * 100 if capacity > 0 else None
-
         severity = evaluate_switch_severity(utilization, "switch")
 
         sync_switch_threshold_alert(
@@ -159,10 +197,6 @@ async def _sync_threshold_alerts(
 
 
 async def poll_and_broadcast_status(libre_service: LibreNMSService) -> int:
-    """
-    Poll LibreNMS for all device statuses and broadcast changes via WebSocket.
-    Returns the number of status changes detected.
-    """
     global _device_status_cache, _switch_status_cache
 
     changes_detected = 0
@@ -180,46 +214,77 @@ async def poll_and_broadcast_status(libre_service: LibreNMSService) -> int:
                 lnms_id = int(device_id)
                 librenms_status_map[lnms_id] = {
                     "status": "online" if lnms_device.get("status") == 1 else "offline",
-                    "hostname": lnms_device.get("hostname", ""),
-                    "uptime": lnms_device.get("uptime", 0),
-                    "last_polled": lnms_device.get("last_polled", ""),
                 }
                 latency_by_lnms_id[lnms_id] = to_float(
                     lnms_device.get("latency_ms") or lnms_device.get("latency")
                 )
 
-        # Check devices
         devices = db.query(Device).filter(Device.librenms_device_id.isnot(None)).all()
         for device in devices:
             lnms_id = device.librenms_device_id
             if lnms_id not in librenms_status_map:
                 continue
 
-            lnms_data = librenms_status_map[lnms_id]
-            raw_status = lnms_data["status"]
-            old_status = _device_status_cache.get(device.device_id)
-
+            raw_status = librenms_status_map[lnms_id]["status"]
+            old_status = _device_status_cache.get(
+                device.device_id, (device.status or "online").lower()
+            )
             failure_count = _device_failure_count.get(device.device_id, 0)
+            success_count = _device_success_count.get(device.device_id, 0)
 
             if raw_status == "offline":
                 failure_count += 1
+                success_count = 0
                 _device_failure_count[device.device_id] = failure_count
-                if failure_count >= 3:
+                _device_success_count[device.device_id] = success_count
+                if failure_count >= OFFLINE_FAIL_REQUIRED:
                     new_status = "offline"
                 else:
                     new_status = "warning"
             else:
+                failure_count = 0
                 _device_failure_count[device.device_id] = 0
-                new_status = "online"
+                success_count += 1
+                _device_success_count[device.device_id] = success_count
+                if old_status == "offline":
+                    new_status = (
+                        "online"
+                        if success_count >= RECOVERY_SUCCESS_REQUIRED
+                        else "offline"
+                    )
+                else:
+                    new_status = "online"
 
-            if old_status is None:
-                _device_status_cache[device.device_id] = new_status
-            elif old_status != new_status:
+            if old_status != new_status:
                 _device_status_cache[device.device_id] = new_status
                 changes_detected += 1
 
                 device.status = new_status
                 device.librenms_last_synced = datetime.now()
+                db.add(device)
+
+                _append_status_history_if_changed(
+                    db,
+                    node_type="device",
+                    node_id=device.device_id,
+                    old_status=old_status,
+                    new_status=new_status,
+                )
+
+                if new_status == "offline":
+                    sync_device_offline_alert(
+                        db,
+                        device_id=device.device_id,
+                        is_offline=True,
+                        data_found=True,
+                    )
+                elif old_status == "offline" and new_status == "online":
+                    sync_device_offline_alert(
+                        db,
+                        device_id=device.device_id,
+                        is_offline=False,
+                        data_found=True,
+                    )
 
                 await ws_manager.broadcast(
                     {
@@ -228,6 +293,9 @@ async def poll_and_broadcast_status(libre_service: LibreNMSService) -> int:
                         "id": device.device_id,
                         "name": device.name,
                         "ip_address": device.ip_address,
+                        "location_name": device.location.name
+                        if getattr(device, "location", None)
+                        else None,
                         "old_status": old_status,
                         "new_status": new_status,
                         "timestamp": datetime.now().isoformat(),
@@ -240,31 +308,66 @@ async def poll_and_broadcast_status(libre_service: LibreNMSService) -> int:
             if lnms_id not in librenms_status_map:
                 continue
 
-            lnms_data = librenms_status_map[lnms_id]
-            raw_status = lnms_data["status"]
-            old_status = _switch_status_cache.get(switch.switch_id)
-
+            raw_status = librenms_status_map[lnms_id]["status"]
+            old_status = _switch_status_cache.get(
+                switch.switch_id, (switch.status or "online").lower()
+            )
             failure_count = _switch_failure_count.get(switch.switch_id, 0)
+            success_count = _switch_success_count.get(switch.switch_id, 0)
 
             if raw_status == "offline":
                 failure_count += 1
+                success_count = 0
                 _switch_failure_count[switch.switch_id] = failure_count
-                if failure_count >= 3:
+                _switch_success_count[switch.switch_id] = success_count
+                if failure_count >= OFFLINE_FAIL_REQUIRED:
                     new_status = "offline"
                 else:
                     new_status = "warning"
             else:
+                failure_count = 0
                 _switch_failure_count[switch.switch_id] = 0
-                new_status = "online"
+                success_count += 1
+                _switch_success_count[switch.switch_id] = success_count
+                if old_status == "offline":
+                    new_status = (
+                        "online"
+                        if success_count >= RECOVERY_SUCCESS_REQUIRED
+                        else "offline"
+                    )
+                else:
+                    new_status = "online"
 
-            if old_status is None:
-                _switch_status_cache[switch.switch_id] = new_status
-            elif old_status != new_status:
+            if old_status != new_status:
                 _switch_status_cache[switch.switch_id] = new_status
                 changes_detected += 1
 
                 switch.status = new_status
                 switch.librenms_last_synced = datetime.now()
+                db.add(switch)
+
+                _append_status_history_if_changed(
+                    db,
+                    node_type="switch",
+                    node_id=switch.switch_id,
+                    old_status=old_status,
+                    new_status=new_status,
+                )
+
+                if new_status == "offline":
+                    sync_switch_offline_alert(
+                        db,
+                        switch_id=switch.switch_id,
+                        is_offline=True,
+                        data_found=True,
+                    )
+                elif old_status == "offline" and new_status == "online":
+                    sync_switch_offline_alert(
+                        db,
+                        switch_id=switch.switch_id,
+                        is_offline=False,
+                        data_found=True,
+                    )
 
                 await ws_manager.broadcast(
                     {
@@ -304,7 +407,8 @@ async def poll_and_broadcast_status(libre_service: LibreNMSService) -> int:
             )
 
     except Exception as e:
-        logger.exception("Error polling device status:  %s", e)
+        logger.exception("Error polling device status: %s", e)
+        db.rollback()
     finally:
         db.close()
 
@@ -314,9 +418,6 @@ async def poll_and_broadcast_status(libre_service: LibreNMSService) -> int:
 async def _run_status_poller(
     libre_service: LibreNMSService, interval_seconds: int
 ) -> None:
-    """
-    Background loop that periodically polls status and broadcasts changes.
-    """
     global _status_poller_stop_event
 
     if _status_poller_stop_event is None:
@@ -350,10 +451,6 @@ async def _run_status_poller(
 def start_status_poller_task(
     libre_service: LibreNMSService, interval_seconds: int = 5
 ) -> asyncio.Task:
-    """
-    Start the status poller as a background task.
-    Default interval is 5 seconds for responsive real-time updates.
-    """
     global _status_poller_task, _status_poller_stop_event
 
     if _status_poller_task and not _status_poller_task.done():
@@ -368,7 +465,6 @@ def start_status_poller_task(
 
 
 async def stop_status_poller_task() -> None:
-    """Stop the status poller task."""
     global _status_poller_task, _status_poller_stop_event
 
     if _status_poller_stop_event:
@@ -382,19 +478,3 @@ async def stop_status_poller_task() -> None:
             pass
         _status_poller_task = None
         _status_poller_stop_event = None
-
-
-async def run_status_tracking() -> None:
-    while True:
-        db = SessionLocal()
-        try:
-            service = StatusTrackingService(db)
-            summary = await service.poll_and_track_all()
-            logger.info("Status poll summary: %s", summary)
-        except Exception as e:
-            logger.exception("Status poll failed: %s", e)
-            db.rollback()
-        finally:
-            db.close()
-
-        await asyncio.sleep(max(1, int(settings.POLL_INTERVAL)))

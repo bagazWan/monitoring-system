@@ -14,7 +14,12 @@ from app.services.metrics_service import (
     to_float,
 )
 from app.services.ping_probe import ping_probe
-from app.utils.thresholds import evaluate_device_severity, evaluate_switch_severity
+from app.utils.thresholds import (
+    DEVICE_THRESHOLDS,
+    evaluate_device_latency_severity,
+    evaluate_device_severity,
+    evaluate_switch_severity,
+)
 
 _LAST_RESYNC_AT: dict[str, datetime] = {}
 
@@ -26,6 +31,10 @@ def _status_severity(status: Optional[str]) -> str:
     if s == "warning":
         return "yellow"
     return "green"
+
+
+def _normalize_device_type(value: Optional[str]) -> str:
+    return (value or "").strip().lower().replace("_", " ")
 
 
 def _resync_key_device(device_id: int) -> str:
@@ -59,6 +68,7 @@ async def calculate_device_metrics(
         "monitored": False,
         "severity": _status_severity(device.status),
         "latency_ms": None,
+        "latency_severity": _status_severity(device.status),
     }
 
     if not device.librenms_device_id:
@@ -140,13 +150,26 @@ async def calculate_device_metrics(
         except Exception:
             pass
 
-    severity = (
-        "red"
-        if (device.status or "").lower() == "offline"
-        else "yellow"
-        if (device.status or "").lower() == "warning"
-        else evaluate_device_severity(device.device_type, in_mbps, out_mbps)
-    )
+    if (device.status or "").lower() == "offline":
+        severity = "red"
+        latency_severity = "red"
+    elif (device.status or "").lower() == "warning":
+        severity = "yellow"
+        latency_severity = "yellow"
+    else:
+        severity = evaluate_device_severity(device.device_type, in_mbps, out_mbps)
+
+        device_type_key = _normalize_device_type(device.device_type)
+        has_latency_rule = (
+            device_type_key in DEVICE_THRESHOLDS
+            and "latency" in DEVICE_THRESHOLDS[device_type_key]
+        )
+
+        latency_severity = (
+            evaluate_device_latency_severity(device.device_type, latency_ms)
+            if has_latency_rule
+            else "green"
+        )
 
     return {
         "device_id": device.device_id,
@@ -156,6 +179,7 @@ async def calculate_device_metrics(
         "monitored": enabled_count > 0,
         "severity": severity,
         "latency_ms": to_finite_float(latency_ms),
+        "latency_severity": latency_severity,
     }
 
 

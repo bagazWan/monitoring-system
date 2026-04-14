@@ -5,7 +5,6 @@ import 'package:flutter/foundation.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import '../api_config.dart';
 
-// Model for status change events
 class StatusChangeEvent {
   final String nodeType;
   final int id;
@@ -13,6 +12,7 @@ class StatusChangeEvent {
   final String ipAddress;
   final String oldStatus;
   final String newStatus;
+  final String? locationName;
   final DateTime timestamp;
 
   StatusChangeEvent({
@@ -23,6 +23,7 @@ class StatusChangeEvent {
     required this.oldStatus,
     required this.newStatus,
     required this.timestamp,
+    this.locationName,
   });
 
   factory StatusChangeEvent.fromJson(Map<String, dynamic> json) {
@@ -33,6 +34,7 @@ class StatusChangeEvent {
       ipAddress: json['ip_address'] ?? '',
       oldStatus: json['old_status'] ?? '',
       newStatus: json['new_status'] ?? '',
+      locationName: json['location_name']?.toString(),
       timestamp: DateTime.tryParse(json['timestamp'] ?? '') ?? DateTime.now(),
     );
   }
@@ -45,7 +47,6 @@ enum WebSocketConnectionState {
   reconnecting,
 }
 
-// Singleton WebSocket service with exponential backoff reconnection
 class WebSocketService {
   static final WebSocketService _instance = WebSocketService._internal();
   factory WebSocketService() => _instance;
@@ -60,15 +61,13 @@ class WebSocketService {
   bool _shouldReconnect = true;
   int _reconnectAttempts = 0;
 
-  // Exponential backoff configuration
   static const int _maxReconnectAttempts = 10;
   static const Duration _initialReconnectDelay = Duration(seconds: 1);
   static const Duration _maxReconnectDelay = Duration(seconds: 60);
   static const Duration _pingInterval = Duration(seconds: 30);
   static const double _backoffMultiplier = 2.0;
-  static const double _jitterFactor = 0.1; // 10% jitter
+  static const double _jitterFactor = 0.1;
 
-  // Stream controllers
   final _statusChangeController =
       StreamController<StatusChangeEvent>.broadcast();
   final _connectionStateController =
@@ -77,8 +76,6 @@ class WebSocketService {
       StreamController<Map<String, dynamic>>.broadcast();
   final _alertStreamController =
       StreamController<Map<String, dynamic>>.broadcast();
-
-  // refresher for alerts list/logs when an alert event comes in
   final _alertsRefreshController = StreamController<void>.broadcast();
 
   Stream<StatusChangeEvent> get statusChanges => _statusChangeController.stream;
@@ -89,7 +86,6 @@ class WebSocketService {
   Stream<void> get alertsRefresh => _alertsRefreshController.stream;
 
   WebSocketConnectionState get currentState => _connectionState;
-
   bool get isConnected =>
       _connectionState == WebSocketConnectionState.connected;
 
@@ -124,8 +120,6 @@ class WebSocketService {
       final wsUrl = ApiConfig.baseUrl
           .replaceFirst('http://', 'ws://')
           .replaceFirst('https://', 'wss://');
-
-      // Unified endpoint
       final uri = Uri.parse('$wsUrl/api/v1/ws');
 
       debugPrint(
@@ -164,30 +158,22 @@ class WebSocketService {
 
       switch (type) {
         case 'connected':
-          debugPrint('WebSocket: Server confirmed connection');
           break;
-
         case 'status_change':
-          final event = StatusChangeEvent.fromJson(data);
-          _statusChangeController.add(event);
+          _statusChangeController.add(StatusChangeEvent.fromJson(data));
           break;
-
         case 'heartbeat':
           _heartbeatController.add(data);
           break;
-
         case 'alert':
           _alertStreamController.add(data);
           _alertsRefreshController.add(null);
           break;
-
         case 'alerts_refresh':
           _alertsRefreshController.add(null);
           break;
-
         case 'pong':
           break;
-
         default:
           debugPrint('WebSocket: Unknown message type: $type');
       }
@@ -202,7 +188,6 @@ class WebSocketService {
   }
 
   void _handleDone() {
-    debugPrint('WebSocket: Connection closed');
     _stopPingTimer();
 
     if (_shouldReconnect) {
@@ -219,9 +204,6 @@ class WebSocketService {
       _scheduleReconnect();
     } else {
       _updateConnectionState(WebSocketConnectionState.disconnected);
-      if (_reconnectAttempts >= _maxReconnectAttempts) {
-        debugPrint('WebSocket: Max reconnect attempts reached');
-      }
     }
   }
 
@@ -230,11 +212,6 @@ class WebSocketService {
     _updateConnectionState(WebSocketConnectionState.reconnecting);
 
     final delay = _calculateReconnectDelay();
-    debugPrint(
-      'WebSocket: Reconnecting in ${delay.inSeconds}s '
-      '(attempt ${_reconnectAttempts + 1}/$_maxReconnectAttempts)',
-    );
-
     _reconnectTimer = Timer(delay, () {
       _reconnectAttempts++;
       _attemptConnection();
@@ -247,9 +224,7 @@ class WebSocketService {
       if (isConnected && _channel != null) {
         try {
           _channel!.sink.add('ping');
-        } catch (e) {
-          debugPrint('WebSocket: Failed to send ping: $e');
-        }
+        } catch (_) {}
       }
     });
   }
@@ -278,7 +253,6 @@ class WebSocketService {
     }
 
     _updateConnectionState(WebSocketConnectionState.disconnected);
-    debugPrint('WebSocket: Disconnected');
   }
 
   void dispose() {

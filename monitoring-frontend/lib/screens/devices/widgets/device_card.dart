@@ -20,16 +20,19 @@ class DeviceCard extends StatelessWidget {
     this.liveStatsListenable,
   });
 
-  Color _resolveStatusColor(String? status, String? severity) {
+  Color _resolveStatusColor(String? status, Map<String, dynamic>? liveStats) {
     final s = (status ?? '').toLowerCase();
-    final sev = (severity ?? '').toLowerCase();
+    if (s == 'offline') return Colors.grey.shade600;
 
-    if (s == 'offline') return Colors.red;
-    if (s == 'warning') return Colors.orange;
+    String norm(dynamic v) => (v ?? '').toString().toLowerCase();
+    final bw = norm(liveStats?['severity']);
+    final lat = norm(liveStats?['latency_severity']);
 
-    if (sev == 'red' || sev == 'critical') return Colors.red;
-    if (sev == 'yellow' || sev == 'warning') return Colors.orange;
+    bool isCritical(String x) => x == 'critical' || x == 'red';
+    bool isWarning(String x) => x == 'warning' || x == 'yellow';
 
+    if (isCritical(bw) || isCritical(lat)) return Colors.red;
+    if (isWarning(bw) || isWarning(lat) || s == 'warning') return Colors.orange;
     return Colors.green;
   }
 
@@ -57,8 +60,7 @@ class DeviceCard extends StatelessWidget {
             return ValueListenableBuilder<String?>(
               valueListenable: statusListenable ?? ValueNotifier(node.status),
               builder: (context, value, __) {
-                final severity = liveStats?['severity']?.toString();
-                final color = _resolveStatusColor(value, severity);
+                final color = _resolveStatusColor(value, liveStats);
                 return _buildStatusDot(color);
               },
             );
@@ -88,7 +90,8 @@ class DeviceCard extends StatelessWidget {
               if (liveStats != null) {
                 final double inMbps = (liveStats['in_mbps'] ?? 0).toDouble();
                 final double outMbps = (liveStats['out_mbps'] ?? 0).toDouble();
-                final String liveStatus = liveStats['status'] ?? 'unknown';
+                final String liveStatus =
+                    (liveStats['status'] ?? 'unknown').toString().toLowerCase();
 
                 final rawLatency =
                     liveStats['latency_ms'] ?? liveStats['latency'];
@@ -163,9 +166,8 @@ class DeviceCard extends StatelessWidget {
                                 Navigator.push(
                                   context,
                                   MaterialPageRoute(
-                                    builder: (_) => DeviceConfigScreen(
-                                      node: node,
-                                    ),
+                                    builder: (_) =>
+                                        DeviceConfigScreen(node: node),
                                   ),
                                 ).then((_) => onRefresh?.call());
                               },
@@ -182,10 +184,7 @@ class DeviceCard extends StatelessWidget {
                               style: TextStyle(
                                   color: Colors.grey[600], fontSize: 13)),
                         ),
-                        Text(
-                          latencyText,
-                          style: const TextStyle(fontSize: 13),
-                        ),
+                        Text(latencyText, style: const TextStyle(fontSize: 13)),
                       ],
                     ),
                   ],

@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 600
     LIBRENMS_URL: str
     LIBRENMS_API_TOKEN: str
+    LIBRENMS_ALERTS_ENABLED: bool = False
     POLL_INTERVAL: int = 5
 
     PING_PROBE_ENABLED: bool = False

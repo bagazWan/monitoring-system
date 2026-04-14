@@ -24,6 +24,10 @@ class _MainLayoutState extends State<MainLayout> {
   StreamSubscription? _alertSub;
   User? _currentUser;
 
+  int _unreadAlertCount = 0;
+
+  static const int _alertsTabIndex = 3;
+
   Future<void> _checkUser() async {
     try {
       final user = await AuthService().getCurrentUser();
@@ -31,6 +35,23 @@ class _MainLayoutState extends State<MainLayout> {
     } catch (e) {
       print("Error fetching user: $e");
     }
+  }
+
+  void _goToPage(int index) {
+    setState(() {
+      _currentPageIndex = index;
+      if (index == _alertsTabIndex) {
+        _unreadAlertCount = 0;
+      }
+    });
+  }
+
+  String _sanitizeAlertMessage(String message) {
+    final m = message.trim();
+    if (m.toLowerCase().contains('nan ms')) {
+      return 'Latency unavailable';
+    }
+    return m.isEmpty ? 'New System Alert' : m;
   }
 
   @override
@@ -42,8 +63,22 @@ class _MainLayoutState extends State<MainLayout> {
     _alertSub = WebSocketService().alertStream.listen((alertData) {
       if (!mounted) return;
 
-      final severity = (alertData['severity'] ?? 'info').toString();
-      final message = (alertData['message'] ?? 'New System Alert').toString();
+      final eventType =
+          (alertData['event'] ?? 'raised').toString().toLowerCase();
+      final alertType =
+          (alertData['alert_type'] ?? '').toString().toLowerCase();
+
+      final isCleared = eventType == 'cleared';
+      final isOfflineType = alertType == 'offline';
+
+      final shouldPopup = !isCleared || isOfflineType;
+      if (!shouldPopup) return;
+
+      final severity =
+          (alertData['severity'] ?? 'info').toString().toLowerCase();
+      final rawMessage =
+          (alertData['message'] ?? 'New System Alert').toString();
+      final message = _sanitizeAlertMessage(rawMessage);
 
       final deviceName = alertData['device_name']?.toString();
       final switchName = alertData['switch_name']?.toString();
@@ -58,20 +93,27 @@ class _MainLayoutState extends State<MainLayout> {
               ? 'Device ID: $deviceId'
               : (switchId != null ? 'Switch ID: $switchId' : null));
 
-      final displayLabel = locationName != null && locationName.isNotEmpty
+      final displayLabel = (locationName != null && locationName.isNotEmpty)
           ? '$label • $locationName'
           : label;
+
+      final popupSeverity = isCleared ? 'info' : severity;
+
+      setState(() {
+        _unreadAlertCount += 1;
+      });
 
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
         AlertNotification.show(
           context,
           message: message,
-          severity: severity,
+          severity: popupSeverity,
+          event: eventType,
           deviceName: displayLabel,
           onTap: () {
             AlertNotification.dismiss();
-            setState(() => _currentPageIndex = 3);
+            _goToPage(_alertsTabIndex);
           },
         );
       });
@@ -116,6 +158,38 @@ class _MainLayoutState extends State<MainLayout> {
     }
   }
 
+  Widget _buildAlertNavIcon() {
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        const Icon(Icons.notifications),
+        if (_unreadAlertCount > 0)
+          Positioned(
+            right: -6,
+            top: -6,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+              decoration: BoxDecoration(
+                color: Colors.red,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+              child: Text(
+                _unreadAlertCount > 99 ? '99+' : '$_unreadAlertCount',
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                  height: 1.1,
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     bool isMobile = MediaQuery.of(context).size.width < 600;
@@ -140,8 +214,7 @@ class _MainLayoutState extends State<MainLayout> {
       const BottomNavigationBarItem(icon: Icon(Icons.router), label: "Devices"),
       const BottomNavigationBarItem(
           icon: Icon(Icons.location_on), label: "Map"),
-      const BottomNavigationBarItem(
-          icon: Icon(Icons.notifications), label: "Alerts"),
+      BottomNavigationBarItem(icon: _buildAlertNavIcon(), label: "Alerts"),
       if (isAdmin)
         const BottomNavigationBarItem(icon: Icon(Icons.people), label: "Users"),
     ];
@@ -159,7 +232,7 @@ class _MainLayoutState extends State<MainLayout> {
         title: Padding(
           padding: const EdgeInsets.symmetric(vertical: 12.0, horizontal: 2.0),
           child: GestureDetector(
-            onTap: () => setState(() => _currentPageIndex = 0),
+            onTap: () => _goToPage(0),
             child: MouseRegion(
               cursor: SystemMouseCursors.click,
               child: Row(
@@ -192,7 +265,7 @@ class _MainLayoutState extends State<MainLayout> {
       bottomNavigationBar: isMobile
           ? BottomNavigationBar(
               currentIndex: _currentPageIndex,
-              onTap: (index) => setState(() => _currentPageIndex = index),
+              onTap: _goToPage,
               type: BottomNavigationBarType.fixed,
               items: navItems,
             )
@@ -202,9 +275,9 @@ class _MainLayoutState extends State<MainLayout> {
           if (!isMobile)
             SideMenu(
               selectedIndex: _currentPageIndex,
-              onItemSelected: (index) =>
-                  setState(() => _currentPageIndex = index),
+              onItemSelected: _goToPage,
               currentUser: _currentUser,
+              unreadAlertCount: _unreadAlertCount,
             ),
           Expanded(
             child: Container(

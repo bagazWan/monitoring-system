@@ -39,7 +39,6 @@ class _DeviceListScreenState extends State<DeviceListScreen>
   final Map<String, ValueNotifier<Map<String, dynamic>?>> _liveStatsNotifiers =
       {};
 
-  // Search & Filters
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
   String? _selectedType;
@@ -49,12 +48,10 @@ class _DeviceListScreenState extends State<DeviceListScreen>
   List<String> _locations = [];
   static const _noChange = Object();
 
-  // Pagination
   int _currentPage = 1;
   int _itemsPerPage = 10;
 
   int get _totalPages => (_totalItems / _itemsPerPage).ceil().clamp(1, 9999);
-
   List<BaseNode> get _paginatedNodes => _nodes;
 
   @override
@@ -173,14 +170,13 @@ class _DeviceListScreenState extends State<DeviceListScreen>
       for (final node in _nodes) {
         final key = '${node.nodeKind}_${node.id}';
         _statusNotifiers.putIfAbsent(
-          key,
-          () => ValueNotifier<String?>(node.status),
-        );
+            key, () => ValueNotifier<String?>(node.status));
         _liveStatsNotifiers.putIfAbsent(
           key,
           () => ValueNotifier<Map<String, dynamic>?>(_liveStats[key]),
         );
       }
+
       _fetchBatchLiveStats();
       _loadLocations();
     } catch (e) {
@@ -197,15 +193,14 @@ class _DeviceListScreenState extends State<DeviceListScreen>
 
     try {
       final stats = await DeviceService().getBulkLiveDetails(visibleNodes);
-      if (mounted) {
-        _liveStats = stats;
-        for (final entry in stats.entries) {
-          _liveStatsNotifiers.putIfAbsent(
-            entry.key,
-            () => ValueNotifier<Map<String, dynamic>?>(entry.value),
-          );
-          _liveStatsNotifiers[entry.key]!.value = entry.value;
-        }
+      if (!mounted) return;
+      _liveStats = stats;
+      for (final entry in stats.entries) {
+        _liveStatsNotifiers.putIfAbsent(
+          entry.key,
+          () => ValueNotifier<Map<String, dynamic>?>(entry.value),
+        );
+        _liveStatsNotifiers[entry.key]!.value = entry.value;
       }
     } catch (e) {
       debugPrint("Batch fetch error: $e");
@@ -249,44 +244,12 @@ class _DeviceListScreenState extends State<DeviceListScreen>
     wsService.connect();
 
     _statusSubscription = wsService.statusChanges.listen((event) {
-      if (mounted) _handleStatusChange(event);
+      if (!mounted) return;
+      final key = '${event.nodeType}_${event.id}';
+      if (_statusNotifiers.containsKey(key)) {
+        _statusNotifiers[key]!.value = event.newStatus;
+      }
     });
-  }
-
-  void _handleStatusChange(StatusChangeEvent event) {
-    final key = '${event.nodeType}_${event.id}';
-    if (_statusNotifiers.containsKey(key)) {
-      _statusNotifiers[key]!.value = event.newStatus;
-    }
-
-    _showStatusNotification(event);
-  }
-
-  void _showStatusNotification(StatusChangeEvent event) {
-    final isOnline = event.newStatus == 'online';
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            Icon(
-              isOnline ? Icons.check_circle : Icons.error,
-              color: Colors.white,
-              size: 18,
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                '${event.name} is now ${event.newStatus.toUpperCase()}',
-                style: const TextStyle(fontSize: 13),
-              ),
-            ),
-          ],
-        ),
-        backgroundColor: isOnline ? Colors.green : Colors.red,
-        duration: const Duration(seconds: 3),
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
   }
 
   @override

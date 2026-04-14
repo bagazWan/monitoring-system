@@ -89,6 +89,7 @@ services:
       - "REDIS_PORT=6379"
       - "RRDCACHED_SERVER=rrdcached:42217"
       - "LIBRENMS_SET_SCHEDULER=1"
+      - "LIBRENMS_POLLER_INTERVAL=1"
     restart: always
 
   dispatcher:

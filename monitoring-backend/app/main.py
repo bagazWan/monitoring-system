@@ -28,7 +28,6 @@ from app.services.alerts_service import (
 )
 from app.services.librenms_service import LibreNMSService
 from app.services.status_poller import (
-    run_status_tracking,
     start_status_poller_task,
     stop_status_poller_task,
 )
@@ -49,7 +48,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Singleton LibreNMS service instance that other modules can import
 libre_service: LibreNMSService = LibreNMSService()
 
 # Background poller task handle
@@ -60,18 +58,18 @@ _status_tracking_task: Optional[asyncio.Task] = None
 
 @app.on_event("startup")
 async def on_startup():
-    """
-    Application startup: start LibreNMS alerts poller as a background asyncio Task
-    """
     global _alerts_poller_task, _status_tracking_task
-    # alerts poller
-    _alerts_poller_task = start_alerts_poller_task(
+    if settings.LIBRENMS_ALERTS_ENABLED:
+        _alerts_poller_task = start_alerts_poller_task(
+            libre_service, interval_seconds=getattr(settings, "POLL_INTERVAL", 5)
+        )
+        logger.info("Started LibreNMS alerts poller task")
+    else:
+        logger.info("LibreNMS alerts poller disabled (backend-only alerts)")
+
+    _status_poller_task = start_status_poller_task(
         libre_service, interval_seconds=getattr(settings, "POLL_INTERVAL", 5)
     )
-    logger.info("Started alerts poller task")
-
-    # status poller
-    _status_tracking_task = asyncio.create_task(run_status_tracking())
     logger.info("Started status tracking loop")
 
 
@@ -83,14 +81,6 @@ async def on_shutdown():
     global _status_tracking_task
     await stop_alerts_poller_task()
     await stop_status_poller_task()
-
-    if _status_tracking_task:
-        _status_tracking_task.cancel()
-        try:
-            await _status_tracking_task
-        except asyncio.CancelledError:
-            pass
-        _status_tracking_task = None
 
     logger.info("Stopped all background poller tasks")
 

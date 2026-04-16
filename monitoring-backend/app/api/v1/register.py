@@ -1,30 +1,22 @@
+import logging
 from datetime import datetime
 
 from app.api.dependencies import require_technician_or_admin
 from app.core.database import get_db
 from app.models import Device, LibreNMSPort, Location, Switch, User
 from app.schemas.device import LibreNMSRegisterRequest
-from app.services.librenms_ports_service import discover_and_store_ports_for
 from app.services.librenms_service import LibreNMSService
+from app.services.register_service import (
+    infer_node_type_from_sysdescr,
+    normalize_node_type,
+    safe_discover_ports,
+    schedule_port_retry_if_needed,
+)
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 router = APIRouter(prefix="/register", tags=["Register"])
-
-
-def _infer_node_type_from_sysdescr(sys_descr: str) -> str:
-    sys_descr_l = (sys_descr or "").lower()
-    is_switch = ("switch" in sys_descr_l) and ("routeros" not in sys_descr_l)
-    return "switch" if is_switch else "device"
-
-
-def _normalize_node_type(node_type: str | None) -> str | None:
-    if node_type is None:
-        return None
-    nt = node_type.strip().lower()
-    if nt in {"device", "switch"}:
-        return nt
-    return None
+logger = logging.getLogger(__name__)
 
 
 @router.post("/librenms")
@@ -62,8 +54,8 @@ async def register_in_librenms(
     sys_name = (lnms_device.get("sysName") or "").strip()
     sys_descr = (lnms_device.get("sysDescr") or "").strip()
 
-    inferred_type = _infer_node_type_from_sysdescr(sys_descr)
-    node_type = _normalize_node_type(payload.node_type) or inferred_type
+    inferred_type = infer_node_type_from_sysdescr(sys_descr)
+    node_type = normalize_node_type(payload.node_type) or inferred_type
 
     if payload.location_id is not None:
         loc = (
@@ -113,21 +105,33 @@ async def register_in_librenms(
             db.commit()
             db.refresh(existing)
 
+            ports_discovered = False
+            warning = None
             if payload.snmp_enabled:
-                await discover_and_store_ports_for(
+                ports_discovered, warning = await safe_discover_ports(
                     db=db,
                     librenms=librenms,
                     librenms_device_id=int(librenms_device_id),
                     switch=existing,
                 )
-                db.commit()
+
+            schedule_port_retry_if_needed(
+                payload=payload,
+                ports_discovered=ports_discovered,
+                node_type="switch",
+                local_id=existing.switch_id,
+                librenms_device_id=int(librenms_device_id),
+            )
 
             return {
+                "status": "ok",
                 "node_type": "switch",
                 "switch_id": existing.switch_id,
                 "librenms_device_id": existing.librenms_device_id,
                 "name": existing.name,
                 "ip_address": existing.ip_address,
+                "ports_discovered": ports_discovered if payload.snmp_enabled else None,
+                "warning": warning,
             }
 
         new_switch = Switch(
@@ -145,21 +149,33 @@ async def register_in_librenms(
         db.commit()
         db.refresh(new_switch)
 
+        ports_discovered = False
+        warning = None
         if payload.snmp_enabled:
-            await discover_and_store_ports_for(
+            ports_discovered, warning = await safe_discover_ports(
                 db=db,
                 librenms=librenms,
                 librenms_device_id=int(librenms_device_id),
                 switch=new_switch,
             )
-            db.commit()
+
+        schedule_port_retry_if_needed(
+            payload=payload,
+            ports_discovered=ports_discovered,
+            node_type="switch",
+            local_id=new_switch.switch_id,
+            librenms_device_id=int(librenms_device_id),
+        )
 
         return {
+            "status": "ok",
             "node_type": "switch",
             "switch_id": new_switch.switch_id,
             "librenms_device_id": new_switch.librenms_device_id,
             "name": new_switch.name,
             "ip_address": new_switch.ip_address,
+            "ports_discovered": ports_discovered if payload.snmp_enabled else None,
+            "warning": warning,
         }
 
     existing = (
@@ -198,21 +214,33 @@ async def register_in_librenms(
         db.commit()
         db.refresh(existing)
 
+        ports_discovered = False
+        warning = None
         if payload.snmp_enabled:
-            await discover_and_store_ports_for(
+            ports_discovered, warning = await safe_discover_ports(
                 db=db,
                 librenms=librenms,
                 librenms_device_id=int(librenms_device_id),
                 device=existing,
             )
-            db.commit()
+
+        schedule_port_retry_if_needed(
+            payload=payload,
+            ports_discovered=ports_discovered,
+            node_type="device",
+            local_id=existing.device_id,
+            librenms_device_id=int(librenms_device_id),
+        )
 
         return {
+            "status": "ok",
             "node_type": "device",
             "device_id": existing.device_id,
             "librenms_device_id": existing.librenms_device_id,
             "name": existing.name,
             "ip_address": existing.ip_address,
+            "ports_discovered": ports_discovered if payload.snmp_enabled else None,
+            "warning": warning,
         }
 
     new_device = Device(
@@ -232,21 +260,33 @@ async def register_in_librenms(
     db.commit()
     db.refresh(new_device)
 
+    ports_discovered = False
+    warning = None
     if payload.snmp_enabled:
-        await discover_and_store_ports_for(
+        ports_discovered, warning = await safe_discover_ports(
             db=db,
             librenms=librenms,
             librenms_device_id=int(librenms_device_id),
             device=new_device,
         )
-        db.commit()
+
+    schedule_port_retry_if_needed(
+        payload=payload,
+        ports_discovered=ports_discovered,
+        node_type="device",
+        local_id=new_device.device_id,
+        librenms_device_id=int(librenms_device_id),
+    )
 
     return {
+        "status": "ok",
         "node_type": "device",
         "device_id": new_device.device_id,
         "librenms_device_id": new_device.librenms_device_id,
         "name": new_device.name,
         "ip_address": new_device.ip_address,
+        "ports_discovered": ports_discovered if payload.snmp_enabled else None,
+        "warning": warning,
     }
 
 
@@ -287,7 +327,6 @@ async def unregister_from_librenms(
 
         db.query(LibreNMSPort).filter(LibreNMSPort.switch_id == sw.switch_id).delete()
 
-        # Detach LibreNMS linkage
         sw.librenms_device_id = None
         sw.librenms_hostname = None
         sw.librenms_last_synced = None
@@ -321,7 +360,6 @@ async def unregister_from_librenms(
 
     db.query(LibreNMSPort).filter(LibreNMSPort.device_id == dev.device_id).delete()
 
-    # Detach LibreNMS linkage
     dev.librenms_device_id = None
     dev.librenms_hostname = None
     dev.librenms_last_synced = None

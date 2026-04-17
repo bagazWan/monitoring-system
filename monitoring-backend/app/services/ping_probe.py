@@ -11,7 +11,6 @@ logger = logging.getLogger(__name__)
 class PingProbe:
     def __init__(self) -> None:
         self._cache: Dict[str, Tuple[float, Optional[float]]] = {}
-        self._lock = asyncio.Lock()
 
     async def ping(self, host: str) -> Optional[float]:
         if not host or not settings.PING_PROBE_ENABLED:
@@ -22,14 +21,10 @@ class PingProbe:
         if cached and now - cached[0] < settings.PING_PROBE_CACHE_SECONDS:
             return cached[1]
 
-        async with self._lock:
-            cached = self._cache.get(host)
-            if cached and now - cached[0] < settings.PING_PROBE_CACHE_SECONDS:
-                return cached[1]
+        latency = await self._run_fping(host)
 
-            latency = await self._run_fping(host)
-            self._cache[host] = (time.monotonic(), latency)
-            return latency
+        self._cache[host] = (time.monotonic(), latency)
+        return latency
 
     async def _run_fping(self, host: str) -> Optional[float]:
         cmd = [
@@ -101,6 +96,49 @@ class PingProbe:
         except Exception as exc:
             logger.debug("fping failed for %s: %s", host, exc)
             return None
+
+    async def ping_bulk(self, hosts: list[str]) -> dict[str, Optional[float]]:
+        if not hosts or not settings.PING_PROBE_ENABLED:
+            return {}
+
+        cmd = [
+            settings.PING_PROBE_PATH,
+            "-C",
+            str(settings.PING_PROBE_COUNT),
+            "-t",
+            str(settings.PING_PROBE_TIMEOUT_MS),
+            "-q",
+        ] + hosts
+
+        results = {host: None for host in hosts}
+
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                *cmd,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            stdout, stderr = await proc.communicate()
+
+            output = (stderr.decode() + "\n" + stdout.decode()).strip()
+
+            if not output:
+                return results
+
+            for line in output.splitlines():
+                if ":" in line:
+                    parts = line.split(":", 1)
+                    ip = parts[0].strip()
+                    times_str = parts[1].strip()
+
+                    times = [float(t) for t in times_str.split() if t != "-"]
+                    if times:
+                        results[ip] = sum(times) / len(times)
+
+        except Exception as exc:
+            logger.error("Bulk fping failed: %s", exc)
+
+        return results
 
 
 ping_probe = PingProbe()

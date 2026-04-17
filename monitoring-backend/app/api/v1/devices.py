@@ -12,6 +12,7 @@ from app.schemas.device import (
     NodePageResponse,
 )
 from app.services.librenms_service import LibreNMSService
+from app.services.metrics_cache_service import MetricsCacheService
 from app.services.node_metrics import calculate_device_metrics
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import false, func, or_
@@ -50,23 +51,21 @@ async def get_device_live_details(device_id: int, db: Session = Depends(get_db))
 
 
 @router.post("/bulk-live-details")
-async def get_bulk_device_details(
-    payload: BulkLiveDetailsRequest, db: Session = Depends(get_db)
+async def get_bulk_details(
+    payload: BulkLiveDetailsRequest,
+    db: Session = Depends(get_db),
 ):
-    librenms = LibreNMSService()
     results = []
+    for d_id in payload.device_ids:
+        cached = MetricsCacheService.get_device(d_id)
 
-    devices = db.query(Device).filter(Device.device_id.in_(payload.device_ids)).all()
-    device_map = {d.device_id: d for d in devices}
-
-    for device_id in payload.device_ids:
-        device = device_map.get(device_id)
-        if not device:
-            continue
-
-        metrics = await calculate_device_metrics(device, db, librenms)
-        results.append(metrics)
-
+        if cached:
+            results.append(cached)
+        else:
+            device = db.query(Device).filter(Device.device_id == d_id).first()
+            if device:
+                metrics = await calculate_device_metrics(device, db, LibreNMSService())
+                results.append(metrics)
     return results
 
 

@@ -7,6 +7,7 @@ import '../../../widgets/visual_feedback.dart';
 import '../../../widgets/search_bar.dart';
 import '../../../widgets/pagination.dart';
 import '../dialogs/location_form_dialog.dart';
+import '../dialogs/manage_location_groups_dialog.dart';
 
 class LocationTab extends StatefulWidget {
   final VoidCallback? onChanged;
@@ -60,31 +61,41 @@ class _LocationTabState extends State<LocationTab> {
         limit: _itemsPerPage,
         search: _searchController.text.trim(),
       );
-      if (mounted) {
-        setState(() {
-          _locations = page.items;
-          _totalItems = page.total;
-          _isLoading = false;
-        });
-      }
+      if (!mounted) return;
+      setState(() {
+        _locations = page.items;
+        _totalItems = page.total;
+        _isLoading = false;
+        _error = null;
+      });
     } catch (e) {
-      if (mounted) {
-        setState(() {
-          _error = e.toString();
-          _isLoading = false;
-        });
-      }
+      if (!mounted) return;
+      setState(() {
+        _error = e.toString();
+        _isLoading = false;
+      });
     }
   }
 
   Future<void> _openForm({Location? location}) async {
-    final result = await showDialog(
+    final result = await showDialog<bool>(
       context: context,
       builder: (context) => LocationFormDialog(location: location),
     );
     if (result == true) {
       widget.onChanged?.call();
       _fetchData(showLoader: true);
+    }
+  }
+
+  Future<void> _openManageGroups() async {
+    final changed = await showDialog<bool>(
+      context: context,
+      builder: (context) => const ManageLocationGroupsDialog(),
+    );
+    if (changed == true) {
+      widget.onChanged?.call();
+      _fetchData(showLoader: false);
     }
   }
 
@@ -96,6 +107,7 @@ class _LocationTabState extends State<LocationTab> {
         widget.onChanged?.call();
         _fetchData(showLoader: true);
       } catch (e) {
+        if (!mounted) return;
         ScaffoldMessenger.of(context)
             .showSnackBar(SnackBar(content: Text("Error: $e")));
       }
@@ -142,10 +154,27 @@ class _LocationTabState extends State<LocationTab> {
               Expanded(
                 child: SearchBarWidget(
                   controller: _searchController,
-                  hintText: "Search by name or address",
+                  hintText: "Search by name, address, or group",
                 ),
               ),
-              const SizedBox(width: 16),
+              const SizedBox(width: 12),
+              SizedBox(
+                height: 40,
+                child: ElevatedButton.icon(
+                  onPressed: _openManageGroups,
+                  icon: const Icon(Icons.group_work_outlined),
+                  label: const Text("Manage Groups"),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.blue[700],
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 20, vertical: 12),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8)),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
               SizedBox(
                 height: 40,
                 child: ElevatedButton.icon(
@@ -161,7 +190,7 @@ class _LocationTabState extends State<LocationTab> {
                         borderRadius: BorderRadius.circular(8)),
                   ),
                 ),
-              )
+              ),
             ],
           ),
           const SizedBox(height: 16),
@@ -177,6 +206,11 @@ class _LocationTabState extends State<LocationTab> {
                 DataColumn(
                     label: Expanded(
                         child: Text("Name",
+                            textAlign: TextAlign.center,
+                            style: TextStyle(fontWeight: FontWeight.bold)))),
+                DataColumn(
+                    label: Expanded(
+                        child: Text("Group",
                             textAlign: TextAlign.center,
                             style: TextStyle(fontWeight: FontWeight.bold)))),
                 DataColumn(
@@ -198,6 +232,7 @@ class _LocationTabState extends State<LocationTab> {
               rows: _locations
                   .map((loc) => DataRow(cells: [
                         DataCell(Text(loc.name)),
+                        DataCell(Text(loc.groupName ?? "-")),
                         DataCell(Text(loc.address ?? "-")),
                         DataCell(Text(loc.description ?? "-")),
                         DataCell(Center(

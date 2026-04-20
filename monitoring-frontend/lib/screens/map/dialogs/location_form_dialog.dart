@@ -22,16 +22,25 @@ class _LocationFormDialogState extends State<LocationFormDialog> {
   late TextEditingController _descController;
   late TextEditingController _typeController;
 
+  int? _selectedGroupId;
+  List<LocationGroup> _groups = [];
+
   @override
   void initState() {
     super.initState();
-    final l = widget.location;
-    _nameController = TextEditingController(text: l?.name ?? "");
-    _addrController = TextEditingController(text: l?.address ?? "");
-    _latController = TextEditingController(text: l?.latitude.toString());
-    _lngController = TextEditingController(text: l?.longitude.toString());
-    _descController = TextEditingController(text: l?.description ?? "");
-    _typeController = TextEditingController(text: l?.type ?? "");
+    final location = widget.location;
+    _nameController = TextEditingController(text: location?.name ?? "");
+    _addrController = TextEditingController(text: location?.address ?? "");
+    _latController = TextEditingController(
+      text: location != null ? location.latitude.toString() : "",
+    );
+    _lngController = TextEditingController(
+      text: location != null ? location.longitude.toString() : "",
+    );
+    _descController = TextEditingController(text: location?.description ?? "");
+    _typeController = TextEditingController(text: location?.type ?? "");
+    _selectedGroupId = location?.groupId;
+    _loadGroups();
   }
 
   @override
@@ -45,31 +54,39 @@ class _LocationFormDialogState extends State<LocationFormDialog> {
     super.dispose();
   }
 
+  Future<void> _loadGroups() async {
+    final data = await _service.getLocationGroups();
+    if (!mounted) return;
+    setState(() => _groups = data);
+  }
+
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _isLoading = true);
 
-    final data = {
+    final payload = {
       "name": _nameController.text.trim(),
       "address": _addrController.text.trim(),
-      "latitude": double.tryParse(_latController.text) ?? 0.0,
-      "longitude": double.tryParse(_lngController.text) ?? 0.0,
+      "latitude": double.tryParse(_latController.text.trim()) ?? 0.0,
+      "longitude": double.tryParse(_lngController.text.trim()) ?? 0.0,
       "location_type": _typeController.text.trim(),
-      "description": _descController.text.trim(),
+      "description": _descController.text.trim().isEmpty
+          ? null
+          : _descController.text.trim(),
+      "group_id": _selectedGroupId,
     };
 
     try {
       if (widget.location == null) {
-        await _service.createLocation(data);
+        await _service.createLocation(payload);
       } else {
-        await _service.updateLocation(widget.location!.id, data);
+        await _service.updateLocation(widget.location!.id, payload);
       }
       if (mounted) Navigator.pop(context, true);
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text("Error: $e")));
-      }
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text("Error: $e")));
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -81,32 +98,73 @@ class _LocationFormDialogState extends State<LocationFormDialog> {
     return AlertDialog(
       title: Text(isEdit ? "Edit Location" : "Add Location"),
       content: SizedBox(
-        width: 500,
+        width: 520,
         child: Form(
           key: _formKey,
           child: SingleChildScrollView(
             child: Column(
-              mainAxisSize: MainAxisSize.min,
               children: [
-                _buildField("Location Name", _nameController, required: true),
-                const SizedBox(height: 16),
-                _buildField("Address", _addrController),
-                const SizedBox(height: 16),
-                _buildField("Type", _typeController),
-                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _nameController,
+                  validator: (v) =>
+                      (v == null || v.trim().isEmpty) ? "Required" : null,
+                  decoration: const InputDecoration(labelText: "Location Name"),
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _addrController,
+                  decoration: const InputDecoration(labelText: "Address"),
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _typeController,
+                  validator: (v) =>
+                      (v == null || v.trim().isEmpty) ? "Required" : null,
+                  decoration: const InputDecoration(labelText: "Location Type"),
+                ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<int>(
+                  value: _selectedGroupId,
+                  items: _groups
+                      .map(
+                        (group) => DropdownMenuItem<int>(
+                          value: group.groupId,
+                          child: Text(group.name),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: (v) => setState(() => _selectedGroupId = v),
+                  decoration:
+                      const InputDecoration(labelText: "Group (Optional)"),
+                ),
+                const SizedBox(height: 12),
                 Row(
                   children: [
                     Expanded(
-                        child: _buildField("Latitude", _latController,
-                            keyboard: TextInputType.number)),
-                    const SizedBox(width: 16),
+                      child: TextFormField(
+                        controller: _latController,
+                        keyboardType: TextInputType.number,
+                        decoration:
+                            const InputDecoration(labelText: "Latitude"),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
                     Expanded(
-                        child: _buildField("Longitude", _lngController,
-                            keyboard: TextInputType.number)),
+                      child: TextFormField(
+                        controller: _lngController,
+                        keyboardType: TextInputType.number,
+                        decoration:
+                            const InputDecoration(labelText: "Longitude"),
+                      ),
+                    ),
                   ],
                 ),
-                const SizedBox(height: 16),
-                _buildField("Description", _descController, maxLines: 3),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _descController,
+                  maxLines: 3,
+                  decoration: const InputDecoration(labelText: "Description"),
+                ),
               ],
             ),
           ),
@@ -114,49 +172,20 @@ class _LocationFormDialogState extends State<LocationFormDialog> {
       ),
       actions: [
         TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text("Cancel")),
+          onPressed: _isLoading ? null : () => Navigator.pop(context),
+          child: const Text("Cancel"),
+        ),
         ElevatedButton(
           onPressed: _isLoading ? null : _submit,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.blue[700],
-            foregroundColor: Colors.white,
-          ),
           child: _isLoading
               ? const SizedBox(
                   width: 16,
                   height: 16,
-                  child: CircularProgressIndicator(
-                      strokeWidth: 2, color: Colors.white))
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
               : Text(isEdit ? "Save Changes" : "Create Location"),
         ),
       ],
-    );
-  }
-
-  Widget _buildField(String label, TextEditingController ctrl,
-      {bool required = false,
-      int maxLines = 1,
-      TextInputType keyboard = TextInputType.text}) {
-    return TextFormField(
-      controller: ctrl,
-      maxLines: maxLines,
-      keyboardType: keyboard,
-      validator: required ? (v) => v!.isEmpty ? "Required" : null : null,
-      decoration: InputDecoration(
-        labelText: label,
-        filled: true,
-        fillColor: Colors.grey[50],
-        isDense: true,
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
-        border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
-            borderSide: BorderSide(color: Colors.grey[300]!)),
-        enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
-            borderSide: BorderSide(color: Colors.grey[300]!)),
-      ),
     );
   }
 }

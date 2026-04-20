@@ -6,16 +6,21 @@ class Location {
   final String? type;
   final String name;
   final String? description;
+  final int? groupId;
+  final String? groupName;
+  final String? typeLabel;
 
-  Location({
-    required this.id,
-    required this.latitude,
-    required this.longitude,
-    this.address,
-    this.type,
-    required this.name,
-    this.description,
-  });
+  Location(
+      {required this.id,
+      required this.latitude,
+      required this.longitude,
+      this.address,
+      this.type,
+      required this.name,
+      this.description,
+      this.groupId,
+      this.groupName,
+      this.typeLabel});
 
   factory Location.fromJson(Map<String, dynamic> json) {
     return Location(
@@ -26,6 +31,9 @@ class Location {
       address: json['address'],
       type: json['location_type'],
       description: json['description'],
+      groupId: json['group_id'],
+      groupName: json['group_name'],
+      typeLabel: json['location_type_label'],
     );
   }
   Map<String, dynamic> toJson() {
@@ -37,6 +45,26 @@ class Location {
       'location_type': type,
       'description': description,
     };
+  }
+}
+
+class LocationGroup {
+  final int groupId;
+  final String name;
+  final String? description;
+
+  LocationGroup({
+    required this.groupId,
+    required this.name,
+    this.description,
+  });
+
+  factory LocationGroup.fromJson(Map<String, dynamic> json) {
+    return LocationGroup(
+      groupId: json['group_id'],
+      name: json['name'],
+      description: json['description'],
+    );
   }
 }
 

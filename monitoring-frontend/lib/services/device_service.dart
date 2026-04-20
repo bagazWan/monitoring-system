@@ -63,7 +63,6 @@ class DeviceService {
   }
 
   Future<Map<String, dynamic>> getLiveDetails(int id, String nodeType) async {
-    // nodeType will be devices or switches
     final t = nodeType.toLowerCase();
     final String base = (t == 'switch' || t == 'switches')
         ? ApiConfig.switches
@@ -153,6 +152,45 @@ class DeviceService {
       }
     }
     throw Exception('Failed to load locations');
+  }
+
+  Future<List<Location>> getLocationOptions() async {
+    final response = await http.get(
+      Uri.parse(ApiConfig.locationOptions),
+      headers: await _getHeaders(),
+    );
+
+    if (response.statusCode == 200) {
+      final List data = jsonDecode(response.body);
+      return data.map((j) => Location.fromJson(j)).toList();
+    }
+    throw Exception('Failed to load location options');
+  }
+
+  Future<List<LocationGroup>> getLocationGroups() async {
+    final response = await http.get(
+      Uri.parse(ApiConfig.locationGroups),
+      headers: await _getHeaders(),
+    );
+
+    if (response.statusCode == 200) {
+      final List data = jsonDecode(response.body);
+      return data.map((j) => LocationGroup.fromJson(j)).toList();
+    }
+    throw Exception('Failed to load location groups');
+  }
+
+  Future<Location> createLocationQuick(Map<String, dynamic> payload) async {
+    final response = await http.post(
+      Uri.parse(ApiConfig.locations),
+      headers: await _getHeaders(),
+      body: jsonEncode(payload),
+    );
+
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      return Location.fromJson(jsonDecode(response.body));
+    }
+    throw Exception('Failed to create location: ${response.body}');
   }
 
   Future<List<String>> getLocationsWithNodes() async {

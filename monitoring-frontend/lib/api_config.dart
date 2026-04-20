@@ -6,7 +6,6 @@ class ApiConfig {
   static const String apiVersion = '/api/v1';
   static const String url = '$baseUrl$apiVersion';
 
-  // Endpoints
   static const String login = '$baseUrl$apiVersion/auth/login';
   static const String register = '$baseUrl$apiVersion/auth/register';
   static const String me = '$baseUrl$apiVersion/auth/me';
@@ -15,6 +14,8 @@ class ApiConfig {
   static const String deviceNodes = '$baseUrl$apiVersion/devices/nodes';
   static const String deviceTypes = '$baseUrl$apiVersion/devices/types';
   static const String locations = '$baseUrl$apiVersion/locations';
+  static const String locationOptions = '$baseUrl$apiVersion/locations/options';
+  static const String locationGroups = '$baseUrl$apiVersion/location-groups';
   static const String networkNodes = '$baseUrl$apiVersion/network-nodes';
   static const String foRoutes = '$baseUrl$apiVersion/fo-routes';
   static const String mapTopology = '$baseUrl$apiVersion/map/topology';

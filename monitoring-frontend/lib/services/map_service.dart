@@ -246,4 +246,49 @@ class MapService {
       throw Exception('Delete failed');
     }
   }
+
+  Future<List<LocationGroup>> getLocationGroups() async {
+    final response = await http.get(
+      Uri.parse(ApiConfig.locationGroups),
+      headers: await _getHeaders(),
+    );
+
+    if (response.statusCode == 200) {
+      final List data = jsonDecode(response.body);
+      return data.map((j) => LocationGroup.fromJson(j)).toList();
+    }
+    throw Exception('Failed to load location groups');
+  }
+
+  Future<void> createLocationGroup(Map<String, dynamic> data) async {
+    final response = await http.post(
+      Uri.parse(ApiConfig.locationGroups),
+      headers: await _getHeaders(),
+      body: jsonEncode(data),
+    );
+    if (response.statusCode != 200 && response.statusCode != 201) {
+      throw Exception('Create group failed: ${response.body}');
+    }
+  }
+
+  Future<void> updateLocationGroup(int id, Map<String, dynamic> data) async {
+    final response = await http.patch(
+      Uri.parse('${ApiConfig.locationGroups}/$id'),
+      headers: await _getHeaders(),
+      body: jsonEncode(data),
+    );
+    if (response.statusCode != 200) {
+      throw Exception('Update group failed: ${response.body}');
+    }
+  }
+
+  Future<void> deleteLocationGroup(int id) async {
+    final response = await http.delete(
+      Uri.parse('${ApiConfig.locationGroups}/$id'),
+      headers: await _getHeaders(),
+    );
+    if (response.statusCode != 200 && response.statusCode != 204) {
+      throw Exception('Delete group failed: ${response.body}');
+    }
+  }
 }

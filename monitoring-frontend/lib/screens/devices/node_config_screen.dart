@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../../models/device.dart';
 import '../../models/location.dart';
 import '../../services/device_service.dart';
-import 'register_node_screen.dart';
+import 'register_device_screen.dart';
 import 'tabs/device_general_tab.dart';
 import 'tabs/device_ports_tab.dart';
 
@@ -102,7 +102,7 @@ class _DeviceConfigScreenState extends State<DeviceConfigScreen>
     final success = await Navigator.push(
         context,
         MaterialPageRoute(
-            builder: (_) => RegisterNodeScreen(initialData: _currentNode)));
+            builder: (_) => RegisterDeviceScreen(initialData: _currentNode)));
 
     if (success == true) {
       await _fetchNodeDetails();

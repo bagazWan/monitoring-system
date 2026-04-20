@@ -3,7 +3,7 @@ import 'package:flutter_web_plugins/url_strategy.dart';
 import 'package:provider/provider.dart';
 import 'screens/auth/register_screen.dart';
 import 'screens/auth/auth_gate.dart';
-import 'screens/devices/register_node_screen.dart';
+import 'screens/devices/register_device_screen.dart';
 import 'widgets/visual_feedback.dart';
 import 'screens/map/location_management_screen.dart';
 import 'providers/metrics_provider.dart';
@@ -41,7 +41,7 @@ class MyApp extends StatelessWidget {
       home: const ErrorBoundary(child: AuthGate()),
       routes: {
         '/register': (context) => const RegisterScreen(),
-        '/register-node': (context) => const RegisterNodeScreen(),
+        '/register-node': (context) => const RegisterDeviceScreen(),
         '/location-management': (context) => const LocationManagementScreen(),
       },
     );

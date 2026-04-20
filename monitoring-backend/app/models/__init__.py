@@ -4,6 +4,7 @@ from app.models.device import Device
 from app.models.fo_route import FORoute
 from app.models.librenms_port import LibreNMSPort
 from app.models.location import Location
+from app.models.location_group import LocationGroup
 from app.models.network_node import NetworkNode
 from app.models.problem_category import ProblemCategory
 from app.models.replacement import DeviceReplacement, SwitchReplacement
@@ -14,6 +15,7 @@ from app.models.user import User
 __all__ = [
     "User",
     "Location",
+    "LocationGroup",
     "ProblemCategory",
     "NetworkNode",
     "FORoute",

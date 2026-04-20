@@ -1,4 +1,4 @@
-from sqlalchemy import Column, DateTime, Float, Integer, String, Text, func
+from sqlalchemy import Column, DateTime, Float, ForeignKey, Integer, String, Text, func
 from sqlalchemy.orm import relationship
 
 from app.core.database import Base
@@ -14,6 +14,10 @@ class Location(Base):
     location_type = Column(String(255), nullable=False, index=True)
     name = Column(String(255), index=True)
     description = Column(Text)
+    group_id = Column(
+        Integer, ForeignKey("location_groups.group_id"), nullable=True, index=True
+    )
+    group = relationship("LocationGroup", back_populates="locations")
     created_at = Column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

@@ -143,17 +143,26 @@ mixin DeviceListWidgets on State<DeviceListScreen> {
         delegate: SliverChildBuilderDelegate(
           (context, index) {
             final node = state._paginatedNodes[index];
-            final key = '${node.nodeKind}_${node.id}';
-            final statusNotifier = state._statusNotifiers[key];
-            final liveStatsNotifier = state._liveStatsNotifiers[key];
 
-            return DeviceCard(
-              key: ValueKey(node.id),
-              node: node,
-              isAdmin: state._isAdmin,
-              onRefresh: state._fetchNodes,
-              liveStatsListenable: liveStatsNotifier,
-              statusListenable: statusNotifier,
+            return Consumer<MetricsProvider>(
+              builder: (context, metricsProvider, child) {
+                final liveData = node.nodeKind == 'switch'
+                    ? metricsProvider.getSwitchMetrics(node.id ?? 0)
+                    : metricsProvider.getDeviceMetrics(node.id ?? 0);
+
+                final liveStatus =
+                    liveData?['status'] as String? ?? node.status;
+
+                return DeviceCard(
+                  key: ValueKey(node.id),
+                  node: node,
+                  isAdmin: state._isAdmin,
+                  canViewIp: state._canViewIp,
+                  onRefresh: state._fetchNodes,
+                  currentStatus: liveStatus,
+                  liveStats: liveData,
+                );
+              },
             );
           },
           childCount: state._paginatedNodes.length,

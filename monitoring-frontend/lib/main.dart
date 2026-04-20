@@ -1,17 +1,26 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_web_plugins/url_strategy.dart';
+import 'package:provider/provider.dart';
 import 'screens/auth/register_screen.dart';
 import 'screens/auth/auth_gate.dart';
 import 'screens/devices/register_node_screen.dart';
 import 'widgets/visual_feedback.dart';
 import 'screens/map/location_management_screen.dart';
+import 'providers/metrics_provider.dart';
 
 void main() {
   usePathUrlStrategy();
   WidgetsFlutterBinding.ensureInitialized();
   PaintingBinding.instance.imageCache.maximumSize = 300;
   PaintingBinding.instance.imageCache.maximumSizeBytes = 30 << 20;
-  runApp(const MyApp());
+  runApp(
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => MetricsProvider()),
+      ],
+      child: const MyApp(),
+    ),
+  );
 }
 
 class MyApp extends StatelessWidget {

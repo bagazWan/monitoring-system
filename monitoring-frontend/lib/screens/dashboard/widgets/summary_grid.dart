@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../../../providers/metrics_provider.dart';
 import '../../../models/dashboard_stats.dart';
 import '../../../widgets/summary_card.dart';
 import '../../../utils/bandwidth_formatter.dart';
@@ -38,12 +40,22 @@ class DashboardSummaryGrid extends StatelessWidget {
               types: stats.deviceTypeStats,
               totalDevices: stats.totalDevices,
             ),
-            SummaryCard(
-              title: "Devices Down",
-              value: offlineCount.toString(),
-              icon: Icons.portable_wifi_off,
-              iconColor: Colors.redAccent,
-              subtitle: "Current offline devices",
+            Consumer<MetricsProvider>(
+              builder: (context, metrics, _) {
+                int liveOffline = metrics.allDeviceMetrics
+                        .where((d) => d['status'] == 'offline')
+                        .length +
+                    metrics.allSwitchMetrics
+                        .where((s) => s['status'] == 'offline')
+                        .length;
+                return SummaryCard(
+                  title: "Devices Down",
+                  value: liveOffline.toString(),
+                  icon: Icons.portable_wifi_off,
+                  iconColor: Colors.redAccent,
+                  subtitle: "Current offline devices",
+                );
+              },
             ),
             SummaryCard(
               title: "Active Alerts",
@@ -52,16 +64,16 @@ class DashboardSummaryGrid extends StatelessWidget {
               iconColor: Colors.orange,
               subtitle: "Unresolved issues",
             ),
-            SummaryCard(
-              title: "Total Bandwidth",
-              value: stats.totalBandwidth == null
-                  ? "N/A"
-                  : BandwidthFormatter.format(stats.totalBandwidth!),
-              icon: Icons.speed,
-              iconColor: Colors.purple,
-              subtitle: stats.totalBandwidth == null
-                  ? "No valid LibreNMS rate data"
-                  : "Aggregate in + out traffic",
+            Consumer<MetricsProvider>(
+              builder: (context, metrics, _) {
+                return SummaryCard(
+                  title: "Total Bandwidth",
+                  value: BandwidthFormatter.format(metrics.totalLiveBandwidth),
+                  icon: Icons.speed,
+                  iconColor: Colors.purple,
+                  subtitle: "Aggregate in + out traffic",
+                );
+              },
             ),
           ],
         );

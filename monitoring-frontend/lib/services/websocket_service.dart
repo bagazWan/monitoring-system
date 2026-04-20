@@ -77,6 +77,8 @@ class WebSocketService {
   final _alertStreamController =
       StreamController<Map<String, dynamic>>.broadcast();
   final _alertsRefreshController = StreamController<void>.broadcast();
+  final _metricsUpdateController =
+      StreamController<Map<String, dynamic>>.broadcast();
 
   Stream<StatusChangeEvent> get statusChanges => _statusChangeController.stream;
   Stream<WebSocketConnectionState> get connectionState =>
@@ -84,6 +86,8 @@ class WebSocketService {
   Stream<Map<String, dynamic>> get heartbeats => _heartbeatController.stream;
   Stream<Map<String, dynamic>> get alertStream => _alertStreamController.stream;
   Stream<void> get alertsRefresh => _alertsRefreshController.stream;
+  Stream<Map<String, dynamic>> get metricsUpdates =>
+      _metricsUpdateController.stream;
 
   WebSocketConnectionState get currentState => _connectionState;
   bool get isConnected =>
@@ -171,6 +175,9 @@ class WebSocketService {
           break;
         case 'alerts_refresh':
           _alertsRefreshController.add(null);
+          break;
+        case 'metrics_update':
+          _metricsUpdateController.add(data);
           break;
         case 'pong':
           break;

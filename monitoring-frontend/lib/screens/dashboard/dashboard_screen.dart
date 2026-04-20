@@ -1,5 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../../providers/metrics_provider.dart';
 import '../../models/dashboard_stats.dart';
 import '../../models/location.dart';
 import '../../services/device_service.dart';
@@ -27,10 +29,10 @@ class _DashboardScreenState extends State<DashboardScreen>
   final DashboardService _dashboardService = DashboardService();
   final ScrollController _scrollController = ScrollController();
 
-  Timer? _refreshTimer;
-  Timer? _trafficTimer;
   StreamSubscription<StatusChangeEvent>? _statusSubscription;
   StreamSubscription<WebSocketConnectionState>? _connectionSubscription;
+  StreamSubscription<void>? _alertRefreshSub;
+  Timer? _localChartTimer;
 
   final GlobalKey _chartsKey = GlobalKey();
   final ValueNotifier<bool> _chartsVisible = ValueNotifier(false);
@@ -42,9 +44,9 @@ class _DashboardScreenState extends State<DashboardScreen>
   final ValueNotifier<List<Location>> _locations = ValueNotifier([]);
   final ValueNotifier<bool> _isLoadingLocations = ValueNotifier(true);
   final ValueNotifier<String?> _selectedLocationName = ValueNotifier(null);
+
   final ValueNotifier<List<DashboardTraffic>> _rawTrafficData =
       ValueNotifier([]);
-
   final ValueNotifier<List<NetworkActivityData>> _trafficData =
       ValueNotifier([]);
   final int _maxTrafficPoints = 60;
@@ -66,13 +68,6 @@ class _DashboardScreenState extends State<DashboardScreen>
     _refreshDashboard();
     _initLocations();
     _initWebSocket();
-
-    _refreshTimer = Timer.periodic(const Duration(seconds: 30), (_) {
-      _refreshDashboard();
-      if (_chartsInitialized) {
-        _refreshUptimeTrend();
-      }
-    });
 
     _scrollController.addListener(_checkLazyLoadTargets);
     WidgetsBinding.instance
@@ -101,7 +96,16 @@ class _DashboardScreenState extends State<DashboardScreen>
     wsService.connect();
 
     _connectionSubscription = wsService.connectionState.listen((_) {});
+
     _statusSubscription = wsService.statusChanges.listen((_) {
+      if (!mounted) return;
+      _refreshDashboard();
+      if (_chartsInitialized) {
+        _refreshUptimeTrend();
+      }
+    });
+
+    _alertRefreshSub = wsService.alertsRefresh.listen((_) {
       if (!mounted) return;
       _refreshDashboard();
       if (_chartsInitialized) {
@@ -115,8 +119,63 @@ class _DashboardScreenState extends State<DashboardScreen>
     _chartsInitialized = true;
     _refreshTraffic();
     _refreshUptimeTrend();
-    _trafficTimer = Timer.periodic(const Duration(seconds: 30), (_) {
-      _refreshTraffic();
+
+    _localChartTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+      if (!mounted) return;
+
+      final metrics = Provider.of<MetricsProvider>(context, listen: false);
+      double currentIn = 0;
+      double currentOut = 0;
+      double totalLatency = 0;
+      int latencyCount = 0;
+
+      for (var d in metrics.allDeviceMetrics) {
+        currentIn += (d['in_mbps'] ?? 0);
+        currentOut += (d['out_mbps'] ?? 0);
+
+        if (d['latency_ms'] != null) {
+          totalLatency += (d['latency_ms'] as num).toDouble();
+          latencyCount++;
+        }
+      }
+      for (var s in metrics.allSwitchMetrics) {
+        currentIn += (s['in_mbps'] ?? 0);
+        currentOut += (s['out_mbps'] ?? 0);
+      }
+
+      double? avgLatency =
+          latencyCount > 0 ? (totalLatency / latencyCount) : null;
+      final now = DateTime.now();
+
+      final newTrafficDataPoint = NetworkActivityData(
+        timestamp: now,
+        inbound: currentIn,
+        outbound: currentOut,
+      );
+
+      final newRawDataPoint = DashboardTraffic(
+        timestamp: now,
+        inboundMbps: currentIn,
+        outboundMbps: currentOut,
+        latencyMs: avgLatency,
+      );
+
+      setState(() {
+        final updatedTraffic =
+            List<NetworkActivityData>.from(_trafficData.value)
+              ..add(newTrafficDataPoint);
+        if (updatedTraffic.length > _maxTrafficPoints) {
+          updatedTraffic.removeAt(0);
+        }
+        _trafficData.value = updatedTraffic;
+
+        final updatedRaw = List<DashboardTraffic>.from(_rawTrafficData.value)
+          ..add(newRawDataPoint);
+        if (updatedRaw.length > _maxTrafficPoints) {
+          updatedRaw.removeAt(0);
+        }
+        _rawTrafficData.value = updatedRaw;
+      });
     });
   }
 
@@ -139,11 +198,9 @@ class _DashboardScreenState extends State<DashboardScreen>
       );
 
       if (!mounted) return;
-
       _dashboardStats.value = stats;
     } catch (e) {
       if (!mounted) return;
-
       _statsError.value = e;
     } finally {
       if (mounted) {
@@ -250,8 +307,8 @@ class _DashboardScreenState extends State<DashboardScreen>
 
   @override
   void dispose() {
-    _refreshTimer?.cancel();
-    _trafficTimer?.cancel();
+    _localChartTimer?.cancel();
+    _alertRefreshSub?.cancel();
     _statusSubscription?.cancel();
     _connectionSubscription?.cancel();
     _scrollController.dispose();

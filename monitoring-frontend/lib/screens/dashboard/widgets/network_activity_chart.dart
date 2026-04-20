@@ -305,7 +305,7 @@ class _NetworkActivityChartState extends State<NetworkActivityChart> {
       spots: widget.data.asMap().entries.map((entry) {
         return FlSpot(entry.key.toDouble(), entry.value.inbound);
       }).toList(),
-      isCurved: true,
+      isCurved: false,
       curveSmoothness: 0.3,
       color: Colors.blue,
       barWidth: 2,
@@ -323,7 +323,7 @@ class _NetworkActivityChartState extends State<NetworkActivityChart> {
       spots: widget.data.asMap().entries.map((entry) {
         return FlSpot(entry.key.toDouble(), entry.value.outbound);
       }).toList(),
-      isCurved: true,
+      isCurved: false,
       curveSmoothness: 0.3,
       color: Colors.green,
       barWidth: 2,

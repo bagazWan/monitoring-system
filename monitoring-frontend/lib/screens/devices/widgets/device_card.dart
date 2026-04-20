@@ -7,26 +7,28 @@ import '../../../utils/bandwidth_formatter.dart';
 class DeviceCard extends StatelessWidget {
   final BaseNode node;
   final bool isAdmin;
+  final bool canViewIp;
   final VoidCallback? onRefresh;
-  final ValueListenable<String?>? statusListenable;
-  final ValueListenable<Map<String, dynamic>?>? liveStatsListenable;
+  final Map<String, dynamic>? liveStats;
+  final String? currentStatus;
 
   const DeviceCard({
     super.key,
     required this.node,
     this.isAdmin = false,
+    this.canViewIp = false,
     this.onRefresh,
-    this.statusListenable,
-    this.liveStatsListenable,
+    this.liveStats,
+    this.currentStatus,
   });
 
-  Color _resolveStatusColor(String? status, Map<String, dynamic>? liveStats) {
+  Color _resolveStatusColor(String? status, Map<String, dynamic>? stats) {
     final s = (status ?? '').toLowerCase();
     if (s == 'offline') return Colors.grey.shade600;
 
     String norm(dynamic v) => (v ?? '').toString().toLowerCase();
-    final bw = norm(liveStats?['severity']);
-    final lat = norm(liveStats?['latency_severity']);
+    final bw = norm(stats?['severity']);
+    final lat = norm(stats?['latency_severity']);
 
     bool isCritical(String x) => x == 'critical' || x == 'red';
     bool isWarning(String x) => x == 'warning' || x == 'yellow';
@@ -38,6 +40,9 @@ class DeviceCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final activeStatusColor =
+        _resolveStatusColor(currentStatus ?? node.status, liveStats);
+
     return Card(
       margin: const EdgeInsets.only(bottom: 10),
       elevation: 0,
@@ -53,149 +58,131 @@ class DeviceCard extends StatelessWidget {
         tilePadding: const EdgeInsets.symmetric(horizontal: 16),
         childrenPadding:
             const EdgeInsets.only(left: 16, right: 16, bottom: 16, top: 0),
-        leading: ValueListenableBuilder<Map<String, dynamic>?>(
-          valueListenable:
-              liveStatsListenable ?? ValueNotifier<Map<String, dynamic>?>(null),
-          builder: (context, liveStats, _) {
-            return ValueListenableBuilder<String?>(
-              valueListenable: statusListenable ?? ValueNotifier(node.status),
-              builder: (context, value, __) {
-                final color = _resolveStatusColor(value, liveStats);
-                return _buildStatusDot(color);
-              },
-            );
-          },
-        ),
+        leading: _buildStatusDot(activeStatusColor),
         title: Text(
           node.name,
           style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
         ),
-        subtitle:
-            Text(node.ipAddress, style: TextStyle(color: Colors.grey[600])),
+        subtitle: canViewIp
+            ? Text(node.ipAddress, style: TextStyle(color: Colors.grey[600]))
+            : null,
         trailing: _buildTypeBadge(node.deviceType ?? 'Device'),
         children: [
           const Padding(
             padding: EdgeInsets.only(bottom: 4.0),
             child: Divider(height: 1),
           ),
-          ValueListenableBuilder<Map<String, dynamic>?>(
-            valueListenable: liveStatsListenable ??
-                ValueNotifier<Map<String, dynamic>?>(null),
-            builder: (context, liveStats, _) {
-              String trafficText = "Loading...";
-              bool isIdle = false;
-              bool isLive = false;
-              String latencyText = "-";
+          _buildLiveStatsRow(context),
 
-              if (liveStats != null) {
-                final double inMbps = (liveStats['in_mbps'] ?? 0).toDouble();
-                final double outMbps = (liveStats['out_mbps'] ?? 0).toDouble();
-                final String liveStatus =
-                    (liveStats['status'] ?? 'unknown').toString().toLowerCase();
+          // _buildInfoRow("MAC Address", node.macAddress ?? "N/A"),
+          _buildInfoRow("Location", node.locationName ?? "Not Set"),
+          _buildInfoRow("Description", node.description ?? "-"),
+          // _buildInfoRow("Last Replaced", node.lastReplacedAt ?? "-"),
+        ],
+      ),
+    );
+  }
 
-                final rawLatency =
-                    liveStats['latency_ms'] ?? liveStats['latency'];
-                if (rawLatency != null) {
-                  latencyText =
-                      "${(rawLatency as num).toDouble().toStringAsFixed(2)} ms";
-                }
+  Widget _buildLiveStatsRow(BuildContext context) {
+    String trafficText = "Waiting for data...";
+    bool isIdle = false;
+    bool isLive = false;
+    String latencyText = "-";
 
-                if (liveStatus == 'offline') {
-                  trafficText = "Device is Offline";
-                  latencyText = "-";
-                } else {
-                  if (inMbps == 0 && outMbps == 0) {
-                    trafficText = "No Traffic (Idle or Disabled)";
-                    isIdle = true;
-                  } else {
-                    trafficText =
-                        "${BandwidthFormatter.format(inMbps)} In • ${BandwidthFormatter.format(outMbps)} Out";
-                    isLive = true;
-                  }
-                }
-              }
+    if (liveStats != null) {
+      final double inMbps = (liveStats!['in_mbps'] ?? 0).toDouble();
+      final double outMbps = (liveStats!['out_mbps'] ?? 0).toDouble();
+      final String liveStatus =
+          (liveStats!['status'] ?? 'unknown').toString().toLowerCase();
 
-              return Padding(
-                padding: const EdgeInsets.symmetric(vertical: 4),
-                child: Column(
+      final rawLatency = liveStats!['latency_ms'] ?? liveStats!['latency'];
+      if (rawLatency != null) {
+        latencyText = "${(rawLatency as num).toDouble().toStringAsFixed(2)} ms";
+      }
+
+      if (liveStatus == 'offline') {
+        trafficText = "Device is Offline";
+        latencyText = "-";
+      } else {
+        if (inMbps == 0 && outMbps == 0) {
+          trafficText = "No Traffic (Idle or Disabled)";
+          isIdle = true;
+        } else {
+          trafficText =
+              "${BandwidthFormatter.format(inMbps)} In • ${BandwidthFormatter.format(outMbps)} Out";
+          isLive = true;
+        }
+      }
+    }
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Column(
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Row(
                   children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Expanded(
-                          child: Row(
-                            children: [
-                              SizedBox(
-                                width: 100,
-                                child: Text("Live Traffic:",
-                                    style: TextStyle(
-                                        color: Colors.grey[600], fontSize: 13)),
-                              ),
-                              Expanded(
-                                child: Text(
-                                  trafficText,
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: isLive
-                                        ? FontWeight.bold
-                                        : FontWeight.normal,
-                                    color: isLive
-                                        ? Colors.blue[700]
-                                        : isIdle
-                                            ? Colors.grey[400]
-                                            : Colors.black87,
-                                    fontStyle: isIdle
-                                        ? FontStyle.italic
-                                        : FontStyle.normal,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        if (isAdmin)
-                          SizedBox(
-                            height: 32,
-                            width: 32,
-                            child: IconButton(
-                              padding: EdgeInsets.zero,
-                              icon: const Icon(Icons.settings,
-                                  size: 20, color: Colors.grey),
-                              tooltip: "Configure Device",
-                              onPressed: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) =>
-                                        DeviceConfigScreen(node: node),
-                                  ),
-                                ).then((_) => onRefresh?.call());
-                              },
-                            ),
-                          ),
-                      ],
+                    SizedBox(
+                      width: 100,
+                      child: Text("Live Traffic:",
+                          style:
+                              TextStyle(color: Colors.grey[600], fontSize: 13)),
                     ),
-                    const SizedBox(height: 6),
-                    Row(
-                      children: [
-                        SizedBox(
-                          width: 100,
-                          child: Text("Latency:",
-                              style: TextStyle(
-                                  color: Colors.grey[600], fontSize: 13)),
+                    Expanded(
+                      child: Text(
+                        trafficText,
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight:
+                              isLive ? FontWeight.bold : FontWeight.normal,
+                          color: isLive
+                              ? Colors.blue[700]
+                              : isIdle
+                                  ? Colors.grey[400]
+                                  : Colors.black87,
+                          fontStyle:
+                              isIdle ? FontStyle.italic : FontStyle.normal,
                         ),
-                        Text(latencyText, style: const TextStyle(fontSize: 13)),
-                      ],
+                      ),
                     ),
                   ],
                 ),
-              );
-            },
+              ),
+              if (isAdmin)
+                SizedBox(
+                  height: 32,
+                  width: 32,
+                  child: IconButton(
+                    padding: EdgeInsets.zero,
+                    icon: const Icon(Icons.settings,
+                        size: 20, color: Colors.grey),
+                    tooltip: "Configure Device",
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => DeviceConfigScreen(node: node),
+                        ),
+                      ).then((_) => onRefresh?.call());
+                    },
+                  ),
+                ),
+            ],
           ),
-          _buildInfoRow("MAC Address", node.macAddress ?? "N/A"),
-          _buildInfoRow("Location", node.locationName ?? "Not Set"),
-          _buildInfoRow("Description", node.description ?? "-"),
-          _buildInfoRow("Last Replaced", node.lastReplacedAt ?? "-"),
+          const SizedBox(height: 6),
+          Row(
+            children: [
+              SizedBox(
+                width: 100,
+                child: Text("Latency:",
+                    style: TextStyle(color: Colors.grey[600], fontSize: 13)),
+              ),
+              Text(latencyText, style: const TextStyle(fontSize: 13)),
+            ],
+          ),
         ],
       ),
     );

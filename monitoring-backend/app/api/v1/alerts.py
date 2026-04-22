@@ -14,22 +14,18 @@ from app.schemas.alert import (
     AlertResponse,
     AlertUpdate,
 )
+from app.services.locations_service import apply_location_name_filter
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import or_
+from sqlalchemy import false, or_
 from sqlalchemy.orm import Session
 
 router = APIRouter(prefix="/alerts", tags=["Alerts"])
 
 
 def _alert_to_response_dict(alert_obj: Any) -> Dict[str, Any]:
-    """
-    Convert Alert/SwitchAlert SQLAlchemy model into a dictionary that matches
-    AlertResponse schema to avoid leaking SQLAlchemy internals
-    """
     dev_name = " - "
     loc_name = " - "
 
-    # Check if it is a Device or a Switch and fetch relationships
     if hasattr(alert_obj, "device") and alert_obj.device:
         dev_name = alert_obj.device.name
         if alert_obj.device.location:
@@ -70,6 +66,7 @@ def _alert_to_response_dict(alert_obj: Any) -> Dict[str, Any]:
 def _apply_alert_filters(
     device_query,
     switch_query,
+    db: Session,
     *,
     status_filter: Optional[str],
     severity: Optional[str],
@@ -102,16 +99,20 @@ def _apply_alert_filters(
         switch_query = switch_query.filter(SwitchAlert.created_at <= end_date)
 
     if location_name:
-        device_query = (
-            device_query.join(Device)
-            .join(Location)
-            .filter(Location.name == location_name)
-        )
-        switch_query = (
-            switch_query.join(Switch)
-            .join(Location)
-            .filter(Location.name == location_name)
-        )
+        loc_q = db.query(Location.location_id)
+        loc_q = apply_location_name_filter(loc_q, location_name)
+        location_ids = [row[0] for row in loc_q.distinct().all()]
+
+        if location_ids:
+            device_query = device_query.join(Device).filter(
+                Device.location_id.in_(location_ids)
+            )
+            switch_query = switch_query.join(Switch).filter(
+                Switch.location_id.in_(location_ids)
+            )
+        else:
+            device_query = device_query.filter(false())
+            switch_query = switch_query.filter(false())
 
     return device_query, switch_query
 
@@ -133,6 +134,7 @@ def get_all_alerts(
     device_query, switch_query = _apply_alert_filters(
         device_query,
         switch_query,
+        db,
         status_filter=status_filter,
         severity=severity,
         start_date=start_date,
@@ -163,9 +165,6 @@ def get_all_alerts(
 
 @router.get("/active", response_model=List[AlertResponse])
 def get_active_alerts(db: Session = Depends(get_db)):
-    """
-    Get only active (unresolved) alerts
-    """
     device_alerts = (
         db.query(Alert).filter(or_(Alert.status == "active", Alert.status == "1")).all()
     )
@@ -192,6 +191,7 @@ def get_alert_locations(
     device_query, switch_query = _apply_alert_filters(
         device_query,
         switch_query,
+        db,
         status_filter=status_filter,
         severity=None,
         start_date=None,
@@ -225,15 +225,10 @@ def get_alert(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """
-    Get single alert by ID (searches both device and switch alerts)
-    """
-    # Try device alerts first
     alert = db.query(Alert).filter(Alert.alert_id == alert_id).first()
     if alert:
         return _alert_to_response_dict(alert)
 
-    # Try switch alerts
     alert = db.query(SwitchAlert).filter(SwitchAlert.alert_id == alert_id).first()
     if alert:
         return _alert_to_response_dict(alert)
@@ -251,13 +246,8 @@ def update_alert(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_technician_or_admin),
 ):
-    """
-    Update fields on an alert (device or switch) for admin/teknisi
-    """
-    # Try device alerts
     alert = db.query(Alert).filter(Alert.alert_id == alert_id).first()
     if not alert:
-        # Try switch alerts
         alert = db.query(SwitchAlert).filter(SwitchAlert.alert_id == alert_id).first()
 
     if not alert:
@@ -266,7 +256,6 @@ def update_alert(
             detail=f"Alert with id {alert_id} not found",
         )
 
-    # Update fields
     update_data = alert_data.model_dump(exclude_unset=True)
     alert.assigned_to_user_id = current_user.user_id
     alert.acknowledged_at = datetime.now(timezone.utc)
@@ -285,9 +274,6 @@ def delete_alert(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_admin),
 ):
-    """
-    Delete an alert (device or switch) for admin only
-    """
     alert = db.query(Alert).filter(Alert.alert_id == alert_id).first()
     if not alert:
         alert = db.query(SwitchAlert).filter(SwitchAlert.alert_id == alert_id).first()
@@ -322,6 +308,7 @@ def delete_alerts_bulk(
     device_query, switch_query = _apply_alert_filters(
         device_query,
         switch_query,
+        db,
         status_filter=status_filter,
         severity=severity,
         start_date=start_date,

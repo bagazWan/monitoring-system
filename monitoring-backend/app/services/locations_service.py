@@ -1,8 +1,29 @@
 from typing import Optional
 
 from fastapi import HTTPException, status
+from sqlalchemy import func, or_
+from sqlalchemy.orm import Query, Session
 
+from app.models import Location, LocationGroup
 from app.utils.constant import LOCATION_TYPE_ALIASES, LOCATION_TYPE_LABELS
+
+
+def resolve_location_id(
+    db: Session,
+    location_id: Optional[int],
+    location_name: Optional[str],
+) -> Optional[int]:
+    if location_id is not None:
+        return location_id
+
+    if location_name and location_name.strip():
+        q = db.query(Location.location_id)
+        q = apply_location_name_filter(q, location_name)
+        row = q.first()
+        if row:
+            return row[0]
+
+    return None
 
 
 def normalize_location_type(raw: Optional[str]) -> str:
@@ -24,3 +45,30 @@ def validate_group_rule(location_type: str, group_id: Optional[int]) -> None:
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="group_id is mandatory for non-Toll Gate locations",
         )
+
+
+def is_toll_gate_type(raw: Optional[str]) -> bool:
+    normalized = normalize_location_type(raw)
+    return normalized == "gerbang_tol"
+
+
+def apply_location_name_filter(query: Query, location_name: Optional[str]) -> Query:
+    if not location_name or not location_name.strip():
+        return query
+
+    needle = location_name.strip().lower()
+
+    query = query.outerjoin(LocationGroup, Location.group_id == LocationGroup.group_id)
+
+    return query.filter(
+        or_(
+            func.lower(func.coalesce(LocationGroup.name, "")) == needle,
+            (
+                (func.lower(Location.name) == needle)
+                & (
+                    func.lower(func.coalesce(Location.location_type, ""))
+                    == "gerbang_tol"
+                )
+            ),
+        )
+    )

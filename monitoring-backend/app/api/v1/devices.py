@@ -12,6 +12,7 @@ from app.schemas.device import (
     NodePageResponse,
 )
 from app.services.librenms_service import LibreNMSService
+from app.services.locations_service import apply_location_name_filter
 from app.services.metrics_cache_service import MetricsCacheService
 from app.services.node_metrics import calculate_device_metrics
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -98,8 +99,16 @@ def get_nodes(
         )
 
     if location_name:
-        device_query = device_query.filter(Location.name == location_name)
-        switch_query = switch_query.filter(Location.name == location_name)
+        loc_q = db.query(Location.location_id)
+        loc_q = apply_location_name_filter(loc_q, location_name)
+        location_ids = [row[0] for row in loc_q.distinct().all()]
+
+        if location_ids:
+            device_query = device_query.filter(Device.location_id.in_(location_ids))
+            switch_query = switch_query.filter(Switch.location_id.in_(location_ids))
+        else:
+            device_query = device_query.filter(false())
+            switch_query = switch_query.filter(false())
 
     if status:
         device_query = device_query.filter(Device.status == status)

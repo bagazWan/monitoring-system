@@ -14,10 +14,10 @@ class DashboardService {
   }
 
   Future<DashboardStats> getDashboardStats(
-      {int? locationId, int? topDownWindowDays}) async {
+      {String? locationName, int? topDownWindowDays}) async {
     final params = <String, String>{};
-    if (locationId != null) {
-      params['location_id'] = locationId.toString();
+    if (locationName != null && locationName.isNotEmpty) {
+      params['location_name'] = locationName;
     }
     if (topDownWindowDays != null) {
       params['top_down_window'] = topDownWindowDays.toString();
@@ -26,31 +26,23 @@ class DashboardService {
     final uri = Uri.parse(ApiConfig.dashboardStats)
         .replace(queryParameters: params.isEmpty ? null : params);
 
-    final response = await http.get(
-      uri,
-      headers: await _getHeaders(),
-    );
-
+    final response = await http.get(uri, headers: await _getHeaders());
     if (response.statusCode == 200) {
       return DashboardStats.fromJson(jsonDecode(response.body));
     }
     throw Exception('Failed to load dashboard stats');
   }
 
-  Future<DashboardTraffic> getDashboardTraffic({int? locationId}) async {
+  Future<DashboardTraffic> getDashboardTraffic({String? locationName}) async {
     final params = <String, String>{};
-    if (locationId != null) {
-      params['location_id'] = locationId.toString();
+    if (locationName != null && locationName.isNotEmpty) {
+      params['location_name'] = locationName;
     }
 
     final uri = Uri.parse(ApiConfig.dashboardTraffic)
         .replace(queryParameters: params.isEmpty ? null : params);
 
-    final response = await http.get(
-      uri,
-      headers: await _getHeaders(),
-    );
-
+    final response = await http.get(uri, headers: await _getHeaders());
     if (response.statusCode == 200) {
       return DashboardTraffic.fromJson(jsonDecode(response.body));
     }
@@ -58,20 +50,16 @@ class DashboardService {
   }
 
   Future<UptimeTrendResponse> getUptimeTrend(
-      {int days = 7, int? locationId}) async {
+      {int days = 7, String? locationName}) async {
     final params = <String, String>{'days': days.toString()};
-    if (locationId != null) {
-      params['location_id'] = locationId.toString();
+    if (locationName != null && locationName.isNotEmpty) {
+      params['location_name'] = locationName;
     }
 
     final uri = Uri.parse(ApiConfig.dashboardUptimeTrend)
         .replace(queryParameters: params);
 
-    final response = await http.get(
-      uri,
-      headers: await _getHeaders(),
-    );
-
+    final response = await http.get(uri, headers: await _getHeaders());
     if (response.statusCode == 200) {
       return UptimeTrendResponse.fromJson(jsonDecode(response.body));
     }

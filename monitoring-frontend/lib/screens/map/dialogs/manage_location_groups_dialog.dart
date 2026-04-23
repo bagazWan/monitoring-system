@@ -16,6 +16,7 @@ class _ManageLocationGroupsDialogState
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _descController = TextEditingController();
 
+  int? _selectedParentId;
   bool _isLoading = true;
   bool _isSaving = false;
   List<LocationGroup> _groups = [];
@@ -51,6 +52,7 @@ class _ManageLocationGroupsDialogState
       _editing = group;
       _nameController.text = group.name;
       _descController.text = group.description ?? "";
+      _selectedParentId = group.parentId;
     });
   }
 
@@ -59,6 +61,7 @@ class _ManageLocationGroupsDialogState
       _editing = null;
       _nameController.clear();
       _descController.clear();
+      _selectedParentId = null;
     });
   }
 
@@ -78,6 +81,7 @@ class _ManageLocationGroupsDialogState
         "description": _descController.text.trim().isEmpty
             ? null
             : _descController.text.trim(),
+        "parent_id": _selectedParentId,
       };
 
       if (_editing == null) {
@@ -93,8 +97,7 @@ class _ManageLocationGroupsDialogState
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(_editing == null ? "Group added" : "Group updated"),
-        ),
+            content: Text(_editing == null ? "Group added" : "Group updated")),
       );
     } catch (e) {
       if (!mounted) return;
@@ -148,8 +151,27 @@ class _ManageLocationGroupsDialogState
     super.dispose();
   }
 
+  List<LocationGroup> _getSortedDisplayGroups() {
+    List<LocationGroup> display = [];
+    final parents = _groups.where((g) => g.parentId == null).toList()
+      ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+
+    for (var p in parents) {
+      display.add(p);
+      final children = _groups.where((g) => g.parentId == p.groupId).toList()
+        ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+      display.addAll(children);
+    }
+
+    final accounted = display.map((e) => e.groupId).toSet();
+    display.addAll(_groups.where((g) => !accounted.contains(g.groupId)));
+    return display;
+  }
+
   @override
   Widget build(BuildContext context) {
+    final displayGroups = _getSortedDisplayGroups();
+
     return AlertDialog(
       title: const Text("Manage Location Groups"),
       content: SizedBox(
@@ -177,13 +199,34 @@ class _ManageLocationGroupsDialogState
                                 const InputDecoration(labelText: "Group Name"),
                           ),
                           const SizedBox(height: 12),
+                          DropdownButtonFormField<int>(
+                            value: _selectedParentId,
+                            decoration: const InputDecoration(
+                                labelText: "Parent Section (Optional)"),
+                            items: [
+                              const DropdownMenuItem<int>(
+                                  value: null,
+                                  child: Text("None (Top Level Section)")),
+                              ..._groups
+                                  .where((g) =>
+                                      g.parentId == null &&
+                                      g.groupId != _editing?.groupId)
+                                  .map((g) => DropdownMenuItem<int>(
+                                      value: g.groupId,
+                                      child: Text(g.name,
+                                          overflow: TextOverflow.ellipsis)))
+                            ],
+                            onChanged: (val) =>
+                                setState(() => _selectedParentId = val),
+                          ),
+                          const SizedBox(height: 12),
                           TextField(
                             controller: _descController,
-                            maxLines: 3,
+                            maxLines: 2,
                             decoration:
                                 const InputDecoration(labelText: "Description"),
                           ),
-                          const SizedBox(height: 12),
+                          const SizedBox(height: 16),
                           Row(
                             children: [
                               ElevatedButton.icon(
@@ -197,7 +240,7 @@ class _ManageLocationGroupsDialogState
                                 const SizedBox(width: 8),
                                 TextButton(
                                   onPressed: _isSaving ? null : _clearForm,
-                                  child: const Text("Cancel Edit"),
+                                  child: const Text("Cancel"),
                                 ),
                               ]
                             ],
@@ -210,7 +253,7 @@ class _ManageLocationGroupsDialogState
                   Expanded(
                     flex: 6,
                     child: Container(
-                      height: 360,
+                      height: 380,
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
                         border: Border.all(color: Colors.grey.shade300),
@@ -218,13 +261,24 @@ class _ManageLocationGroupsDialogState
                         color: Colors.white,
                       ),
                       child: ListView.separated(
-                        itemCount: _groups.length,
+                        itemCount: displayGroups.length,
                         separatorBuilder: (_, __) => const Divider(height: 1),
                         itemBuilder: (_, i) {
-                          final group = _groups[i];
+                          final group = displayGroups[i];
+                          final isChild = group.parentId != null;
                           return ListTile(
-                            title: Text(group.name),
-                            subtitle: Text(group.description ?? "-"),
+                            title: Text(
+                                isChild ? "↳ ${group.name}" : group.name,
+                                style: TextStyle(
+                                    fontWeight: isChild
+                                        ? FontWeight.normal
+                                        : FontWeight.bold)),
+                            subtitle: Text(group.description ??
+                                (isChild
+                                    ? "Child Location"
+                                    : "Top Level Section")),
+                            contentPadding: EdgeInsets.only(
+                                left: isChild ? 24.0 : 8.0, right: 8.0),
                             trailing: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [

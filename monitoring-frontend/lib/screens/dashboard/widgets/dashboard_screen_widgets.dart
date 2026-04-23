@@ -83,18 +83,18 @@ mixin DashboardScreenWidgets on State<DashboardScreen> {
     return ValueListenableBuilder<bool>(
       valueListenable: state._isLoadingLocations,
       builder: (context, loadingLocations, _) {
-        return ValueListenableBuilder<List<Location>>(
-          valueListenable: state._locations,
-          builder: (context, locations, _) {
+        return ValueListenableBuilder<List<String>>(
+          valueListenable: state._locationFilters,
+          builder: (context, locationFilters, _) {
             return ValueListenableBuilder<String?>(
-              valueListenable: state._selectedLocationName,
+              valueListenable: state._selectedLocationFilter,
               builder: (context, selected, _) {
                 return DashboardFilters(
                   isLoading: loadingLocations,
-                  locations: locations,
-                  selectedLocationName: selected,
+                  locationFilters: locationFilters,
+                  selectedLocationFilter: selected,
                   onLocationChanged: (value) {
-                    state._selectedLocationName.value = value;
+                    state._selectedLocationFilter.value = value;
                     state._refreshDashboard();
                     state._resetTrafficData();
                     if (state._chartsInitialized) {

@@ -13,7 +13,6 @@ class LocationFormDialog extends StatefulWidget {
 class _LocationFormDialogState extends State<LocationFormDialog> {
   final _formKey = GlobalKey<FormState>();
   final _service = MapService();
-  bool _isLoading = false;
 
   late TextEditingController _nameController;
   late TextEditingController _addrController;
@@ -23,24 +22,116 @@ class _LocationFormDialogState extends State<LocationFormDialog> {
   late TextEditingController _typeController;
 
   int? _selectedGroupId;
+  bool _isLoadingGroups = true;
   List<LocationGroup> _groups = [];
+  bool _isSaving = false;
 
   @override
   void initState() {
     super.initState();
-    final location = widget.location;
-    _nameController = TextEditingController(text: location?.name ?? "");
-    _addrController = TextEditingController(text: location?.address ?? "");
-    _latController = TextEditingController(
-      text: location != null ? location.latitude.toString() : "",
-    );
-    _lngController = TextEditingController(
-      text: location != null ? location.longitude.toString() : "",
-    );
-    _descController = TextEditingController(text: location?.description ?? "");
-    _typeController = TextEditingController(text: location?.type ?? "");
-    _selectedGroupId = location?.groupId;
+    _initControllers();
     _loadGroups();
+  }
+
+  void _initControllers() {
+    final d = widget.location;
+    _nameController = TextEditingController(text: d?.name ?? "");
+    _addrController = TextEditingController(text: d?.address ?? "");
+    _latController =
+        TextEditingController(text: d != null ? d.latitude.toString() : "");
+    _lngController =
+        TextEditingController(text: d != null ? d.longitude.toString() : "");
+    _descController = TextEditingController(text: d?.description ?? "");
+    _typeController = TextEditingController(text: d?.type ?? "");
+    _selectedGroupId = d?.groupId;
+  }
+
+  Future<void> _loadGroups() async {
+    setState(() => _isLoadingGroups = true);
+    try {
+      final groups = await _service.getLocationGroups();
+      if (!mounted) return;
+
+      setState(() {
+        _groups = groups;
+        _isLoadingGroups = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isLoadingGroups = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Failed to load location groups: $e")));
+    }
+  }
+
+  List<LocationGroup> _getSortedDisplayGroups() {
+    List<LocationGroup> display = [];
+
+    final parents = _groups.where((g) => g.parentId == null).toList()
+      ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+
+    for (var p in parents) {
+      display.add(p);
+      final children = _groups.where((g) => g.parentId == p.groupId).toList()
+        ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+      display.addAll(children);
+    }
+
+    final accounted = display.map((e) => e.groupId).toSet();
+    display.addAll(_groups.where((g) => !accounted.contains(g.groupId)));
+
+    return display;
+  }
+
+  Future<void> _submit() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    final d = widget.location;
+    final name = _nameController.text.trim();
+    final latitude = double.tryParse(_latController.text.trim());
+    final longitude = double.tryParse(_lngController.text.trim());
+
+    if (name.isEmpty ||
+        latitude == null ||
+        longitude == null ||
+        _selectedGroupId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content:
+              Text("Please fill all required fields and select a group.")));
+      return;
+    }
+
+    setState(() => _isSaving = true);
+    try {
+      final payload = {
+        "name": name,
+        "address": _addrController.text.trim(),
+        "latitude": latitude,
+        "longitude": longitude,
+        "location_type": _typeController.text.trim(),
+        "description": _descController.text.trim().isEmpty
+            ? null
+            : _descController.text.trim(),
+        "group_id": _selectedGroupId,
+      };
+
+      if (d == null) {
+        await _service.createLocation(payload);
+      } else {
+        await _service.updateLocation(d.id, payload);
+      }
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(d == null ? "Location created" : "Location updated")));
+      Navigator.pop(context, true);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text("Save failed: $e")));
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
+    }
   }
 
   @override
@@ -54,135 +145,132 @@ class _LocationFormDialogState extends State<LocationFormDialog> {
     super.dispose();
   }
 
-  Future<void> _loadGroups() async {
-    final data = await _service.getLocationGroups();
-    if (!mounted) return;
-    setState(() => _groups = data);
-  }
-
-  Future<void> _submit() async {
-    if (!_formKey.currentState!.validate()) return;
-    setState(() => _isLoading = true);
-
-    final payload = {
-      "name": _nameController.text.trim(),
-      "address": _addrController.text.trim(),
-      "latitude": double.tryParse(_latController.text.trim()) ?? 0.0,
-      "longitude": double.tryParse(_lngController.text.trim()) ?? 0.0,
-      "location_type": _typeController.text.trim(),
-      "description": _descController.text.trim().isEmpty
-          ? null
-          : _descController.text.trim(),
-      "group_id": _selectedGroupId,
-    };
-
-    try {
-      if (widget.location == null) {
-        await _service.createLocation(payload);
-      } else {
-        await _service.updateLocation(widget.location!.id, payload);
-      }
-      if (mounted) Navigator.pop(context, true);
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text("Error: $e")));
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final isEdit = widget.location != null;
+    final displayGroups = _getSortedDisplayGroups();
+
     return AlertDialog(
-      title: Text(isEdit ? "Edit Location" : "Add Location"),
+      title: Text(isEdit ? "Edit Location Point" : "Add Location Point"),
       content: SizedBox(
         width: 520,
-        child: Form(
-          key: _formKey,
-          child: SingleChildScrollView(
-            child: Column(
-              children: [
-                TextFormField(
-                  controller: _nameController,
-                  validator: (v) =>
-                      (v == null || v.trim().isEmpty) ? "Required" : null,
-                  decoration: const InputDecoration(labelText: "Location Name"),
-                ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: _addrController,
-                  decoration: const InputDecoration(labelText: "Address"),
-                ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: _typeController,
-                  validator: (v) =>
-                      (v == null || v.trim().isEmpty) ? "Required" : null,
-                  decoration: const InputDecoration(labelText: "Location Type"),
-                ),
-                const SizedBox(height: 12),
-                DropdownButtonFormField<int>(
-                  value: _selectedGroupId,
-                  items: _groups
-                      .map(
-                        (group) => DropdownMenuItem<int>(
-                          value: group.groupId,
-                          child: Text(group.name),
-                        ),
-                      )
-                      .toList(),
-                  onChanged: (v) => setState(() => _selectedGroupId = v),
-                  decoration:
-                      const InputDecoration(labelText: "Group (Optional)"),
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextFormField(
-                        controller: _latController,
-                        keyboardType: TextInputType.number,
+        child: _isLoadingGroups
+            ? const Center(child: CircularProgressIndicator())
+            : Form(
+                key: _formKey,
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      TextFormField(
+                        controller: _nameController,
                         decoration:
-                            const InputDecoration(labelText: "Latitude"),
+                            const InputDecoration(labelText: "Location Name"),
+                        validator: (v) =>
+                            v == null || v.trim().isEmpty ? "Required" : null,
                       ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: TextFormField(
-                        controller: _lngController,
-                        keyboardType: TextInputType.number,
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: _addrController,
+                        decoration: const InputDecoration(labelText: "Address"),
+                      ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: _typeController,
+                        decoration: const InputDecoration(
+                            labelText: "Location Type (e.g., gerbang_tol)"),
+                        validator: (v) =>
+                            v == null || v.trim().isEmpty ? "Required" : null,
+                      ),
+                      const SizedBox(height: 12),
+                      DropdownButtonFormField<int>(
+                        value: _selectedGroupId,
+                        decoration: const InputDecoration(
+                            labelText: "Parent Section / Group",
+                            hintText: "Select a Section/Gate"),
+                        validator: (v) =>
+                            v == null ? "Please select a group" : null,
+                        items: displayGroups.map((group) {
+                          final isChild = group.parentId != null;
+                          return DropdownMenuItem<int>(
+                            value: group.groupId,
+                            child: Padding(
+                              padding:
+                                  EdgeInsets.only(left: isChild ? 16.0 : 0.0),
+                              child: Text(
+                                group.name,
+                                style: TextStyle(
+                                  fontWeight: isChild
+                                      ? FontWeight.normal
+                                      : FontWeight.bold,
+                                  color: isChild
+                                      ? Colors.black87
+                                      : Colors.blueAccent,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                        onChanged: (val) =>
+                            setState(() => _selectedGroupId = val),
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextFormField(
+                              controller: _latController,
+                              keyboardType: TextInputType.number,
+                              decoration:
+                                  const InputDecoration(labelText: "Latitude"),
+                              validator: (v) =>
+                                  v == null || double.tryParse(v.trim()) == null
+                                      ? "Required"
+                                      : null,
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: TextFormField(
+                              controller: _lngController,
+                              keyboardType: TextInputType.number,
+                              decoration:
+                                  const InputDecoration(labelText: "Longitude"),
+                              validator: (v) =>
+                                  v == null || double.tryParse(v.trim()) == null
+                                      ? "Required"
+                                      : null,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: _descController,
+                        maxLines: 3,
                         decoration:
-                            const InputDecoration(labelText: "Longitude"),
+                            const InputDecoration(labelText: "Description"),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: _descController,
-                  maxLines: 3,
-                  decoration: const InputDecoration(labelText: "Description"),
-                ),
-              ],
-            ),
-          ),
-        ),
+              ),
       ),
       actions: [
         TextButton(
-          onPressed: _isLoading ? null : () => Navigator.pop(context),
+          onPressed: () => Navigator.pop(context, false),
           child: const Text("Cancel"),
         ),
         ElevatedButton(
-          onPressed: _isLoading ? null : _submit,
-          child: _isLoading
+          onPressed: (_isLoadingGroups || _isSaving) ? null : _submit,
+          child: _isSaving
               ? const SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
+                  height: 20,
+                  width: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                  ))
               : Text(isEdit ? "Save Changes" : "Create Location"),
         ),
       ],

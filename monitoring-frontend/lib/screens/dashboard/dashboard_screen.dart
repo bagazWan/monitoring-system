@@ -41,9 +41,10 @@ class _DashboardScreenState extends State<DashboardScreen>
 
   bool _chartsInitialized = false;
 
-  final ValueNotifier<List<Location>> _locations = ValueNotifier([]);
+  final ValueNotifier<List<Location>> _rawLocations = ValueNotifier([]);
+  final ValueNotifier<List<String>> _locationFilters = ValueNotifier([]);
   final ValueNotifier<bool> _isLoadingLocations = ValueNotifier(true);
-  final ValueNotifier<String?> _selectedLocationName = ValueNotifier(null);
+  final ValueNotifier<String?> _selectedLocationFilter = ValueNotifier(null);
 
   final ValueNotifier<List<DashboardTraffic>> _rawTrafficData =
       ValueNotifier([]);
@@ -76,17 +77,46 @@ class _DashboardScreenState extends State<DashboardScreen>
 
   Future<void> _initLocations() async {
     try {
-      final locations = await _deviceService.getLocations();
+      final groups = await _deviceService.getLocationGroups();
       if (!mounted) return;
 
-      locations
-          .sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+      final List<String> formattedNames = [];
 
-      _locations.value = locations;
+      final parents = groups.where((g) => g.parentId == null).toList()
+        ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+
+      for (final parent in parents) {
+        formattedNames.add(parent.name);
+
+        final children = groups
+            .where((g) => g.parentId == parent.groupId)
+            .toList()
+          ..sort(
+              (a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+
+        for (final child in children) {
+          formattedNames.add("   ↳ ${child.name}");
+        }
+      }
+
+      final accountedFor = groups
+          .where((g) =>
+              g.parentId == null || parents.any((p) => p.groupId == g.parentId))
+          .map((e) => e.groupId)
+          .toSet();
+      final orphans = groups
+          .where((g) => !accountedFor.contains(g.groupId))
+          .toList()
+        ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+      for (final orphan in orphans) {
+        formattedNames.add(orphan.name);
+      }
+
+      _locationFilters.value = formattedNames;
       _isLoadingLocations.value = false;
     } catch (_) {
       if (!mounted) return;
-      _locations.value = [];
+      _locationFilters.value = [];
       _isLoadingLocations.value = false;
     }
   }
@@ -179,12 +209,10 @@ class _DashboardScreenState extends State<DashboardScreen>
     });
   }
 
-  int? _resolveSelectedLocationId() {
-    final selected = _selectedLocationName.value;
-    if (selected == null) return null;
-    final match = _locations.value.where((l) => l.name == selected);
-    if (match.isEmpty) return null;
-    return match.first.id;
+  String? _resolveSelectedLocationFilter() {
+    final raw = _selectedLocationFilter.value;
+    if (raw == null) return null;
+    return raw.replaceAll('↳', '').trim();
   }
 
   Future<void> _refreshDashboard() async {
@@ -193,7 +221,7 @@ class _DashboardScreenState extends State<DashboardScreen>
 
     try {
       final stats = await _dashboardService.getDashboardStats(
-        locationId: _resolveSelectedLocationId(),
+        locationName: _resolveSelectedLocationFilter(),
         topDownWindowDays: _topDownWindowDays.value,
       );
 
@@ -212,7 +240,7 @@ class _DashboardScreenState extends State<DashboardScreen>
   Future<void> _refreshTraffic() async {
     try {
       final traffic = await _dashboardService.getDashboardTraffic(
-        locationId: _resolveSelectedLocationId(),
+        locationName: _resolveSelectedLocationFilter(),
       );
 
       if (!mounted) return;
@@ -255,7 +283,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     try {
       final trend = await _dashboardService.getUptimeTrend(
         days: 7,
-        locationId: _resolveSelectedLocationId(),
+        locationName: _resolveSelectedLocationFilter(),
       );
       if (!mounted) return;
 
@@ -315,9 +343,10 @@ class _DashboardScreenState extends State<DashboardScreen>
 
     _chartsVisible.dispose();
     _topDownVisible.dispose();
-    _locations.dispose();
+    _rawLocations.dispose();
+    _locationFilters.dispose();
     _isLoadingLocations.dispose();
-    _selectedLocationName.dispose();
+    _selectedLocationFilter.dispose();
     _rawTrafficData.dispose();
     _trafficData.dispose();
     _uptimeTrendData.dispose();

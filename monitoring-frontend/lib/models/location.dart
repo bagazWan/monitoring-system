@@ -52,18 +52,20 @@ class LocationGroup {
   final int groupId;
   final String name;
   final String? description;
+  final int? parentId;
 
-  LocationGroup({
-    required this.groupId,
-    required this.name,
-    this.description,
-  });
+  LocationGroup(
+      {required this.groupId,
+      required this.name,
+      this.description,
+      this.parentId});
 
   factory LocationGroup.fromJson(Map<String, dynamic> json) {
     return LocationGroup(
       groupId: json['group_id'],
       name: json['name'],
       description: json['description'],
+      parentId: json['parent_id'],
     );
   }
 }

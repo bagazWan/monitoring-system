@@ -160,7 +160,7 @@ class _MapViewState extends State<MapView> {
             initialCenter: widget.center,
             initialZoom: 13.20,
             minZoom: 13,
-            maxZoom: 17,
+            maxZoom: 20,
           ),
           children: [
             TileLayer(

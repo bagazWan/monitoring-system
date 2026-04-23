@@ -1,5 +1,6 @@
 import asyncio
 import logging
+from sys import prefix
 from typing import Optional
 
 from fastapi import FastAPI
@@ -7,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.v1 import (
     alerts,
+    analytics,
     auth,
     dashboard,
     devices,
@@ -28,6 +30,10 @@ from app.services.alerts_service import (
     stop_alerts_poller_task,
 )
 from app.services.librenms_service import LibreNMSService
+from app.services.metrics_history_poller import (
+    start_metrics_history_poller,
+    stop_metrics_history_poller,
+)
 from app.services.status_poller import (
     start_status_poller_task,
     stop_status_poller_task,
@@ -73,6 +79,9 @@ async def on_startup():
     )
     logger.info("Started status tracking loop")
 
+    start_metrics_history_poller(libre_service, interval_seconds=300)
+    logger.info("Started 5-minute metrics history poller")
+
 
 @app.on_event("shutdown")
 async def on_shutdown():
@@ -82,7 +91,7 @@ async def on_shutdown():
     global _status_tracking_task
     await stop_alerts_poller_task()
     await stop_status_poller_task()
-
+    await stop_metrics_history_poller()
     logger.info("Stopped all background poller tasks")
 
 
@@ -106,3 +115,4 @@ app.include_router(dashboard.router, prefix="/api/v1")
 app.include_router(websocket.router, prefix="/api/v1")
 app.include_router(librenms_ports.router, prefix="/api/v1")
 app.include_router(register.router, prefix="/api/v1")
+app.include_router(analytics.router, prefix="/api/v1")

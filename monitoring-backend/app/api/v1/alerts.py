@@ -164,18 +164,30 @@ def get_all_alerts(
 
 
 @router.get("/active", response_model=List[AlertResponse])
-def get_active_alerts(db: Session = Depends(get_db)):
-    device_alerts = (
-        db.query(Alert).filter(or_(Alert.status == "active", Alert.status == "1")).all()
+def get_active_alerts(
+    severity: Optional[str] = Query(None, description="Filter by severity"),
+    location_name: Optional[str] = Query(
+        None, description="Filter by location hierarchy"
+    ),
+    db: Session = Depends(get_db),
+):
+    device_query = db.query(Alert)
+    switch_query = db.query(SwitchAlert)
+
+    device_query, switch_query = _apply_alert_filters(
+        device_query,
+        switch_query,
+        db,
+        status_filter="active",
+        severity=severity,
+        start_date=None,
+        end_date=None,
+        location_name=location_name,
     )
 
-    switch_alerts = (
-        db.query(SwitchAlert)
-        .filter(or_(SwitchAlert.status == "active", SwitchAlert.status == "1"))
-        .all()
-    )
-
-    results = [_alert_to_response_dict(a) for a in device_alerts + switch_alerts]
+    results = [
+        _alert_to_response_dict(a) for a in device_query.all() + switch_query.all()
+    ]
     results.sort(key=lambda x: x.get("created_at") or "", reverse=True)
     return results
 

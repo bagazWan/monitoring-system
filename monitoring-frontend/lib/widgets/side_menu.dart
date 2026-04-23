@@ -6,11 +6,15 @@ class SideMenu extends StatefulWidget {
   final Function(int) onItemSelected;
   final User? currentUser;
   final int unreadAlertCount;
+  final VoidCallback onSync;
+  final VoidCallback onLogout;
 
   const SideMenu({
     super.key,
     required this.selectedIndex,
     required this.onItemSelected,
+    required this.onSync,
+    required this.onLogout,
     this.currentUser,
     this.unreadAlertCount = 0,
   });
@@ -58,7 +62,6 @@ class _SideMenuState extends State<SideMenu> {
 
   @override
   Widget build(BuildContext context) {
-    //  Auto-collapse if width < 1100px
     double screenWidth = MediaQuery.of(context).size.width;
     bool isWideEnough = screenWidth > 1100;
     bool shouldExtend = isWideEnough && _manualToggle;
@@ -78,7 +81,9 @@ class _SideMenuState extends State<SideMenu> {
           icon: _buildAlertsIcon(), label: const Text('Alerts')),
     ];
 
-    if (widget.currentUser?.role == 'admin') {
+    bool isAdmin = widget.currentUser?.role == 'admin';
+
+    if (isAdmin) {
       destinations.add(
         const NavigationRailDestination(
             icon: Icon(Icons.people), label: Text('Users')),
@@ -106,6 +111,84 @@ class _SideMenuState extends State<SideMenu> {
         selectedLabelTextStyle:
             const TextStyle(color: activeColor, fontWeight: FontWeight.bold),
         destinations: destinations,
+        trailing: Expanded(
+          child: Align(
+            alignment: Alignment.bottomLeft,
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 16.0),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (isAdmin)
+                    _buildBottomButton(
+                      icon: Icons.sync,
+                      label: 'Sync',
+                      color: Colors.blue,
+                      isExtended: shouldExtend,
+                      onTap: widget.onSync,
+                    ),
+                  const SizedBox(height: 8),
+                  _buildBottomButton(
+                    icon: Icons.logout,
+                    label: 'Logout',
+                    color: Colors.black87,
+                    isExtended: shouldExtend,
+                    onTap: widget.onLogout,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBottomButton({
+    required IconData icon,
+    required String label,
+    required Color color,
+    required bool isExtended,
+    required VoidCallback onTap,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12.0),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(30),
+          hoverColor: Colors.grey[100],
+          child: SizedBox(
+            width: isExtended ? 176 : 48,
+            height: 48,
+            child: Row(
+              children: [
+                SizedBox(
+                  width: 48,
+                  child: Center(
+                    child: Icon(icon, color: color, size: 24),
+                  ),
+                ),
+                if (isExtended) ...[
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      label,
+                      style: TextStyle(
+                        color: color,
+                        fontWeight: FontWeight.w500,
+                        fontSize: 14,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }

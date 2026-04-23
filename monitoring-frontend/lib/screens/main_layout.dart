@@ -193,8 +193,6 @@ class _MainLayoutState extends State<MainLayout> {
   @override
   Widget build(BuildContext context) {
     bool isMobile = MediaQuery.of(context).size.width < 600;
-    const Color headerColor = Colors.white;
-    final Color dividerColor = Colors.grey[300]!;
     final isAdmin = _currentUser?.role == 'admin';
 
     final pages = <Widget>[
@@ -220,48 +218,41 @@ class _MainLayoutState extends State<MainLayout> {
     ];
 
     return Scaffold(
-      appBar: AppBar(
-        backgroundColor: headerColor,
-        surfaceTintColor: Colors.transparent,
-        elevation: 0,
-        toolbarHeight: 70,
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(1.0),
-          child: Container(color: dividerColor, height: 1.0),
-        ),
-        title: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 12.0, horizontal: 2.0),
-          child: GestureDetector(
-            onTap: () => _goToPage(0),
-            child: MouseRegion(
-              cursor: SystemMouseCursors.click,
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Image.asset(
-                    'assets/images/logo_mmn.png',
-                    height: 95,
-                  ),
-                ],
+      appBar: isMobile
+          ? AppBar(
+              backgroundColor: Colors.grey[50],
+              elevation: 0,
+              scrolledUnderElevation: 0,
+              toolbarHeight: 56,
+              bottom: PreferredSize(
+                preferredSize: const Size.fromHeight(1.0),
+                child: Container(
+                  color: Colors.grey[300],
+                  height: 1.0,
+                ),
               ),
-            ),
-          ),
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.sync, color: Colors.blue),
-            onPressed: () => _handleSync(context),
-            tooltip: "Sync with LibreNMS",
-          ),
-          TextButton.icon(
-            onPressed: _handleLogout,
-            icon: const Icon(Icons.logout, color: Colors.black87),
-            label:
-                const Text("Logout", style: TextStyle(color: Colors.black87)),
-          ),
-          const SizedBox(width: 16),
-        ],
-      ),
+              actions: [
+                if (isAdmin)
+                  IconButton(
+                    icon: const Icon(Icons.sync, color: Colors.blue),
+                    onPressed: () => _handleSync(context),
+                    tooltip: "Sync with LibreNMS",
+                  ),
+                TextButton.icon(
+                  onPressed: _handleLogout,
+                  icon: const Icon(Icons.logout, color: Colors.black87),
+                  label: const Text(
+                    "Logout",
+                    style: TextStyle(
+                      color: Colors.black87,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+              ],
+            )
+          : null,
       bottomNavigationBar: isMobile
           ? BottomNavigationBar(
               currentIndex: _currentPageIndex,
@@ -270,22 +261,26 @@ class _MainLayoutState extends State<MainLayout> {
               items: navItems,
             )
           : null,
-      body: Row(
-        children: [
-          if (!isMobile)
-            SideMenu(
-              selectedIndex: _currentPageIndex,
-              onItemSelected: _goToPage,
-              currentUser: _currentUser,
-              unreadAlertCount: _unreadAlertCount,
+      body: SafeArea(
+        child: Row(
+          children: [
+            if (!isMobile)
+              SideMenu(
+                selectedIndex: _currentPageIndex,
+                onItemSelected: _goToPage,
+                currentUser: _currentUser,
+                unreadAlertCount: _unreadAlertCount,
+                onSync: () => _handleSync(context),
+                onLogout: _handleLogout,
+              ),
+            Expanded(
+              child: Container(
+                color: Colors.grey[50],
+                child: pages[_currentPageIndex],
+              ),
             ),
-          Expanded(
-            child: Container(
-              color: Colors.grey[50],
-              child: pages[_currentPageIndex],
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

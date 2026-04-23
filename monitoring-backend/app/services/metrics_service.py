@@ -80,15 +80,16 @@ def extract_port_capacity_mbps(port: dict) -> Optional[float]:
     return None
 
 
-def get_ports_for_location(db: Session, location_id: Optional[int]):
+def get_ports_for_location(db: Session, location_ids: Optional[list[int]]):
     ports_query = db.query(LibreNMSPort)
 
-    if location_id:
+    if location_ids:
         ports_query = ports_query.outerjoin(
             Device, LibreNMSPort.device_id == Device.device_id
         ).outerjoin(Switch, LibreNMSPort.switch_id == Switch.switch_id)
         ports_query = ports_query.filter(
-            (Device.location_id == location_id) | (Switch.location_id == location_id)
+            (Device.location_id.in_(location_ids))
+            | (Switch.location_id.in_(location_ids))
         )
 
     enabled_ports = ports_query.filter(LibreNMSPort.enabled.is_(True)).all()
@@ -168,9 +169,9 @@ async def fetch_port_metrics(
 
 
 async def aggregate_port_rates(
-    db: Session, location_id: Optional[int]
+    db: Session, location_ids: Optional[list[int]]
 ) -> Tuple[float, float, bool]:
-    ports = get_ports_for_location(db, location_id)
+    ports = get_ports_for_location(db, location_ids)
     if not ports:
         return 0.0, 0.0, False
 
@@ -180,7 +181,7 @@ async def aggregate_port_rates(
 
 
 async def aggregate_port_metrics_by_node(
-    db: Session, location_id: Optional[int]
+    db: Session, location_ids: Optional[list[int]]
 ) -> Tuple[
     Dict[int, Tuple[float, float]],
     Dict[int, Tuple[float, float]],
@@ -188,7 +189,7 @@ async def aggregate_port_metrics_by_node(
     Dict[int, float],
     bool,
 ]:
-    ports = get_ports_for_location(db, location_id)
+    ports = get_ports_for_location(db, location_ids)
     if not ports:
         return {}, {}, {}, {}, False
 

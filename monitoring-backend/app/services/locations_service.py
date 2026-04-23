@@ -1,27 +1,28 @@
-from typing import Optional
+from typing import List, Optional
 
 from fastapi import HTTPException, status
 from sqlalchemy import func, or_
-from sqlalchemy.orm import Query, Session
+from sqlalchemy.orm import Query, Session, aliased
 
 from app.models import Location, LocationGroup
 from app.utils.constant import LOCATION_TYPE_ALIASES, LOCATION_TYPE_LABELS
 
 
-def resolve_location_id(
+def resolve_location_ids(
     db: Session,
     location_id: Optional[int],
     location_name: Optional[str],
-) -> Optional[int]:
+) -> Optional[List[int]]:
     if location_id is not None:
-        return location_id
+        return [location_id]
 
     if location_name and location_name.strip():
         q = db.query(Location.location_id)
         q = apply_location_name_filter(q, location_name)
-        row = q.first()
-        if row:
-            return row[0]
+        rows = q.distinct().all()
+        if rows:
+            return [row[0] for row in rows]
+        return [-1]
 
     return None
 
@@ -57,11 +58,16 @@ def apply_location_name_filter(query: Query, location_name: Optional[str]) -> Qu
         return query
 
     needle = location_name.strip().lower()
+    ParentGroup = aliased(LocationGroup)
 
     query = query.outerjoin(LocationGroup, Location.group_id == LocationGroup.group_id)
+    query = query.outerjoin(
+        ParentGroup, LocationGroup.parent_id == ParentGroup.group_id
+    )
 
     return query.filter(
         or_(
+            func.lower(func.coalesce(ParentGroup.name, "")) == needle,
             func.lower(func.coalesce(LocationGroup.name, "")) == needle,
             (
                 (func.lower(Location.name) == needle)

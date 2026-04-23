@@ -5,12 +5,13 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from sqlalchemy import and_, func, or_
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, aliased
 
 from app.models import (
     Alert,
     Device,
     Location,
+    LocationGroup,
     StatusHistory,
     Switch,
     SwitchAlert,
@@ -20,7 +21,7 @@ from app.services.ping_probe import ping_probe
 
 
 async def get_current_average_latency(
-    db: Session, location_id: Optional[int]
+    db: Session, location_ids: Optional[list[int]]
 ) -> Optional[float]:
     dev_query = db.query(Device.ip_address).filter(
         Device.ip_address.isnot(None), Device.ip_address != ""
@@ -29,9 +30,9 @@ async def get_current_average_latency(
         Switch.ip_address.isnot(None), Switch.ip_address != ""
     )
 
-    if location_id:
-        dev_query = dev_query.filter(Device.location_id == location_id)
-        sw_query = sw_query.filter(Switch.location_id == location_id)
+    if location_ids:
+        dev_query = dev_query.filter(Device.location_id.in_(location_ids))
+        sw_query = sw_query.filter(Switch.location_id.in_(location_ids))
 
     ips = [row[0] for row in dev_query.all()] + [row[0] for row in sw_query.all()]
 
@@ -58,7 +59,7 @@ async def get_current_average_latency(
 
 
 def build_uptime_trend(
-    db: Session, days: int, location_id: Optional[int] = None
+    db: Session, days: int, location_ids: Optional[list[int]] = None
 ) -> dict:
     now = datetime.now(timezone.utc)
     window_start = (now - timedelta(days=days - 1)).replace(
@@ -68,9 +69,9 @@ def build_uptime_trend(
     dev_query = db.query(Device.device_id)
     sw_query = db.query(Switch.switch_id)
 
-    if location_id:
-        dev_query = dev_query.filter(Device.location_id == location_id)
-        sw_query = sw_query.filter(Switch.location_id == location_id)
+    if location_ids:
+        dev_query = dev_query.filter(Device.location_id.in_(location_ids))
+        sw_query = sw_query.filter(Switch.location_id.in_(location_ids))
 
     devices = dev_query.all()
     switches = sw_query.all()
@@ -194,15 +195,15 @@ def build_uptime_trend(
 async def build_dashboard_stats(
     *,
     db: Session,
-    location_id: Optional[int],
+    location_ids: Optional[list[int]],
     top_down_window: int,
 ):
     dev_query = db.query(Device)
     sw_query = db.query(Switch)
 
-    if location_id:
-        dev_query = dev_query.filter(Device.location_id == location_id)
-        sw_query = sw_query.filter(Switch.location_id == location_id)
+    if location_ids:
+        dev_query = dev_query.filter(Device.location_id.in_(location_ids))
+        sw_query = sw_query.filter(Switch.location_id.in_(location_ids))
 
     total_devices = dev_query.count()
     total_switches = sw_query.count()
@@ -220,10 +221,10 @@ async def build_dashboard_stats(
     cctv_online = dev_query.filter(cctv_filter, Device.status == "online").count()
     cctv_uptime = (cctv_online / cctv_total * 100) if cctv_total > 0 else 0.0
 
-    total_in, total_out, data_found = await aggregate_port_rates(db, location_id)
+    total_in, total_out, data_found = await aggregate_port_rates(db, location_ids)
     total_bandwidth_mbps = total_in + total_out
 
-    avg_latency = await get_current_average_latency(db, location_id)
+    avg_latency = await get_current_average_latency(db, location_ids)
 
     top_down = []
     window_start = datetime.now(timezone.utc) - timedelta(days=top_down_window)
@@ -232,31 +233,58 @@ async def build_dashboard_stats(
         func.lower(func.coalesce(SwitchAlert.severity, "")) == "critical"
     )
 
+    # UPDATED TOP DOWN AGGREGATION
+    ParentGroup = aliased(LocationGroup)
+
     dev_down = (
         db.query(
-            Location.location_id.label("location_id"),
-            Location.name.label("location_name"),
+            func.coalesce(
+                ParentGroup.group_id, LocationGroup.group_id, Location.location_id
+            ).label("location_id"),
+            func.coalesce(ParentGroup.name, LocationGroup.name, Location.name).label(
+                "location_name"
+            ),
             func.count(Alert.alert_id).label("offline_count"),
         )
-        .join(Device, Location.location_id == Device.location_id)
-        .join(Alert, Alert.device_id == Device.device_id)
+        .select_from(Alert)
+        .join(Device, Alert.device_id == Device.device_id)
+        .join(Location, Device.location_id == Location.location_id)
+        .outerjoin(LocationGroup, Location.group_id == LocationGroup.group_id)
+        .outerjoin(ParentGroup, LocationGroup.parent_id == ParentGroup.group_id)
         .filter(Alert.created_at >= window_start)
         .filter(critical_filter)
-        .group_by(Location.location_id, Location.name)
+        .group_by(
+            func.coalesce(
+                ParentGroup.group_id, LocationGroup.group_id, Location.location_id
+            ),
+            func.coalesce(ParentGroup.name, LocationGroup.name, Location.name),
+        )
         .all()
     )
 
     sw_down = (
         db.query(
-            Location.location_id.label("location_id"),
-            Location.name.label("location_name"),
+            func.coalesce(
+                ParentGroup.group_id, LocationGroup.group_id, Location.location_id
+            ).label("location_id"),
+            func.coalesce(ParentGroup.name, LocationGroup.name, Location.name).label(
+                "location_name"
+            ),
             func.count(SwitchAlert.alert_id).label("offline_count"),
         )
-        .join(Switch, Location.location_id == Switch.location_id)
-        .join(SwitchAlert, SwitchAlert.switch_id == Switch.switch_id)
+        .select_from(SwitchAlert)
+        .join(Switch, SwitchAlert.switch_id == Switch.switch_id)
+        .join(Location, Switch.location_id == Location.location_id)
+        .outerjoin(LocationGroup, Location.group_id == LocationGroup.group_id)
+        .outerjoin(ParentGroup, LocationGroup.parent_id == ParentGroup.group_id)
         .filter(SwitchAlert.created_at >= window_start)
         .filter(critical_sw_filter)
-        .group_by(Location.location_id, Location.name)
+        .group_by(
+            func.coalesce(
+                ParentGroup.group_id, LocationGroup.group_id, Location.location_id
+            ),
+            func.coalesce(ParentGroup.name, LocationGroup.name, Location.name),
+        )
         .all()
     )
 
@@ -342,9 +370,11 @@ async def build_dashboard_stats(
     }
 
 
-async def build_dashboard_traffic(*, db: Session, location_id: Optional[int]) -> dict:
-    total_in, total_out, data_found = await aggregate_port_rates(db, location_id)
-    avg_latency = await get_current_average_latency(db, location_id)
+async def build_dashboard_traffic(
+    *, db: Session, location_ids: Optional[list[int]]
+) -> dict:
+    total_in, total_out, data_found = await aggregate_port_rates(db, location_ids)
+    avg_latency = await get_current_average_latency(db, location_ids)
 
     return {
         "timestamp": datetime.now(timezone.utc).isoformat(),

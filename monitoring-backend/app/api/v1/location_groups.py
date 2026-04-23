@@ -37,7 +37,9 @@ def create_group(
     if existing:
         raise HTTPException(status_code=400, detail="Group name already exist")
 
-    row = LocationGroup(name=name, description=payload.description)
+    row = LocationGroup(
+        name=name, description=payload.description, parent_id=payload.parent_id
+    )
     db.add(row)
     db.commit()
     db.refresh(row)

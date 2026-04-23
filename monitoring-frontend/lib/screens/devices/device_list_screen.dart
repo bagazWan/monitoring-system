@@ -97,15 +97,45 @@ class _DeviceListScreenState extends State<DeviceListScreen>
 
   Future<void> _loadLocations() async {
     try {
-      final names = await DeviceService().getLocationsWithNodes();
+      final groups = await DeviceService().getLocationGroups();
       if (!mounted) return;
 
-      names.sort();
-      if (_selectedLocation != null && !names.contains(_selectedLocation)) {
-        names.insert(0, _selectedLocation!);
+      final List<String> formattedNames = [];
+      final parents = groups.where((g) => g.parentId == null).toList()
+        ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+
+      for (final parent in parents) {
+        formattedNames.add(parent.name);
+        final children = groups
+            .where((g) => g.parentId == parent.groupId)
+            .toList()
+          ..sort(
+              (a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+
+        for (final child in children) {
+          formattedNames.add("   ↳ ${child.name}");
+        }
       }
 
-      setState(() => _locations = names);
+      final accountedFor = groups
+          .where((g) =>
+              g.parentId == null || parents.any((p) => p.groupId == g.parentId))
+          .map((e) => e.groupId)
+          .toSet();
+      final orphans = groups
+          .where((g) => !accountedFor.contains(g.groupId))
+          .toList()
+        ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+      for (final orphan in orphans) {
+        formattedNames.add(orphan.name);
+      }
+
+      if (_selectedLocation != null &&
+          !formattedNames.contains(_selectedLocation)) {
+        formattedNames.insert(0, _selectedLocation!);
+      }
+
+      setState(() => _locations = formattedNames);
     } catch (_) {}
   }
 
@@ -116,9 +146,11 @@ class _DeviceListScreenState extends State<DeviceListScreen>
     });
 
     try {
+      final cleanLocation = _selectedLocation?.replaceAll('↳', '').trim();
+
       final page = await DeviceService().getNodesPage(
         search: _searchQuery,
-        locationName: _selectedLocation,
+        locationName: cleanLocation,
         deviceType: _selectedType,
         status: _selectedStatus,
         page: _currentPage,

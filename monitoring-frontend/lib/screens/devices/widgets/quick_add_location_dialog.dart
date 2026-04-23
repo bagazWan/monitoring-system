@@ -40,21 +40,32 @@ class _QuickAddLocationDialogState extends State<QuickAddLocationDialog> {
     }
   }
 
-  bool _isTollGateType(String raw) {
-    final v = raw.trim().toLowerCase().replaceAll('_', ' ');
-    return v == 'gerbang tol' || v == 'toll gate' || v == 'tollgate';
+  List<LocationGroup> _getSortedDisplayGroups() {
+    List<LocationGroup> display = [];
+
+    final parents = _groups.where((g) => g.parentId == null).toList()
+      ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+
+    for (var p in parents) {
+      display.add(p);
+      final children = _groups.where((g) => g.parentId == p.groupId).toList()
+        ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+      display.addAll(children);
+    }
+
+    final accounted = display.map((e) => e.groupId).toSet();
+    display.addAll(_groups.where((g) => !accounted.contains(g.groupId)));
+
+    return display;
   }
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
 
     final typeRaw = _typeController.text.trim();
-    final isTollGate = _isTollGateType(typeRaw);
-
-    if (!isTollGate && _selectedGroupId == null) {
+    if (_selectedGroupId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text("Group is required for non toll-gate location")),
+        const SnackBar(content: Text("Please select a Parent Section / Group")),
       );
       return;
     }
@@ -67,7 +78,7 @@ class _QuickAddLocationDialogState extends State<QuickAddLocationDialog> {
         "location_type": typeRaw,
         "latitude": double.tryParse(_latController.text.trim()) ?? 0.0,
         "longitude": double.tryParse(_lngController.text.trim()) ?? 0.0,
-        "group_id": isTollGate ? null : _selectedGroupId,
+        "group_id": _selectedGroupId,
       });
 
       if (!mounted) return;
@@ -93,6 +104,7 @@ class _QuickAddLocationDialogState extends State<QuickAddLocationDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final displayGroups = _getSortedDisplayGroups();
     return AlertDialog(
       title: const Text("Add Location"),
       content: Form(
@@ -118,14 +130,27 @@ class _QuickAddLocationDialogState extends State<QuickAddLocationDialog> {
               const SizedBox(height: 12),
               DropdownButtonFormField<int>(
                 value: _selectedGroupId,
-                items: _groups
-                    .map((g) => DropdownMenuItem<int>(
-                          value: g.groupId,
-                          child: Text(g.name),
-                        ))
-                    .toList(),
+                items: displayGroups.map((g) {
+                  final isChild = g.parentId != null;
+                  return DropdownMenuItem<int>(
+                    value: g.groupId,
+                    child: Padding(
+                      padding: EdgeInsets.only(left: isChild ? 16.0 : 0.0),
+                      child: Text(
+                        g.name,
+                        style: TextStyle(
+                          fontWeight:
+                              isChild ? FontWeight.normal : FontWeight.bold,
+                          color: isChild ? Colors.black87 : Colors.blueAccent,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  );
+                }).toList(),
                 onChanged: (v) => setState(() => _selectedGroupId = v),
-                decoration: const InputDecoration(labelText: "Group"),
+                decoration:
+                    const InputDecoration(labelText: "Parent Section / Group"),
               ),
               const SizedBox(height: 12),
               Row(

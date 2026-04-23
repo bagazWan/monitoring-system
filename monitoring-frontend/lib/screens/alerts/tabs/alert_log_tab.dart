@@ -6,6 +6,7 @@ import '../dialogs/alert_details_dialog.dart';
 import '../dialogs/alert_delete_dialog.dart';
 import '../../../models/alert.dart';
 import '../../../services/alert_service.dart';
+import '../../../services/map_service.dart';
 import '../../../services/auth_service.dart';
 import '../../../services/websocket_service.dart';
 import '../../../../widgets/pagination.dart';
@@ -63,9 +64,40 @@ class _AlertLogTabState extends State<AlertLogTab> {
 
   Future<void> _loadLocations() async {
     try {
-      final names = await AlertService().getAlertLocations();
+      final groups = await MapService().getLocationGroups();
       if (!mounted) return;
-      setState(() => _locations = names);
+
+      final List<String> formattedNames = [];
+      final parents = groups.where((g) => g.parentId == null).toList()
+        ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+
+      for (final parent in parents) {
+        formattedNames.add(parent.name);
+        final children = groups
+            .where((g) => g.parentId == parent.groupId)
+            .toList()
+          ..sort(
+              (a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+
+        for (final child in children) {
+          formattedNames.add("   ↳ ${child.name}");
+        }
+      }
+
+      final accountedFor = groups
+          .where((g) =>
+              g.parentId == null || parents.any((p) => p.groupId == g.parentId))
+          .map((e) => e.groupId)
+          .toSet();
+      final orphans = groups
+          .where((g) => !accountedFor.contains(g.groupId))
+          .toList()
+        ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+      for (final orphan in orphans) {
+        formattedNames.add(orphan.name);
+      }
+
+      setState(() => _locations = formattedNames);
     } catch (_) {}
   }
 
@@ -75,12 +107,13 @@ class _AlertLogTabState extends State<AlertLogTab> {
       _error = null;
     });
     try {
+      final cleanLocation = _selectedLocation?.replaceAll('↳', '').trim();
       final page = await AlertService().getAlertLogs(
         startDate: _selectedDateRange?.start,
         endDate: _selectedDateRange?.end,
         severity: _selectedSeverity,
         status: _selectedStatus,
-        locationName: _selectedLocation,
+        locationName: cleanLocation,
         page: _currentPage,
         limit: _pageSize,
       );
@@ -147,13 +180,15 @@ class _AlertLogTabState extends State<AlertLogTab> {
 
     if (confirmed != true) return;
 
+    final cleanLocation = _selectedLocation?.replaceAll('↳', '').trim();
     await AlertService().deleteAlertLogs(
       startDate: _selectedDateRange?.start,
       endDate: _selectedDateRange?.end,
       severity: _selectedSeverity,
       status: _selectedStatus,
-      locationName: _selectedLocation,
+      locationName: cleanLocation,
     );
+
     _currentPage = 1;
     await _fetchLogs();
     _loadLocations();

@@ -17,9 +17,22 @@ class AlertService {
     };
   }
 
-  Future<List<Alert>> getActiveAlerts() async {
+  Future<List<Alert>> getActiveAlerts(
+      {String? severity, String? locationName}) async {
+    final queryParams = <String>[];
+
+    if (severity != null && severity.isNotEmpty && severity != 'all') {
+      queryParams.add('severity=${Uri.encodeQueryComponent(severity)}');
+    }
+    if (locationName != null && locationName.isNotEmpty) {
+      queryParams
+          .add('location_name=${Uri.encodeQueryComponent(locationName)}');
+    }
+
+    final query = queryParams.isEmpty ? '' : '?${queryParams.join('&')}';
+
     final response = await http.get(
-      Uri.parse('${ApiConfig.alerts}/active'),
+      Uri.parse('${ApiConfig.alerts}/active$query'),
       headers: await _getHeaders(),
     );
 
@@ -32,19 +45,26 @@ class AlertService {
   }
 
   Future<List<String>> getAlertLocations({String? status}) async {
-    final params = <String, String>{};
-    if (status != null && status.isNotEmpty) {
-      params['status_filter'] = status;
-    }
-
-    final uri = Uri.parse('${ApiConfig.alerts}/locations')
-        .replace(queryParameters: params.isEmpty ? null : params);
-
-    final response = await http.get(uri, headers: await _getHeaders());
+    final response = await http.get(
+      Uri.parse(ApiConfig.locationOptions),
+      headers: await _getHeaders(),
+    );
 
     if (response.statusCode == 200) {
-      final List data = json.decode(response.body);
-      return data.map((e) => e.toString()).toList();
+      final List<dynamic> data = json.decode(response.body);
+
+      final options = <String>{};
+      for (final raw in data) {
+        final item = raw as Map<String, dynamic>;
+        final groupName = (item['group_name'] ?? '').toString().trim();
+        if (groupName.isNotEmpty) {
+          options.add(groupName);
+        }
+      }
+
+      final list = options.toList()
+        ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+      return list;
     }
     throw Exception('Failed to load alert locations');
   }

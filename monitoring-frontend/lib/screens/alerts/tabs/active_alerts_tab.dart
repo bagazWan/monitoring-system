@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../../models/alert.dart';
 import '../../../services/alert_service.dart';
+import '../../../services/map_service.dart';
 import '../../../services/websocket_service.dart';
 import '../../../widgets/alert_card.dart';
 import '../../../widgets/visual_feedback.dart';
@@ -20,7 +21,6 @@ class _ActiveAlertsTabState extends State<ActiveAlertsTab> {
   StreamSubscription? _alertsRefreshSub;
 
   List<Alert> _allAlerts = [];
-  List<Alert> _filteredAlerts = [];
   bool _isLoading = true;
   String? _error;
 
@@ -46,9 +46,40 @@ class _ActiveAlertsTabState extends State<ActiveAlertsTab> {
 
   Future<void> _loadLocations() async {
     try {
-      final names = await AlertService().getAlertLocations(status: 'active');
+      final groups = await MapService().getLocationGroups();
       if (!mounted) return;
-      setState(() => _locations = names);
+
+      final List<String> formattedNames = [];
+      final parents = groups.where((g) => g.parentId == null).toList()
+        ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+
+      for (final parent in parents) {
+        formattedNames.add(parent.name);
+        final children = groups
+            .where((g) => g.parentId == parent.groupId)
+            .toList()
+          ..sort(
+              (a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+
+        for (final child in children) {
+          formattedNames.add("   ↳ ${child.name}");
+        }
+      }
+
+      final accountedFor = groups
+          .where((g) =>
+              g.parentId == null || parents.any((p) => p.groupId == g.parentId))
+          .map((e) => e.groupId)
+          .toSet();
+      final orphans = groups
+          .where((g) => !accountedFor.contains(g.groupId))
+          .toList()
+        ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+      for (final orphan in orphans) {
+        formattedNames.add(orphan.name);
+      }
+
+      setState(() => _locations = formattedNames);
     } catch (_) {}
   }
 
@@ -58,7 +89,12 @@ class _ActiveAlertsTabState extends State<ActiveAlertsTab> {
       _error = null;
     });
     try {
-      final alerts = await AlertService().getActiveAlerts();
+      final cleanLocation = _selectedLocation?.replaceAll('↳', '').trim();
+      final alerts = await AlertService().getActiveAlerts(
+        severity: _selectedSeverity,
+        locationName: cleanLocation,
+      );
+
       if (mounted) {
         setState(() {
           _allAlerts = alerts;
@@ -67,7 +103,6 @@ class _ActiveAlertsTabState extends State<ActiveAlertsTab> {
             if (a.severity != 'critical' && b.severity == 'critical') return 1;
             return b.createdAt.compareTo(a.createdAt);
           });
-          _applyFilters();
           _isLoading = false;
         });
       }
@@ -82,22 +117,12 @@ class _ActiveAlertsTabState extends State<ActiveAlertsTab> {
     }
   }
 
-  void _applyFilters() {
-    _filteredAlerts = _allAlerts.where((alert) {
-      if (_selectedSeverity != null && alert.severity != _selectedSeverity)
-        return false;
-      if (_selectedLocation != null && alert.locationName != _selectedLocation)
-        return false;
-      return true;
-    }).toList();
-  }
-
   void _clearFilters() {
     setState(() {
       _selectedSeverity = null;
       _selectedLocation = null;
-      _applyFilters();
     });
+    _fetchAlerts();
   }
 
   Future<void> _openAcknowledgeDialog(Alert alert) async {
@@ -123,26 +148,24 @@ class _ActiveAlertsTabState extends State<ActiveAlertsTab> {
       children: [
         AlertFilterBar(
           selectedSeverity: _selectedSeverity,
-          onSeverityChanged: (val) => setState(() {
-            _selectedSeverity = val;
-            _applyFilters();
-          }),
+          onSeverityChanged: (val) {
+            setState(() => _selectedSeverity = val);
+            _fetchAlerts();
+          },
           selectedLocation: _selectedLocation,
           locations: _locations,
-          onLocationChanged: (val) => setState(() {
-            _selectedLocation = val;
-            _applyFilters();
-          }),
+          onLocationChanged: (val) {
+            setState(() => _selectedLocation = val);
+            _fetchAlerts();
+          },
           onClear: (_selectedSeverity != null || _selectedLocation != null)
               ? _clearFilters
               : null,
         ),
         Expanded(
-          child: _filteredAlerts.isEmpty
-              ? EmptyStateWidget(
-                  message: _allAlerts.isEmpty
-                      ? "No active alerts"
-                      : "No active alerts match filters",
+          child: _allAlerts.isEmpty
+              ? const EmptyStateWidget(
+                  message: "No active alerts match filters",
                   icon: Icons.notifications_off_outlined,
                 )
               : RefreshIndicator(
@@ -150,9 +173,9 @@ class _ActiveAlertsTabState extends State<ActiveAlertsTab> {
                   child: ListView.builder(
                     padding:
                         const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    itemCount: _filteredAlerts.length,
+                    itemCount: _allAlerts.length,
                     itemBuilder: (context, index) {
-                      final alert = _filteredAlerts[index];
+                      final alert = _allAlerts[index];
                       return AlertCard(
                         alert: alert,
                         isTechnicianOrAdmin: widget.isTechnicianOrAdmin,

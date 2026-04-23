@@ -5,6 +5,7 @@ import '../../models/switch_summary.dart';
 import '../../models/device.dart';
 import '../../models/network_node.dart';
 import 'widgets/quick_add_location_dialog.dart';
+import 'widgets/location_search_picker_dialog.dart';
 
 part 'widgets/register_device_layout.dart';
 part 'widgets/register_device_form_inputs.dart';
@@ -72,9 +73,10 @@ class _RegisterDeviceScreenState extends State<RegisterDeviceScreen>
 
   Future<void> _loadDropdowns() async {
     try {
-      final locations = await _service.getLocationOptions();
+      final locations = await _service.getAllLocationOptions();
       final switches = await _service.getSwitches();
       final nodes = await _service.getNetworkNodes();
+      if (!mounted) return;
       setState(() {
         _locations = locations;
         _switches = switches;
@@ -95,13 +97,33 @@ class _RegisterDeviceScreenState extends State<RegisterDeviceScreen>
     );
 
     if (created != null) {
-      final refreshed = await _service.getLocationOptions();
+      final refreshed = await _service.getAllLocationOptions();
       if (!mounted) return;
       setState(() {
         _locations = refreshed;
         _selectedLocationId = created.id;
       });
     }
+  }
+
+  Future<void> _pickLocationWithSearch() async {
+    final selectedId = await showDialog<int>(
+      context: context,
+      builder: (_) => LocationSearchPickerDialog(locations: _locations),
+    );
+    if (selectedId != null) {
+      setState(() => _selectedLocationId = selectedId);
+    }
+  }
+
+  String _selectedLocationLabel() {
+    final match = _locations.where((l) => l.id == _selectedLocationId);
+    if (match.isEmpty) return "Select location...";
+    final location = match.first;
+    if ((location.groupName ?? '').isNotEmpty) {
+      return "${location.name} • ${location.groupName}";
+    }
+    return location.name;
   }
 
   Future<void> _submit() async {

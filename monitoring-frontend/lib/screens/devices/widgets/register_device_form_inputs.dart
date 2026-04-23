@@ -6,36 +6,31 @@ mixin RegisterDeviceFormInputs on State<RegisterDeviceScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        DropdownButtonFormField<int>(
-          value: state._selectedLocationId,
-          items: state._locations
-              .map((location) => DropdownMenuItem<int>(
-                    value: location.id,
-                    child: Text(
-                      location.groupName != null
-                          ? "${location.name} • ${location.groupName}"
-                          : location.name,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontSize: 14),
-                    ),
-                  ))
-              .toList(),
-          onChanged: (value) =>
-              setState(() => state._selectedLocationId = value),
-          validator: (v) => v == null ? "Required" : null,
-          decoration: InputDecoration(
-            labelText: "Location",
-            filled: true,
-            fillColor: Colors.grey[50],
-            isDense: true,
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
-            border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-                borderSide: BorderSide(color: Colors.grey[300]!)),
-            enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-                borderSide: BorderSide(color: Colors.grey[300]!)),
+        InkWell(
+          onTap: state._pickLocationWithSearch,
+          child: InputDecorator(
+            decoration: InputDecoration(
+              labelText: "Location",
+              filled: true,
+              fillColor: Colors.grey[50],
+              isDense: true,
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+              border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide(color: Colors.grey[300]!)),
+              enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide(color: Colors.grey[300]!)),
+              focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: const BorderSide(color: Colors.blue, width: 1.5)),
+            ),
+            child: Text(
+              state._selectedLocationLabel(),
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 14),
+            ),
           ),
         ),
         const SizedBox(height: 8),

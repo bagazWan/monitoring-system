@@ -331,4 +331,40 @@ class DeviceService {
     }
     throw Exception('Failed to load device types');
   }
+
+  Future<List<Location>> getAllLocationOptions() async {
+    final headers = await _getHeaders();
+
+    List<Location> parseItems(dynamic decoded) {
+      List rawItems;
+      if (decoded is List) {
+        rawItems = decoded;
+      } else if (decoded is Map<String, dynamic>) {
+        if (decoded['items'] is List) {
+          rawItems = decoded['items'] as List;
+        } else if (decoded['data'] is List) {
+          rawItems = decoded['data'] as List;
+        } else {
+          rawItems = [];
+        }
+      } else {
+        rawItems = [];
+      }
+
+      final items = rawItems.map((e) => Location.fromJson(e)).toList()
+        ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+      return items;
+    }
+
+    final optionsRes = await http.get(
+      Uri.parse(ApiConfig.locationOptions),
+      headers: headers,
+    );
+
+    if (optionsRes.statusCode == 200) {
+      final parsed = parseItems(jsonDecode(optionsRes.body));
+      if (parsed.isNotEmpty) return parsed;
+    }
+    throw Exception('Failed to load all locations');
+  }
 }

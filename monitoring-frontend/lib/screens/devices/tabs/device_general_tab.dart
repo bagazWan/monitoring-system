@@ -4,6 +4,7 @@ import '../../../models/location.dart';
 import '../../../models/switch_summary.dart';
 import '../../../models/network_node.dart';
 import '../../../services/device_service.dart';
+import '../widgets/location_search_picker_dialog.dart';
 
 typedef SaveCallback = Future<void> Function(Map<String, dynamic> data);
 typedef DangerActionCallback = Future<void> Function(String action);
@@ -38,6 +39,7 @@ class _DeviceGeneralTabState extends State<DeviceGeneralTab> {
   int? _selectedSwitchId;
   int? _selectedNetworkNodeId;
 
+  List<Location> _locations = [];
   List<SwitchSummary> _switches = [];
   List<NetworkNode> _networkNodes = [];
   bool _saving = false;
@@ -56,6 +58,7 @@ class _DeviceGeneralTabState extends State<DeviceGeneralTab> {
     } else if (widget.node.nodeKind == 'switch') {
       _selectedNetworkNodeId = widget.node.nodeId;
     }
+    _locations = List<Location>.from(widget.locations);
     _fetchDropdowns();
   }
 
@@ -69,6 +72,39 @@ class _DeviceGeneralTabState extends State<DeviceGeneralTab> {
       _selectedLocationId = widget.node.locationId;
       _selectedSwitchId = widget.node.switchId;
       _selectedNetworkNodeId = widget.node.nodeId;
+    }
+
+    if (oldWidget.locations != widget.locations &&
+        widget.locations.isNotEmpty) {
+      final mergedById = <int, Location>{
+        for (final loc in _locations) loc.id: loc,
+      };
+      for (final loc in widget.locations) {
+        mergedById[loc.id] = loc;
+      }
+
+      _locations = mergedById.values.toList()
+        ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+    }
+  }
+
+  String _selectedLocationLabel() {
+    final match = _locations.where((l) => l.id == _selectedLocationId);
+    if (match.isEmpty) return "Select location...";
+    final location = match.first;
+    if ((location.groupName ?? '').isNotEmpty) {
+      return "${location.name} • ${location.groupName}";
+    }
+    return location.name;
+  }
+
+  Future<void> _pickLocation() async {
+    final selectedId = await showDialog<int>(
+      context: context,
+      builder: (_) => LocationSearchPickerDialog(locations: _locations),
+    );
+    if (selectedId != null) {
+      setState(() => _selectedLocationId = selectedId);
     }
   }
 
@@ -92,6 +128,13 @@ class _DeviceGeneralTabState extends State<DeviceGeneralTab> {
   Future<void> _fetchDropdowns() async {
     final service = DeviceService();
     try {
+      final allLocations = await service.getAllLocationOptions();
+      if (mounted && allLocations.isNotEmpty) {
+        setState(() {
+          _locations = allLocations;
+        });
+      }
+
       if (widget.node.nodeKind == 'device') {
         final sw = await service.getSwitches();
         if (mounted) setState(() => _switches = sw);
@@ -124,14 +167,12 @@ class _DeviceGeneralTabState extends State<DeviceGeneralTab> {
             ]),
             const SizedBox(height: 24),
             _buildSectionCard("Location & Details", [
-              DropdownButtonFormField<int>(
-                value: _selectedLocationId,
-                items: widget.locations
-                    .map((l) =>
-                        DropdownMenuItem(value: l.id, child: Text(l.name)))
-                    .toList(),
-                onChanged: (val) => setState(() => _selectedLocationId = val),
-                decoration: _inputDecoration("Location"),
+              InkWell(
+                onTap: _pickLocation,
+                child: InputDecorator(
+                  decoration: _inputDecoration("Location"),
+                  child: Text(_selectedLocationLabel()),
+                ),
               ),
               const SizedBox(height: 16),
               if (!isSwitch)

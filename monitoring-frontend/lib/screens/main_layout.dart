@@ -11,6 +11,7 @@ import 'devices/device_list_screen.dart';
 import 'alerts/alert_screen.dart';
 import 'users/user_management_screen.dart';
 import 'map/map_screen.dart';
+import 'analytics/analytics_screen.dart';
 
 class MainLayout extends StatefulWidget {
   const MainLayout({super.key});
@@ -26,7 +27,7 @@ class _MainLayoutState extends State<MainLayout> {
 
   int _unreadAlertCount = 0;
 
-  static const int _alertsTabIndex = 3;
+  static const int _alertsTabIndex = 4;
 
   Future<void> _checkUser() async {
     try {
@@ -200,6 +201,7 @@ class _MainLayoutState extends State<MainLayout> {
       const DeviceListScreen(),
       const MapScreen(),
       const AlertScreen(),
+      const AnalyticsScreen(),
       if (isAdmin) const UserManagementScreen(),
     ];
 
@@ -213,6 +215,8 @@ class _MainLayoutState extends State<MainLayout> {
       const BottomNavigationBarItem(
           icon: Icon(Icons.location_on), label: "Map"),
       BottomNavigationBarItem(icon: _buildAlertNavIcon(), label: "Alerts"),
+      const BottomNavigationBarItem(
+          icon: Icon(Icons.analytics), label: "Analytics"),
       if (isAdmin)
         const BottomNavigationBarItem(icon: Icon(Icons.people), label: "Users"),
     ];

@@ -26,6 +26,8 @@ class ApiConfig {
       '$baseUrl$apiVersion/dashboard/traffic';
   static const String dashboardUptimeTrend =
       '$baseUrl$apiVersion/dashboard/uptime-trend';
+  static const String analyticsHistory =
+      '$baseUrl$apiVersion/analytics/history';
   static const String syncLibreNMS = '$baseUrl$apiVersion/sync/from-librenms';
   static const String deviceList = '$baseUrl$apiVersion/devices/with-locations';
   static const String switchList =

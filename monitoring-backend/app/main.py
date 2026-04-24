@@ -1,6 +1,5 @@
 import asyncio
 import logging
-from sys import prefix
 from typing import Optional
 
 from fastapi import FastAPI
@@ -57,7 +56,6 @@ app.add_middleware(
 
 libre_service: LibreNMSService = LibreNMSService()
 
-# Background poller task handle
 _alerts_poller_task: Optional[asyncio.Task] = None
 _status_poller_task: Optional[asyncio.Task] = None
 _status_tracking_task: Optional[asyncio.Task] = None
@@ -86,7 +84,7 @@ async def on_startup():
 @app.on_event("shutdown")
 async def on_shutdown():
     """
-    Application shutdown:  stop all background tasks
+    stop all background tasks
     """
     global _status_tracking_task
     await stop_alerts_poller_task()

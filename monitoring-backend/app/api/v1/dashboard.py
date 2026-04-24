@@ -17,12 +17,16 @@ router = APIRouter(prefix="/dashboard", tags=["Dashboard"])
 async def get_dashboard_summary(
     location_id: Optional[int] = Query(None),
     location_name: Optional[str] = Query(None),
+    device_type: Optional[str] = Query(None),
     top_down_window: int = Query(7, ge=1, le=30),
     db: Session = Depends(get_db),
 ):
     loc_ids = resolve_location_ids(db, location_id, location_name)
     return await build_dashboard_stats(
-        db=db, location_ids=loc_ids, top_down_window=top_down_window
+        db=db,
+        location_ids=loc_ids,
+        top_down_window=top_down_window,
+        device_type=device_type,
     )
 
 
@@ -30,10 +34,13 @@ async def get_dashboard_summary(
 async def get_dashboard_traffic(
     location_id: Optional[int] = Query(None),
     location_name: Optional[str] = Query(None),
+    device_type: Optional[str] = Query(None),
     db: Session = Depends(get_db),
 ):
     loc_ids = resolve_location_ids(db, location_id, location_name)
-    return await build_dashboard_traffic(db=db, location_ids=loc_ids)
+    return await build_dashboard_traffic(
+        db=db, location_ids=loc_ids, device_type=device_type
+    )
 
 
 @router.get("/uptime-trend")
@@ -41,7 +48,8 @@ def get_uptime_trend(
     days: int = Query(7, ge=1, le=30),
     location_id: Optional[int] = Query(None),
     location_name: Optional[str] = Query(None),
+    device_type: Optional[str] = Query(None),
     db: Session = Depends(get_db),
 ):
     loc_ids = resolve_location_ids(db, location_id, location_name)
-    return build_uptime_trend(db, days, location_ids=loc_ids)
+    return build_uptime_trend(db, days, location_ids=loc_ids, device_type=device_type)

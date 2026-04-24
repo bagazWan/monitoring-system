@@ -4,6 +4,7 @@ import math
 from datetime import datetime, timedelta
 from typing import Dict, Optional, Tuple
 
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.models import Device, LibreNMSPort, Switch
@@ -80,17 +81,29 @@ def extract_port_capacity_mbps(port: dict) -> Optional[float]:
     return None
 
 
-def get_ports_for_location(db: Session, location_ids: Optional[list[int]]):
+def get_ports_for_location(
+    db: Session, location_ids: Optional[list[int]], device_type: Optional[str] = None
+):
     ports_query = db.query(LibreNMSPort)
 
-    if location_ids:
+    if location_ids or device_type:
         ports_query = ports_query.outerjoin(
             Device, LibreNMSPort.device_id == Device.device_id
         ).outerjoin(Switch, LibreNMSPort.switch_id == Switch.switch_id)
+
+    if location_ids:
         ports_query = ports_query.filter(
             (Device.location_id.in_(location_ids))
             | (Switch.location_id.in_(location_ids))
         )
+
+    if device_type:
+        if device_type.lower() == "switch":
+            ports_query = ports_query.filter(LibreNMSPort.switch_id.isnot(None))
+        else:
+            ports_query = ports_query.filter(
+                func.lower(Device.device_type) == device_type.lower()
+            )
 
     enabled_ports = ports_query.filter(LibreNMSPort.enabled.is_(True)).all()
     if enabled_ports:
@@ -169,9 +182,9 @@ async def fetch_port_metrics(
 
 
 async def aggregate_port_rates(
-    db: Session, location_ids: Optional[list[int]]
+    db: Session, location_ids: Optional[list[int]], device_type: Optional[str] = None
 ) -> Tuple[float, float, bool]:
-    ports = get_ports_for_location(db, location_ids)
+    ports = get_ports_for_location(db, location_ids, device_type)
     if not ports:
         return 0.0, 0.0, False
 

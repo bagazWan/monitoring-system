@@ -2,18 +2,24 @@ class LocationDownSummary {
   final int locationId;
   final String locationName;
   final int offlineCount;
+  final List<LocationDownSummary>? children;
 
-  LocationDownSummary({
-    required this.locationId,
-    required this.locationName,
-    required this.offlineCount,
-  });
+  LocationDownSummary(
+      {required this.locationId,
+      required this.locationName,
+      required this.offlineCount,
+      this.children});
 
   factory LocationDownSummary.fromJson(Map<String, dynamic> json) {
     return LocationDownSummary(
       locationId: json['location_id'],
       locationName: json['location_name'],
       offlineCount: json['offline_count'],
+      children: json['children'] != null
+          ? (json['children'] as List)
+              .map((i) => LocationDownSummary.fromJson(i))
+              .toList()
+          : null,
     );
   }
 }

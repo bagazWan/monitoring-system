@@ -132,7 +132,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Padding(
-            padding: EdgeInsets.fromLTRB(24.0, 24.0, 24.0, 12),
+            padding: EdgeInsets.all(24),
             child: Text("History Graph",
                 style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
           ),

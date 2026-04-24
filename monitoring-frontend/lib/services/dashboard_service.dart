@@ -14,10 +14,15 @@ class DashboardService {
   }
 
   Future<DashboardStats> getDashboardStats(
-      {String? locationName, int? topDownWindowDays}) async {
+      {String? locationName,
+      int? topDownWindowDays,
+      String? deviceType}) async {
     final params = <String, String>{};
     if (locationName != null && locationName.isNotEmpty) {
       params['location_name'] = locationName;
+    }
+    if (deviceType != null && deviceType.isNotEmpty) {
+      params['device_type'] = deviceType;
     }
     if (topDownWindowDays != null) {
       params['top_down_window'] = topDownWindowDays.toString();
@@ -33,15 +38,18 @@ class DashboardService {
     throw Exception('Failed to load dashboard stats');
   }
 
-  Future<DashboardTraffic> getDashboardTraffic({String? locationName}) async {
+  Future<DashboardTraffic> getDashboardTraffic(
+      {String? locationName, String? deviceType}) async {
     final params = <String, String>{};
     if (locationName != null && locationName.isNotEmpty) {
       params['location_name'] = locationName;
     }
+    if (deviceType != null && deviceType.isNotEmpty) {
+      params['device_type'] = deviceType;
+    }
 
     final uri = Uri.parse(ApiConfig.dashboardTraffic)
         .replace(queryParameters: params.isEmpty ? null : params);
-
     final response = await http.get(uri, headers: await _getHeaders());
     if (response.statusCode == 200) {
       return DashboardTraffic.fromJson(jsonDecode(response.body));
@@ -50,15 +58,17 @@ class DashboardService {
   }
 
   Future<UptimeTrendResponse> getUptimeTrend(
-      {int days = 7, String? locationName}) async {
+      {int days = 7, String? locationName, String? deviceType}) async {
     final params = <String, String>{'days': days.toString()};
     if (locationName != null && locationName.isNotEmpty) {
       params['location_name'] = locationName;
     }
+    if (deviceType != null && deviceType.isNotEmpty) {
+      params['device_type'] = deviceType;
+    }
 
     final uri = Uri.parse(ApiConfig.dashboardUptimeTrend)
         .replace(queryParameters: params);
-
     final response = await http.get(uri, headers: await _getHeaders());
     if (response.statusCode == 200) {
       return UptimeTrendResponse.fromJson(jsonDecode(response.body));

@@ -1,20 +1,15 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import '../../providers/metrics_provider.dart';
 import '../../models/dashboard_stats.dart';
-import '../../models/location.dart';
 import '../../services/device_service.dart';
 import '../../services/dashboard_service.dart';
 import '../../services/websocket_service.dart';
 import '../../widgets/visual_feedback.dart';
+import '../../widgets/filter_dropdown.dart';
 import 'widgets/network_activity_chart.dart';
-import 'widgets/dashboard_filters.dart';
 import 'widgets/summary_grid.dart';
 import 'widgets/top_down.dart';
 import 'widgets/dashboard_charts.dart';
-
-part 'widgets/dashboard_screen_widgets.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -23,8 +18,7 @@ class DashboardScreen extends StatefulWidget {
   State<DashboardScreen> createState() => _DashboardScreenState();
 }
 
-class _DashboardScreenState extends State<DashboardScreen>
-    with DashboardScreenWidgets {
+class _DashboardScreenState extends State<DashboardScreen> {
   final DeviceService _deviceService = DeviceService();
   final DashboardService _dashboardService = DashboardService();
   final ScrollController _scrollController = ScrollController();
@@ -41,24 +35,21 @@ class _DashboardScreenState extends State<DashboardScreen>
 
   bool _chartsInitialized = false;
 
-  final ValueNotifier<List<Location>> _rawLocations = ValueNotifier([]);
   final ValueNotifier<List<String>> _locationFilters = ValueNotifier([]);
-  final ValueNotifier<bool> _isLoadingLocations = ValueNotifier(true);
+  final ValueNotifier<List<String>> _deviceTypes = ValueNotifier([]);
+  final ValueNotifier<bool> _isLoadingFilters = ValueNotifier(true);
   final ValueNotifier<String?> _selectedLocationFilter = ValueNotifier(null);
-
+  final ValueNotifier<String?> _selectedDeviceType = ValueNotifier(null);
   final ValueNotifier<List<DashboardTraffic>> _rawTrafficData =
       ValueNotifier([]);
   final ValueNotifier<List<NetworkActivityData>> _trafficData =
       ValueNotifier([]);
   final int _maxTrafficPoints = 60;
-
   final ValueNotifier<List<UptimeTrendPoint>> _uptimeTrendData =
       ValueNotifier([]);
   final ValueNotifier<int> _topDownWindowDays = ValueNotifier(7);
-
   final ValueNotifier<bool> _isTrafficLoading = ValueNotifier(true);
   final ValueNotifier<bool> _isUptimeLoading = ValueNotifier(true);
-
   final ValueNotifier<bool> _isStatsLoading = ValueNotifier(true);
   final ValueNotifier<DashboardStats?> _dashboardStats = ValueNotifier(null);
   final ValueNotifier<Object?> _statsError = ValueNotifier(null);
@@ -67,7 +58,7 @@ class _DashboardScreenState extends State<DashboardScreen>
   void initState() {
     super.initState();
     _refreshDashboard();
-    _initLocations();
+    _initFilters();
     _initWebSocket();
 
     _scrollController.addListener(_checkLazyLoadTargets);
@@ -75,49 +66,34 @@ class _DashboardScreenState extends State<DashboardScreen>
         .addPostFrameCallback((_) => _checkLazyLoadTargets());
   }
 
-  Future<void> _initLocations() async {
+  Future<void> _initFilters() async {
     try {
       final groups = await _deviceService.getLocationGroups();
+      final types = await _deviceService.getDeviceTypes();
       if (!mounted) return;
 
       final List<String> formattedNames = [];
-
       final parents = groups.where((g) => g.parentId == null).toList()
         ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
 
       for (final parent in parents) {
         formattedNames.add(parent.name);
-
         final children = groups
             .where((g) => g.parentId == parent.groupId)
             .toList()
           ..sort(
               (a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
-
         for (final child in children) {
           formattedNames.add("   ↳ ${child.name}");
         }
       }
 
-      final accountedFor = groups
-          .where((g) =>
-              g.parentId == null || parents.any((p) => p.groupId == g.parentId))
-          .map((e) => e.groupId)
-          .toSet();
-      final orphans = groups
-          .where((g) => !accountedFor.contains(g.groupId))
-          .toList()
-        ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
-      for (final orphan in orphans) {
-        formattedNames.add(orphan.name);
-      }
-
       _locationFilters.value = formattedNames;
-      _isLoadingLocations.value = false;
+      _deviceTypes.value = types;
+      _isLoadingFilters.value = false;
     } catch (_) {
       if (!mounted) return;
-      _locationFilters.value = [];
-      _isLoadingLocations.value = false;
+      _isLoadingFilters.value = false;
     }
   }
 
@@ -130,17 +106,13 @@ class _DashboardScreenState extends State<DashboardScreen>
     _statusSubscription = wsService.statusChanges.listen((_) {
       if (!mounted) return;
       _refreshDashboard();
-      if (_chartsInitialized) {
-        _refreshUptimeTrend();
-      }
+      if (_chartsInitialized) _refreshUptimeTrend();
     });
 
     _alertRefreshSub = wsService.alertsRefresh.listen((_) {
       if (!mounted) return;
       _refreshDashboard();
-      if (_chartsInitialized) {
-        _refreshUptimeTrend();
-      }
+      if (_chartsInitialized) _refreshUptimeTrend();
     });
   }
 
@@ -152,60 +124,7 @@ class _DashboardScreenState extends State<DashboardScreen>
 
     _localChartTimer = Timer.periodic(const Duration(seconds: 30), (_) {
       if (!mounted) return;
-
-      final metrics = Provider.of<MetricsProvider>(context, listen: false);
-      double currentIn = 0;
-      double currentOut = 0;
-      double totalLatency = 0;
-      int latencyCount = 0;
-
-      for (var d in metrics.allDeviceMetrics) {
-        currentIn += (d['in_mbps'] ?? 0);
-        currentOut += (d['out_mbps'] ?? 0);
-
-        if (d['latency_ms'] != null) {
-          totalLatency += (d['latency_ms'] as num).toDouble();
-          latencyCount++;
-        }
-      }
-      for (var s in metrics.allSwitchMetrics) {
-        currentIn += (s['in_mbps'] ?? 0);
-        currentOut += (s['out_mbps'] ?? 0);
-      }
-
-      double? avgLatency =
-          latencyCount > 0 ? (totalLatency / latencyCount) : null;
-      final now = DateTime.now();
-
-      final newTrafficDataPoint = NetworkActivityData(
-        timestamp: now,
-        inbound: currentIn,
-        outbound: currentOut,
-      );
-
-      final newRawDataPoint = DashboardTraffic(
-        timestamp: now,
-        inboundMbps: currentIn,
-        outboundMbps: currentOut,
-        latencyMs: avgLatency,
-      );
-
-      setState(() {
-        final updatedTraffic =
-            List<NetworkActivityData>.from(_trafficData.value)
-              ..add(newTrafficDataPoint);
-        if (updatedTraffic.length > _maxTrafficPoints) {
-          updatedTraffic.removeAt(0);
-        }
-        _trafficData.value = updatedTraffic;
-
-        final updatedRaw = List<DashboardTraffic>.from(_rawTrafficData.value)
-          ..add(newRawDataPoint);
-        if (updatedRaw.length > _maxTrafficPoints) {
-          updatedRaw.removeAt(0);
-        }
-        _rawTrafficData.value = updatedRaw;
-      });
+      _refreshTraffic();
     });
   }
 
@@ -222,6 +141,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     try {
       final stats = await _dashboardService.getDashboardStats(
         locationName: _resolveSelectedLocationFilter(),
+        deviceType: _selectedDeviceType.value,
         topDownWindowDays: _topDownWindowDays.value,
       );
 
@@ -231,9 +151,7 @@ class _DashboardScreenState extends State<DashboardScreen>
       if (!mounted) return;
       _statsError.value = e;
     } finally {
-      if (mounted) {
-        _isStatsLoading.value = false;
-      }
+      if (mounted) _isStatsLoading.value = false;
     }
   }
 
@@ -241,6 +159,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     try {
       final traffic = await _dashboardService.getDashboardTraffic(
         locationName: _resolveSelectedLocationFilter(),
+        deviceType: _selectedDeviceType.value,
       );
 
       if (!mounted) return;
@@ -260,22 +179,17 @@ class _DashboardScreenState extends State<DashboardScreen>
 
       final updated = List<NetworkActivityData>.from(_trafficData.value)
         ..add(dataPoint);
-      if (updated.length > _maxTrafficPoints) {
-        updated.removeAt(0);
-      }
+      if (updated.length > _maxTrafficPoints) updated.removeAt(0);
       _trafficData.value = updated;
 
       final updatedRaw = List<DashboardTraffic>.from(_rawTrafficData.value)
         ..add(traffic);
-      if (updatedRaw.length > _maxTrafficPoints) {
-        updatedRaw.removeAt(0);
-      }
+      if (updatedRaw.length > _maxTrafficPoints) updatedRaw.removeAt(0);
       _rawTrafficData.value = updatedRaw;
 
       _isTrafficLoading.value = false;
     } catch (_) {
-      if (!mounted) return;
-      _isTrafficLoading.value = false;
+      if (mounted) _isTrafficLoading.value = false;
     }
   }
 
@@ -284,14 +198,25 @@ class _DashboardScreenState extends State<DashboardScreen>
       final trend = await _dashboardService.getUptimeTrend(
         days: 7,
         locationName: _resolveSelectedLocationFilter(),
+        deviceType: _selectedDeviceType.value,
       );
       if (!mounted) return;
 
       _uptimeTrendData.value = List<UptimeTrendPoint>.from(trend.data);
       _isUptimeLoading.value = false;
     } catch (_) {
-      if (!mounted) return;
-      _isUptimeLoading.value = false;
+      if (mounted) _isUptimeLoading.value = false;
+    }
+  }
+
+  void _onFilterChanged() {
+    _refreshDashboard();
+    _trafficData.value = [];
+    _rawTrafficData.value = [];
+    _isTrafficLoading.value = true;
+    if (_chartsInitialized) {
+      _refreshTraffic();
+      _refreshUptimeTrend();
     }
   }
 
@@ -300,15 +225,6 @@ class _DashboardScreenState extends State<DashboardScreen>
     if (_chartsInitialized) {
       await _refreshTraffic();
       await _refreshUptimeTrend();
-    }
-  }
-
-  void _resetTrafficData() {
-    _trafficData.value = [];
-    _rawTrafficData.value = [];
-    _isTrafficLoading.value = true;
-    if (_chartsInitialized) {
-      _refreshTraffic();
     }
   }
 
@@ -329,8 +245,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     if (box == null || !box.hasSize) return false;
 
     final position = box.localToGlobal(Offset.zero);
-    final viewportHeight = MediaQuery.of(ctx).size.height;
-    return position.dy < viewportHeight;
+    return position.dy < MediaQuery.of(ctx).size.height;
   }
 
   @override
@@ -340,13 +255,13 @@ class _DashboardScreenState extends State<DashboardScreen>
     _statusSubscription?.cancel();
     _connectionSubscription?.cancel();
     _scrollController.dispose();
-
     _chartsVisible.dispose();
     _topDownVisible.dispose();
-    _rawLocations.dispose();
     _locationFilters.dispose();
-    _isLoadingLocations.dispose();
+    _deviceTypes.dispose();
+    _isLoadingFilters.dispose();
     _selectedLocationFilter.dispose();
+    _selectedDeviceType.dispose();
     _rawTrafficData.dispose();
     _trafficData.dispose();
     _uptimeTrendData.dispose();
@@ -361,6 +276,188 @@ class _DashboardScreenState extends State<DashboardScreen>
 
   @override
   Widget build(BuildContext context) {
-    return buildDashboardScreen(context);
+    return RefreshIndicator(
+      onRefresh: _handleManualRefresh,
+      child: ScrollConfiguration(
+        behavior: ScrollConfiguration.of(context).copyWith(scrollbars: false),
+        child: SingleChildScrollView(
+          controller: _scrollController,
+          physics: const AlwaysScrollableScrollPhysics(),
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: ValueListenableBuilder<bool>(
+              valueListenable: _isStatsLoading,
+              builder: (context, loading, _) {
+                return ValueListenableBuilder<Object?>(
+                  valueListenable: _statsError,
+                  builder: (context, error, _) {
+                    return ValueListenableBuilder<DashboardStats?>(
+                      valueListenable: _dashboardStats,
+                      builder: (context, stats, _) {
+                        if (loading && stats == null) {
+                          return const Center(
+                              child: CircularProgressIndicator());
+                        }
+                        if (error != null) {
+                          return AsyncErrorWidget(
+                              error: error, onRetry: _handleManualRefresh);
+                        }
+                        if (stats == null) {
+                          return const EmptyStateWidget(
+                              message: "No dashboard data available",
+                              icon: Icons.dashboard_customize_outlined);
+                        }
+
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text("Overview",
+                                style: TextStyle(
+                                    fontSize: 24, fontWeight: FontWeight.bold)),
+                            const SizedBox(height: 24),
+                            ValueListenableBuilder<bool>(
+                              valueListenable: _isLoadingFilters,
+                              builder: (context, isLoading, _) {
+                                return Wrap(
+                                  spacing: 16,
+                                  runSpacing: 16,
+                                  children: [
+                                    SizedBox(
+                                      width: 220,
+                                      child: FilterDropdown(
+                                        label: "Location",
+                                        value: _selectedLocationFilter.value,
+                                        items: _locationFilters.value,
+                                        onChanged: (val) {
+                                          _selectedLocationFilter.value = val;
+                                          _onFilterChanged();
+                                        },
+                                      ),
+                                    ),
+                                    SizedBox(
+                                      width: 220,
+                                      child: FilterDropdown(
+                                        label: "Device",
+                                        value: _selectedDeviceType.value,
+                                        items: _deviceTypes.value,
+                                        onChanged: (val) {
+                                          _selectedDeviceType.value = val;
+                                          _onFilterChanged();
+                                        },
+                                      ),
+                                    ),
+                                  ],
+                                );
+                              },
+                            ),
+                            const SizedBox(height: 20),
+                            DashboardSummaryGrid(
+                                stats: stats,
+                                offlineCount:
+                                    stats.totalDevices - stats.onlineDevices),
+                            const SizedBox(height: 30),
+                            ValueListenableBuilder<bool>(
+                              valueListenable: _chartsVisible,
+                              builder: (context, visible, _) {
+                                if (!visible) {
+                                  return Container(
+                                    key: _chartsKey,
+                                    height: 320,
+                                    alignment: Alignment.center,
+                                    decoration: BoxDecoration(
+                                        color: Colors.white,
+                                        borderRadius: BorderRadius.circular(12),
+                                        border: Border.all(
+                                            color: Colors.grey.shade200)),
+                                    child: Text("Scroll to load charts",
+                                        style:
+                                            TextStyle(color: Colors.grey[500])),
+                                  );
+                                }
+                                return Container(
+                                  key: _chartsKey,
+                                  child: ValueListenableBuilder<
+                                      List<NetworkActivityData>>(
+                                    valueListenable: _trafficData,
+                                    builder: (context, traffic, _) =>
+                                        ValueListenableBuilder<bool>(
+                                      valueListenable: _isTrafficLoading,
+                                      builder: (context, trafficLoading, _) =>
+                                          ValueListenableBuilder<
+                                              List<UptimeTrendPoint>>(
+                                        valueListenable: _uptimeTrendData,
+                                        builder: (context, uptime, _) =>
+                                            ValueListenableBuilder<bool>(
+                                          valueListenable: _isUptimeLoading,
+                                          builder:
+                                              (context, uptimeLoading, _) =>
+                                                  ValueListenableBuilder<
+                                                      List<DashboardTraffic>>(
+                                            valueListenable: _rawTrafficData,
+                                            builder: (context, rawTraffic, _) =>
+                                                DashboardCharts(
+                                              trafficData: traffic,
+                                              rawTrafficData: rawTraffic,
+                                              isTrafficLoading: trafficLoading,
+                                              uptimeData: uptime,
+                                              isUptimeLoading: uptimeLoading,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                            const SizedBox(height: 30),
+                            ValueListenableBuilder<bool>(
+                              valueListenable: _topDownVisible,
+                              builder: (context, visible, _) {
+                                if (!visible) {
+                                  return Container(
+                                    key: _topDownKey,
+                                    height: 220,
+                                    alignment: Alignment.center,
+                                    decoration: BoxDecoration(
+                                        color: Colors.white,
+                                        borderRadius: BorderRadius.circular(12),
+                                        border: Border.all(
+                                            color: Colors.grey.shade200)),
+                                    child: Text("Scroll to load top down",
+                                        style:
+                                            TextStyle(color: Colors.grey[500])),
+                                  );
+                                }
+                                return Container(
+                                  key: _topDownKey,
+                                  child: ValueListenableBuilder<int>(
+                                    valueListenable: _topDownWindowDays,
+                                    builder: (context, windowDays, _) {
+                                      return DashboardTopDown(
+                                        stats: stats,
+                                        selectedWindowDays: windowDays,
+                                        onWindowChanged: (window) {
+                                          _topDownWindowDays.value = window;
+                                          _refreshDashboard();
+                                        },
+                                      );
+                                    },
+                                  ),
+                                );
+                              },
+                            ),
+                          ],
+                        );
+                      },
+                    );
+                  },
+                );
+              },
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }

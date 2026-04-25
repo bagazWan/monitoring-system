@@ -1,7 +1,11 @@
 from datetime import datetime
 from typing import List, Optional
 
-from app.api.dependencies import require_admin, require_technician_or_admin
+from app.api.dependencies import (
+    get_current_user,
+    require_admin,
+    require_technician_or_admin,
+)
 from app.core.database import get_db
 from app.models import Device, Location, Switch, User
 from app.schemas.device import (
@@ -79,24 +83,30 @@ def get_nodes(
     device_type: Optional[str] = Query(None),
     status: Optional[str] = Query(None),
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     device_query = db.query(Device).join(Location, isouter=True)
     switch_query = db.query(Switch).join(Location, isouter=True)
 
     if search:
         term = f"%{search.lower()}%"
-        device_query = device_query.filter(
-            or_(
-                func.lower(Device.name).like(term),
-                func.lower(Device.ip_address).like(term),
+
+        if current_user.role in ["admin", "teknisi"]:
+            device_query = device_query.filter(
+                or_(
+                    func.lower(Device.name).like(term),
+                    func.lower(Device.ip_address).like(term),
+                )
             )
-        )
-        switch_query = switch_query.filter(
-            or_(
-                func.lower(Switch.name).like(term),
-                func.lower(Switch.ip_address).like(term),
+            switch_query = switch_query.filter(
+                or_(
+                    func.lower(Switch.name).like(term),
+                    func.lower(Switch.ip_address).like(term),
+                )
             )
-        )
+        else:
+            device_query = device_query.filter(func.lower(Device.name).like(term))
+            switch_query = switch_query.filter(func.lower(Switch.name).like(term))
 
     if location_name:
         loc_q = db.query(Location.location_id)

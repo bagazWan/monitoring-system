@@ -46,7 +46,7 @@ class _LocationSearchPickerDialogState
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text("Select Location"),
+      title: const Text("Pilih Lokasi"),
       content: SizedBox(
         width: 520,
         height: 420,
@@ -55,14 +55,14 @@ class _LocationSearchPickerDialogState
             TextField(
               controller: _searchController,
               decoration: const InputDecoration(
-                hintText: "Search location or group...",
+                hintText: "Cari lokasi atau group...",
                 prefixIcon: Icon(Icons.search),
               ),
             ),
             const SizedBox(height: 12),
             Expanded(
               child: _filtered.isEmpty
-                  ? const Center(child: Text("No matching location"))
+                  ? const Center(child: Text("Tidak ada lokasi yang sesuai"))
                   : ListView.builder(
                       itemCount: _filtered.length,
                       itemBuilder: (context, index) {
@@ -83,7 +83,7 @@ class _LocationSearchPickerDialogState
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text("Cancel"),
+          child: const Text("Batal"),
         ),
       ],
     );

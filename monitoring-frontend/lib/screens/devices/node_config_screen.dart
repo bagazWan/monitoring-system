@@ -70,7 +70,7 @@ class _DeviceConfigScreenState extends State<DeviceConfigScreen>
           _currentNode.nodeKind, _currentNode.id!, data);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text("Settings saved successfully")));
+            const SnackBar(content: Text("Pengaturan berhasil disimpan")));
         setState(() => _hasChanges = true);
         _fetchNodeDetails();
       }
@@ -108,16 +108,16 @@ class _DeviceConfigScreenState extends State<DeviceConfigScreen>
       await _fetchNodeDetails();
       if (mounted) {
         setState(() => _hasChanges = true);
-        ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text("Device reconnected successfully")));
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text("Perangkat berhasil terhubung kembali")));
       }
     }
   }
 
   Future<void> _unregisterDevice() async {
     final confirm = await _showConfirmationDialog(
-      "Stop Monitoring?",
-      "This will remove the device from LibreNMS monitoring.\n\nThe record will remain in the database as 'Offline'.",
+      "Berhenti Monitoring?",
+      "Pilihan ini akan menghilangkan monitoring dari LibreNMS.\n\n Data akan tersimpan di database sebagai OFFLINE.",
       "Unregister",
       Colors.orange,
     );
@@ -128,7 +128,8 @@ class _DeviceConfigScreenState extends State<DeviceConfigScreen>
             _currentNode.nodeKind, _currentNode.id!);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-              content: Text("Device unregistered (Monitoring Stopped)")));
+              content:
+                  Text("Perangkat tidak terdaftar (monitoring berhenti)")));
           setState(() {
             _hasChanges = true;
             _currentLibreNmsId = null;
@@ -143,9 +144,9 @@ class _DeviceConfigScreenState extends State<DeviceConfigScreen>
 
   Future<void> _deleteDevice() async {
     final confirm = await _showConfirmationDialog(
-      "Delete device completely?",
-      "This will permanently delete device from the database.\n\nHistory and configuration will be lost.",
-      "Delete",
+      "Hapus perangkat?",
+      "Pilihan ini akan menghapus perangkat dari database.\n\nHistori dan konfigurasi akan hilang.",
+      "Hapus",
       Colors.red,
     );
 
@@ -155,7 +156,7 @@ class _DeviceConfigScreenState extends State<DeviceConfigScreen>
             _currentNode.nodeKind, _currentNode.id!);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text("Device deleted successfully")));
+              const SnackBar(content: Text("Perangkat berhasil dihapus")));
           Navigator.pop(context, true);
         }
       } catch (e) {
@@ -174,7 +175,7 @@ class _DeviceConfigScreenState extends State<DeviceConfigScreen>
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(context, false),
-              child: const Text("Cancel")),
+              child: const Text("Batal")),
           ElevatedButton(
               style: ElevatedButton.styleFrom(
                   backgroundColor: color, foregroundColor: Colors.white),
@@ -217,10 +218,8 @@ class _DeviceConfigScreenState extends State<DeviceConfigScreen>
             indicatorColor: Colors.blue[700],
             indicatorWeight: 3,
             tabs: const [
-              Tab(
-                  text: "General Settings",
-                  icon: Icon(Icons.settings_outlined)),
-              Tab(text: "Port Management", icon: Icon(Icons.hub_outlined)),
+              Tab(text: "Pengaturan", icon: Icon(Icons.settings_outlined)),
+              Tab(text: "Manajemen Port", icon: Icon(Icons.hub_outlined)),
             ],
           ),
         ),

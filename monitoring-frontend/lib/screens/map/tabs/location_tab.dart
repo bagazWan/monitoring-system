@@ -118,17 +118,18 @@ class _LocationTabState extends State<LocationTab> {
     return showDialog<bool>(
       context: context,
       builder: (c) => AlertDialog(
-        title: const Text("Delete Location?"),
-        content: Text("Delete $name? All nodes here will be unassigned."),
+        title: const Text("Hapus lokasi?"),
+        content: Text(
+            "Hapus $name? Semua perangkat di sini akan menjadi tidak teralokasi."),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(c, false),
-              child: const Text("Cancel")),
+              child: const Text("Batal")),
           ElevatedButton(
               onPressed: () => Navigator.pop(c, true),
               style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.red, foregroundColor: Colors.white),
-              child: const Text("Delete")),
+              child: const Text("Hapus")),
         ],
       ),
     );
@@ -154,7 +155,7 @@ class _LocationTabState extends State<LocationTab> {
               Expanded(
                 child: SearchBarWidget(
                   controller: _searchController,
-                  hintText: "Search by name, address, or group",
+                  hintText: "Cari berdasarkan nama, alamat, atau group",
                 ),
               ),
               const SizedBox(width: 12),
@@ -163,7 +164,7 @@ class _LocationTabState extends State<LocationTab> {
                 child: ElevatedButton.icon(
                   onPressed: _openManageGroups,
                   icon: const Icon(Icons.group_work_outlined),
-                  label: const Text("Manage Groups"),
+                  label: const Text("Kelola Group"),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.blue[700],
                     foregroundColor: Colors.white,
@@ -180,7 +181,7 @@ class _LocationTabState extends State<LocationTab> {
                 child: ElevatedButton.icon(
                   onPressed: () => _openForm(),
                   icon: const Icon(Icons.add),
-                  label: const Text("Add Location"),
+                  label: const Text("Tambah Lokasi"),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.blue[700],
                     foregroundColor: Colors.white,
@@ -198,14 +199,14 @@ class _LocationTabState extends State<LocationTab> {
             EmptyStateWidget.searching(
               isSearching: _searchController.text.isNotEmpty,
               searchQuery: _searchController.text,
-              label: 'locations',
+              label: 'lokasi',
             )
           else ...[
             CustomDataTable(
               columns: const [
                 DataColumn(
                     label: Expanded(
-                        child: Text("Name",
+                        child: Text("Nama",
                             textAlign: TextAlign.center,
                             style: TextStyle(fontWeight: FontWeight.bold)))),
                 DataColumn(
@@ -215,12 +216,12 @@ class _LocationTabState extends State<LocationTab> {
                             style: TextStyle(fontWeight: FontWeight.bold)))),
                 DataColumn(
                     label: Expanded(
-                        child: Text("Address",
+                        child: Text("Alamat",
                             textAlign: TextAlign.center,
                             style: TextStyle(fontWeight: FontWeight.bold)))),
                 DataColumn(
                     label: Expanded(
-                        child: Text("Description",
+                        child: Text("Deskripsi",
                             textAlign: TextAlign.center,
                             style: TextStyle(fontWeight: FontWeight.bold)))),
                 DataColumn(

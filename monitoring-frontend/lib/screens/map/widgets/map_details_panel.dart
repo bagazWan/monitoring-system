@@ -66,7 +66,7 @@ class MapDetailsPanel extends StatelessWidget {
                         ),
                         const Expanded(
                           child: Text(
-                            "Details",
+                            "Detail",
                             style: TextStyle(
                               fontWeight: FontWeight.bold,
                               fontSize: 16,
@@ -75,7 +75,7 @@ class MapDetailsPanel extends StatelessWidget {
                           ),
                         ),
                         IconButton(
-                          tooltip: "Close",
+                          tooltip: "Tutup",
                           onPressed: onClose,
                           constraints: iconConstraints,
                           padding: EdgeInsets.zero,
@@ -101,7 +101,8 @@ class MapDetailsPanel extends StatelessWidget {
                     ? const Center(
                         child: Padding(
                           padding: EdgeInsets.all(16),
-                          child: Text("Tap a marker to see location details."),
+                          child:
+                              Text("Tekan titik untuk melihat detail lokasi."),
                         ),
                       )
                     : LocationDetailsContent(

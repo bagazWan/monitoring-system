@@ -8,7 +8,7 @@ class SearchBarWidget extends StatelessWidget {
   const SearchBarWidget({
     super.key,
     required this.controller,
-    this.hintText = 'Search.. .',
+    this.hintText = 'Cari.. .',
     this.onClear,
   });
 

@@ -61,7 +61,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('${event.name} is now ${event.newStatus}'),
+            content: Text('${event.name} sekarang ${event.newStatus}'),
             backgroundColor: event.newStatus.toLowerCase() == 'online'
                 ? Colors.green
                 : Colors.red,
@@ -170,7 +170,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            "User Management",
+            "Manajemen User",
             style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 24),
@@ -179,14 +179,14 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
               Expanded(
                 child: SearchBarWidget(
                   controller: _searchController,
-                  hintText: 'Search by username or name',
+                  hintText: 'Cari berdasarkan username atau nama',
                 ),
               ),
               const SizedBox(width: 16),
               ElevatedButton.icon(
                 onPressed: () => _openUserDialog(),
                 icon: const Icon(Icons.add),
-                label: const Text('Add User'),
+                label: const Text('Tambah User'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.blueAccent,
                   foregroundColor: Colors.white,
@@ -226,7 +226,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                             style: TextStyle(fontWeight: FontWeight.bold)))),
                 DataColumn(
                     label: Expanded(
-                        child: Text("Full Name",
+                        child: Text("Nama lengkap",
                             style: TextStyle(fontWeight: FontWeight.bold)))),
                 DataColumn(
                     label: Expanded(
@@ -259,7 +259,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                         onPressed: () => _openUserDialog(user: user),
                       ),
                       IconButton(
-                        tooltip: 'Delete',
+                        tooltip: 'Hapus',
                         icon: const Icon(Icons.delete, color: Colors.red),
                         onPressed: () => _deleteUser(user.id),
                       ),
@@ -292,17 +292,17 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text("Delete user"),
-        content: const Text("Are you sure you want to delete this user?"),
+        title: const Text("Hapus user"),
+        content: const Text("Apakah yakin menghapus user ini ?"),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text("Cancel"),
+            child: const Text("Batal"),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            child: const Text("Delete"),
+            child: const Text("Hapus"),
           ),
         ],
       ),

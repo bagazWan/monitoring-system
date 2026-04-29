@@ -69,7 +69,7 @@ class _UserFormDialogState extends State<UserFormDialog> {
         Navigator.pop(context, true);
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
             content:
-                Text(widget.user == null ? "User created" : "User updated")));
+                Text(widget.user == null ? "User dibuat" : "User diperbarui")));
       }
     } catch (e) {
       if (mounted) {
@@ -87,7 +87,7 @@ class _UserFormDialogState extends State<UserFormDialog> {
 
     return AlertDialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      title: Text(isEdit ? "Edit User" : "Add New User"),
+      title: Text(isEdit ? "Edit User" : "Tambah User Baru"),
       content: SizedBox(
         width: 500,
         child: SingleChildScrollView(
@@ -99,7 +99,7 @@ class _UserFormDialogState extends State<UserFormDialog> {
                 _buildTextField("Username", _usernameController,
                     required: true),
                 const SizedBox(height: 16),
-                _buildTextField("Full Name", _fullNameController),
+                _buildTextField("Nama Lengkap", _fullNameController),
                 const SizedBox(height: 16),
                 _buildTextField("Email", _emailController, email: true),
                 const SizedBox(height: 16),
@@ -117,7 +117,7 @@ class _UserFormDialogState extends State<UserFormDialog> {
                 const SizedBox(height: 16),
                 _buildTextField(
                   isEdit
-                      ? "Password (Leave blank to keep current)"
+                      ? "Password (Kosongkan untuk menggunakan data saat ini)"
                       : "Password",
                   _passwordController,
                   required: !isEdit,
@@ -131,7 +131,7 @@ class _UserFormDialogState extends State<UserFormDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text("Cancel"),
+          child: const Text("Batal"),
         ),
         ElevatedButton(
           onPressed: _isLoading ? null : _submit,
@@ -145,7 +145,7 @@ class _UserFormDialogState extends State<UserFormDialog> {
                   height: 16,
                   child: CircularProgressIndicator(
                       strokeWidth: 2, color: Colors.white))
-              : Text(isEdit ? "Save Changes" : "Create User"),
+              : Text(isEdit ? "Simpan" : "Buat User"),
         ),
       ],
     );
@@ -158,8 +158,9 @@ class _UserFormDialogState extends State<UserFormDialog> {
       obscureText: obscure,
       validator: (v) {
         if (required && (v == null || v.isEmpty)) return "Required";
-        if (email && v != null && v.isNotEmpty && !v.contains('@'))
-          return "Invalid Email";
+        if (email && v != null && v.isNotEmpty && !v.contains('@')) {
+          return "Email invalid";
+        }
         return null;
       },
       decoration: _inputDecoration(label),

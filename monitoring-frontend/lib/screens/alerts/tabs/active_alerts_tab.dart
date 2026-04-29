@@ -165,7 +165,7 @@ class _ActiveAlertsTabState extends State<ActiveAlertsTab> {
         Expanded(
           child: _allAlerts.isEmpty
               ? const EmptyStateWidget(
-                  message: "No active alerts match filters",
+                  message: "Tidak ada alert aktif",
                   icon: Icons.notifications_off_outlined,
                 )
               : RefreshIndicator(

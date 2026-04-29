@@ -48,7 +48,6 @@ class AlertCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Top row (severity + time)
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -102,14 +101,12 @@ class AlertCard extends StatelessWidget {
                 ),
               ],
             ),
-
             const SizedBox(height: 12),
             Text(
               alert.deviceName,
               style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
             ),
             const SizedBox(height: 4),
-
             Row(
               children: [
                 Icon(Icons.location_on_outlined,
@@ -133,16 +130,13 @@ class AlertCard extends StatelessWidget {
                 )
               ],
             ),
-
             const Divider(height: 24),
-
             Text(
               alert.message,
               style: const TextStyle(fontSize: 14, height: 1.4),
               maxLines: 3,
               overflow: TextOverflow.ellipsis,
             ),
-
             if (isAcked && (alert.resolvedByFullName?.isNotEmpty ?? false)) ...[
               const SizedBox(height: 10),
               Row(
@@ -157,7 +151,6 @@ class AlertCard extends StatelessWidget {
                 ],
               ),
             ],
-
             if (isTechnicianOrAdmin && alert.status == 'active') ...[
               const SizedBox(height: 16),
               SizedBox(
@@ -165,7 +158,7 @@ class AlertCard extends StatelessWidget {
                 child: ElevatedButton.icon(
                   onPressed: onResolve,
                   icon: const Icon(Icons.check_circle_outline, size: 18),
-                  label: Text(isAcked ? "Update Note" : "Acknowledge"),
+                  label: Text(isAcked ? "Perbarui Note" : "Acknowledge"),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.green[600],
                     foregroundColor: Colors.white,

@@ -4,8 +4,8 @@ import '../../models/location.dart';
 import '../../models/switch_summary.dart';
 import '../../models/device.dart';
 import '../../models/network_node.dart';
+import '../../widgets/location_search_picker_dialog.dart';
 import 'widgets/quick_add_location_dialog.dart';
-import 'widgets/location_search_picker_dialog.dart';
 
 part 'widgets/register_device_layout.dart';
 part 'widgets/register_device_form_inputs.dart';
@@ -84,8 +84,8 @@ class _RegisterDeviceScreenState extends State<RegisterDeviceScreen>
       });
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text("Error loading dropdowns: $e")));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text("Error memuat dropdown: $e")));
       }
     }
   }
@@ -118,7 +118,7 @@ class _RegisterDeviceScreenState extends State<RegisterDeviceScreen>
 
   String _selectedLocationLabel() {
     final match = _locations.where((l) => l.id == _selectedLocationId);
-    if (match.isEmpty) return "Select location...";
+    if (match.isEmpty) return "Pilih lokasi...";
     final location = match.first;
     if ((location.groupName ?? '').isNotEmpty) {
       return "${location.name} • ${location.groupName}";
@@ -163,13 +163,13 @@ class _RegisterDeviceScreenState extends State<RegisterDeviceScreen>
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text("Node registered successfully")));
+            const SnackBar(content: Text("Perangkat berhasil terdaftar")));
         Navigator.pop(context, true);
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text("Failed: $e")));
+            .showSnackBar(SnackBar(content: Text("Gagal: $e")));
       }
     } finally {
       if (mounted) setState(() => _loading = false);

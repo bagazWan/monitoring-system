@@ -26,13 +26,15 @@ mixin DeviceListWidgets on State<DeviceListScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            "Device List",
+            "List Perangkat",
             style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 24),
           SearchBarWidget(
             controller: state._searchController,
-            hintText: 'Search by name or IP address',
+            hintText: state._canViewIp
+                ? 'Cari berdasarkan nama atau IP perangkat'
+                : 'Cari berdasarkan nama perangkat',
           ),
           const SizedBox(height: 12),
           Row(
@@ -87,7 +89,7 @@ mixin DeviceListWidgets on State<DeviceListScreen> {
     return Row(
       children: [
         Text(
-          "Showing $showing of $total devices",
+          "Menampilkan $showing dari $total perangkat",
           style: TextStyle(color: Colors.grey[600]),
         ),
       ],
@@ -106,7 +108,7 @@ mixin DeviceListWidgets on State<DeviceListScreen> {
         child: AsyncErrorWidget(
           error: state._error!,
           onRetry: state._fetchNodes,
-          message: 'Failed to load devices',
+          message: 'Gagal memuat perangkat',
         ),
       );
     }
@@ -117,7 +119,7 @@ mixin DeviceListWidgets on State<DeviceListScreen> {
           child: EmptyStateWidget.searching(
             isSearching: true,
             searchQuery: state._searchQuery,
-            label: 'devices',
+            label: 'perangkat',
             defaultIcon: Icons.devices_other,
           ),
         );
@@ -125,7 +127,7 @@ mixin DeviceListWidgets on State<DeviceListScreen> {
 
       return SliverFillRemaining(
         child: EmptyStateWidget(
-          message: 'No devices found',
+          message: 'Tidak ada perangkat yang ditemukan',
           icon: Icons.devices_other,
           onAction: (state._searchQuery.isNotEmpty ||
                   state._selectedType != null ||

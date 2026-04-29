@@ -17,7 +17,8 @@ mixin RegisterDeviceLayout
         scrolledUnderElevation: 0,
         backgroundColor: Colors.white,
         foregroundColor: Colors.black87,
-        title: Text(isEditing ? "Reconnect Device" : "Register New Node",
+        title: Text(
+            isEditing ? "Hubung Kembali Perangkat" : "Daftar Perangkat Baru",
             style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
         actions: [
           IconButton(
@@ -36,7 +37,7 @@ mixin RegisterDeviceLayout
               children: [
                 buildNodeTypeCard(),
                 const SizedBox(height: 24),
-                buildSectionHeader("Network Connection", Icons.lan),
+                buildSectionHeader("Koneksi Jaringan", Icons.lan),
                 buildFormCard([
                   buildResponsiveRow(
                     isNarrow: isNarrow,
@@ -60,7 +61,7 @@ mixin RegisterDeviceLayout
                     buildResponsiveRow(
                       isNarrow: isNarrow,
                       children: [
-                        buildTextField("SNMP Version", state._snmpController),
+                        buildTextField("Versi SNMP", state._snmpController),
                         buildTextField(
                           "Community String",
                           state._communityController,
@@ -72,14 +73,14 @@ mixin RegisterDeviceLayout
                   ],
                 ]),
                 const SizedBox(height: 24),
-                buildSectionHeader("Identity & Location", Icons.info_outline),
+                buildSectionHeader("Identitas & Lokasi", Icons.info_outline),
                 buildFormCard([
                   buildResponsiveRow(
                     isNarrow: isNarrow,
                     children: [
-                      buildTextField("Display Name", state._nameController),
+                      buildTextField("Nama Tampilan", state._nameController),
                       buildTextField(
-                          "Type (e.g. CCTV)", state._deviceTypeController),
+                          "Tipe (contoh: CCTV)", state._deviceTypeController),
                     ],
                   ),
                   const SizedBox(height: 16),
@@ -89,7 +90,7 @@ mixin RegisterDeviceLayout
                       buildLocationSelector(),
                       if (state._nodeType == 'device')
                         buildDropdown(
-                            "Parent Switch",
+                            "Hub/switch induk",
                             state._selectedSwitchId,
                             state._switches,
                             (val) =>
@@ -99,7 +100,7 @@ mixin RegisterDeviceLayout
                     ],
                   ),
                   const SizedBox(height: 16),
-                  buildTextField("Description", state._descriptionController,
+                  buildTextField("Deskripsi", state._descriptionController,
                       maxLines: 3),
                 ]),
                 const SizedBox(height: 24),
@@ -123,7 +124,7 @@ mixin RegisterDeviceLayout
                             child: CircularProgressIndicator(
                                 color: Colors.white, strokeWidth: 2))
                         : Text(
-                            isEditing ? "UPDATE CONNECTION" : "REGISTER NODE",
+                            isEditing ? "UPDATE KONEKSI" : "DAFTAR PERANGKAT",
                             style: const TextStyle(
                                 fontWeight: FontWeight.bold, letterSpacing: 1),
                           ),

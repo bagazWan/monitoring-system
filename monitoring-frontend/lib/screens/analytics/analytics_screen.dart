@@ -133,7 +133,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
         children: [
           const Padding(
             padding: EdgeInsets.all(24),
-            child: Text("History Graph",
+            child: Text("Grafik Histori",
                 style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
           ),
           Expanded(
@@ -179,7 +179,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                     onDateRangePressed: () async {
                       final picked = await showDateRangePicker(
                         context: context,
-                        firstDate: DateTime(2023),
+                        firstDate: DateTime(2026),
                         lastDate: DateTime.now(),
                         initialDateRange: _dateRange,
                       );

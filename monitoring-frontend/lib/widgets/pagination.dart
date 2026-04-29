@@ -20,24 +20,19 @@ class PaginationWidget extends StatelessWidget {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        // Previous button
         IconButton(
           onPressed:
               currentPage > 1 ? () => onPageChanged(currentPage - 1) : null,
           icon: const Icon(Icons.chevron_left),
-          tooltip: 'Previous page',
+          tooltip: 'Halaman sebelumnya',
         ),
-
-        // Page numbers
         ..._buildPageNumbers(),
-
-        // Next button
         IconButton(
           onPressed: currentPage < totalPages
               ? () => onPageChanged(currentPage + 1)
               : null,
           icon: const Icon(Icons.chevron_right),
-          tooltip: 'Next page',
+          tooltip: 'Halaman selanjutnya',
         ),
       ],
     );
@@ -58,7 +53,6 @@ class PaginationWidget extends StatelessWidget {
       startPage = math.max(1, totalPages - 4);
     }
 
-    // First page
     if (startPage > 1) {
       pages.add(_buildPageButton(1));
       if (startPage > 2) {
@@ -66,12 +60,10 @@ class PaginationWidget extends StatelessWidget {
       }
     }
 
-    // Middle pages
     for (int i = startPage; i <= endPage; i++) {
       pages.add(_buildPageButton(i));
     }
 
-    // Last page
     if (endPage < totalPages) {
       if (endPage < totalPages - 1) {
         pages.add(_buildEllipsis());

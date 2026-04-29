@@ -49,20 +49,20 @@ class DashboardSummaryGrid extends StatelessWidget {
                         .where((s) => s['status'] == 'offline')
                         .length;
                 return SummaryCard(
-                  title: "Devices Down",
+                  title: "Perangkat Down",
                   value: liveOffline.toString(),
                   icon: Icons.portable_wifi_off,
                   iconColor: Colors.redAccent,
-                  subtitle: "Current offline devices",
+                  subtitle: "Perangkat offline saat ini",
                 );
               },
             ),
             SummaryCard(
-              title: "Active Alerts",
+              title: "Alert Aktif",
               value: stats.activeAlerts.toString(),
               icon: Icons.warning_amber_rounded,
               iconColor: Colors.orange,
-              subtitle: "Unresolved issues",
+              subtitle: "Alert yang belum terselesaikan",
             ),
             Consumer<MetricsProvider>(
               builder: (context, metrics, _) {
@@ -71,7 +71,7 @@ class DashboardSummaryGrid extends StatelessWidget {
                   value: BandwidthFormatter.format(metrics.totalLiveBandwidth),
                   icon: Icons.speed,
                   iconColor: Colors.purple,
-                  subtitle: "Aggregate in + out traffic",
+                  subtitle: "Total trafik in + out",
                 );
               },
             ),
@@ -127,7 +127,7 @@ class _DeviceTypeStatsCardState extends State<_DeviceTypeStatsCard> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                "Device Stats",
+                "Statistik Perangkat",
                 style: TextStyle(
                   color: Colors.grey[600],
                   fontWeight: FontWeight.w600,
@@ -143,7 +143,7 @@ class _DeviceTypeStatsCardState extends State<_DeviceTypeStatsCard> {
           ),
           const SizedBox(height: 6),
           Text(
-            "${widget.totalDevices} total registered",
+            "${widget.totalDevices} total terdaftar",
             style: TextStyle(
               color: Colors.grey[600],
               fontSize: 12,
@@ -159,7 +159,7 @@ class _DeviceTypeStatsCardState extends State<_DeviceTypeStatsCard> {
               child: widget.types.isEmpty
                   ? Center(
                       child: Text(
-                        "No devices",
+                        "Tidak ada perangkat",
                         style: TextStyle(color: Colors.grey[500]),
                       ),
                     )

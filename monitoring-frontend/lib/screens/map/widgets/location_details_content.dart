@@ -42,7 +42,7 @@ class LocationDetailsContent extends StatelessWidget {
             Text(location.address!),
           ],
           const SizedBox(height: 12),
-          Text("Nodes at location: ${nodesAtLocation.length}"),
+          Text("Perangkat di lokasi: ${nodesAtLocation.length}"),
           const SizedBox(height: 8),
           ...nodesAtLocation.map((n) {
             final status = (n.status ?? 'unknown').toLowerCase();

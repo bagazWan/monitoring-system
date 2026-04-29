@@ -5,7 +5,6 @@ class AlertNotification {
   static OverlayEntry? _currentEntry;
   static Timer? _dismissTimer;
 
-  /// Show alert notification overlay
   static void show(
     BuildContext context, {
     required String message,
@@ -35,8 +34,6 @@ class AlertNotification {
     );
 
     overlay.insert(_currentEntry!);
-
-    // Auto dismiss after 5 seconds
     _dismissTimer = Timer(const Duration(seconds: 5), () {
       dismiss();
     });
@@ -132,7 +129,7 @@ class _AlertNotificationWidgetState extends State<_AlertNotificationWidget>
     }
   }
 
-  String _title() => _isCleared ? 'Recovered' : 'New Alert';
+  String _title() => _isCleared ? 'Pulih' : 'Alert Baru';
 
   @override
   Widget build(BuildContext context) {
@@ -199,7 +196,7 @@ class _AlertNotificationWidgetState extends State<_AlertNotificationWidget>
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
                     TextButton(
-                        onPressed: widget.onTap, child: const Text('View')),
+                        onPressed: widget.onTap, child: const Text('Lihat')),
                   ],
                 ),
               ],

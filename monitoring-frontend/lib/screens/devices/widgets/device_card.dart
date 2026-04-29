@@ -66,7 +66,7 @@ class DeviceCard extends StatelessWidget {
         subtitle: canViewIp
             ? Text(node.ipAddress, style: TextStyle(color: Colors.grey[600]))
             : null,
-        trailing: _buildTypeBadge(node.deviceType ?? 'Device'),
+        trailing: _buildTypeBadge(node.deviceType ?? 'Perangkat'),
         children: [
           const Padding(
             padding: EdgeInsets.only(bottom: 4.0),
@@ -75,8 +75,8 @@ class DeviceCard extends StatelessWidget {
           _buildLiveStatsRow(context),
 
           // _buildInfoRow("MAC Address", node.macAddress ?? "N/A"),
-          _buildInfoRow("Location", node.locationName ?? "Not Set"),
-          _buildInfoRow("Description", node.description ?? "-"),
+          _buildInfoRow("Lokasi", node.locationName ?? "Belum diatur"),
+          _buildInfoRow("Deskripsi", node.description ?? "-"),
           // _buildInfoRow("Last Replaced", node.lastReplacedAt ?? "-"),
         ],
       ),
@@ -84,7 +84,7 @@ class DeviceCard extends StatelessWidget {
   }
 
   Widget _buildLiveStatsRow(BuildContext context) {
-    String trafficText = "Waiting for data...";
+    String trafficText = "Menunggu data ...";
     bool isIdle = false;
     bool isLive = false;
     String latencyText = "-";
@@ -101,11 +101,11 @@ class DeviceCard extends StatelessWidget {
       }
 
       if (liveStatus == 'offline') {
-        trafficText = "Device is Offline";
+        trafficText = "Perangkat offline";
         latencyText = "-";
       } else {
         if (inMbps == 0 && outMbps == 0) {
-          trafficText = "No Traffic (Idle or Disabled)";
+          trafficText = "Tidak ada trafik";
           isIdle = true;
         } else {
           trafficText =
@@ -127,7 +127,7 @@ class DeviceCard extends StatelessWidget {
                   children: [
                     SizedBox(
                       width: 100,
-                      child: Text("Live Traffic:",
+                      child: Text("Trafik:",
                           style:
                               TextStyle(color: Colors.grey[600], fontSize: 13)),
                     ),
@@ -159,7 +159,7 @@ class DeviceCard extends StatelessWidget {
                     padding: EdgeInsets.zero,
                     icon: const Icon(Icons.settings,
                         size: 20, color: Colors.grey),
-                    tooltip: "Configure Device",
+                    tooltip: "Konfigurasi Perangkat",
                     onPressed: () {
                       Navigator.push(
                         context,
@@ -177,7 +177,7 @@ class DeviceCard extends StatelessWidget {
             children: [
               SizedBox(
                 width: 100,
-                child: Text("Latency:",
+                child: Text("Latensi:",
                     style: TextStyle(color: Colors.grey[600], fontSize: 13)),
               ),
               Text(latencyText, style: const TextStyle(fontSize: 13)),

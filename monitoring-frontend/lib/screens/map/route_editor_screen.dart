@@ -69,9 +69,13 @@ class _RouteEditorScreenState extends State<RouteEditorScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_points.isNotEmpty) {
         final bounds = LatLngBounds.fromPoints(_points);
-        _mapController.fitCamera(
-          CameraFit.bounds(bounds: bounds, padding: const EdgeInsets.all(50)),
-        );
+        if (bounds.southWest == bounds.northEast) {
+          _mapController.move(bounds.center, 15.0);
+        } else {
+          _mapController.fitCamera(
+            CameraFit.bounds(bounds: bounds, padding: const EdgeInsets.all(50)),
+          );
+        }
       }
     });
   }
@@ -89,14 +93,14 @@ class _RouteEditorScreenState extends State<RouteEditorScreen> {
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Route line saved successfully")),
+          const SnackBar(content: Text("Jalur garis tersimpan")),
         );
         Navigator.pop(context, true);
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Failed to save route: $e")),
+          SnackBar(content: Text("Gagal menyimpan jalur: $e")),
         );
       }
     } finally {
@@ -108,7 +112,7 @@ class _RouteEditorScreenState extends State<RouteEditorScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Edit FO Route Line",
+        title: const Text("Edit Garis Jalur FO",
             style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
         actions: [
           Padding(
@@ -122,7 +126,7 @@ class _RouteEditorScreenState extends State<RouteEditorScreen> {
                       child: CircularProgressIndicator(
                           strokeWidth: 2, color: Colors.white))
                   : const Icon(Icons.save),
-              label: const Text("Save Map"),
+              label: const Text("Simpan Peta"),
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.green,
                 foregroundColor: Colors.white,
@@ -136,7 +140,7 @@ class _RouteEditorScreenState extends State<RouteEditorScreen> {
   }
 
   Widget _buildBody() {
-    final dragMarkers = _polyEditor.edit();
+    final dragMarkers = List<DragMarker>.from(_polyEditor.edit());
 
     if (dragMarkers.isNotEmpty) {
       dragMarkers.removeWhere(

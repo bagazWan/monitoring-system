@@ -46,16 +46,16 @@ class _LocationManagementScreenState extends State<LocationManagementScreen>
       child: Scaffold(
         backgroundColor: Colors.grey[50],
         appBar: AppBar(
-          title: const Text("Location Master Data",
+          title: const Text("Master Data Lokasi",
               style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
           bottom: TabBar(
             controller: _tabController,
             labelColor: Colors.blue[700],
             indicatorColor: Colors.blue[700],
             tabs: const [
-              Tab(text: "Locations", icon: Icon(Icons.location_on)),
-              Tab(text: "Network Nodes", icon: Icon(Icons.lan)),
-              Tab(text: "FO Routes", icon: Icon(Icons.route)),
+              Tab(text: "Lokasi", icon: Icon(Icons.location_on)),
+              Tab(text: "Node Jaringan", icon: Icon(Icons.lan)),
+              Tab(text: "Jalur FO", icon: Icon(Icons.route)),
             ],
           ),
         ),

@@ -23,20 +23,20 @@ class AlertLogTable extends StatelessWidget {
     return CustomDataTable(
       columns: const [
         DataColumn(
-            label:
-                Text('Created', style: TextStyle(fontWeight: FontWeight.bold))),
+            label: Text('Waktu muncul',
+                style: TextStyle(fontWeight: FontWeight.bold))),
         DataColumn(
-            label:
-                Text('Cleared', style: TextStyle(fontWeight: FontWeight.bold))),
+            label: Text('Waktu selesai',
+                style: TextStyle(fontWeight: FontWeight.bold))),
         DataColumn(
             label: Text('Severity',
                 style: TextStyle(fontWeight: FontWeight.bold))),
         DataColumn(
-            label:
-                Text('Device', style: TextStyle(fontWeight: FontWeight.bold))),
-        DataColumn(
-            label: Text('Location',
+            label: Text('Perangkat',
                 style: TextStyle(fontWeight: FontWeight.bold))),
+        DataColumn(
+            label:
+                Text('Lokasi', style: TextStyle(fontWeight: FontWeight.bold))),
         DataColumn(label: Text('')),
       ],
       rows: logs.map((a) {
@@ -63,14 +63,14 @@ class AlertLogTable extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   IconButton(
-                    tooltip: "Details",
+                    tooltip: "Detail",
                     icon: const Icon(Icons.open_in_new,
                         size: 18, color: Colors.blue),
                     onPressed: () => onDetails(a),
                   ),
                   if (isAdmin)
                     IconButton(
-                      tooltip: "Delete",
+                      tooltip: "Hapus",
                       icon:
                           const Icon(Icons.delete, size: 18, color: Colors.red),
                       onPressed: () => onDelete(a),

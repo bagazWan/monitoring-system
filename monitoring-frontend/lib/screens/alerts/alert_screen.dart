@@ -47,7 +47,7 @@ class _AlertScreenState extends State<AlertScreen>
             width: double.infinity,
             padding: const EdgeInsets.fromLTRB(24.0, 24.0, 24.0, 12),
             child: const Text(
-              'Incident Log',
+              'Log Insiden',
               style: TextStyle(
                   color: Colors.black,
                   fontSize: 24,
@@ -68,8 +68,8 @@ class _AlertScreenState extends State<AlertScreen>
               indicatorColor: Colors.blue[700],
               indicatorSize: TabBarIndicatorSize.label,
               tabs: const [
-                Tab(text: 'Active Alerts'),
-                Tab(text: 'Alerts Log'),
+                Tab(text: 'Active Alert'),
+                Tab(text: 'Log Alert'),
               ],
             ),
           ),

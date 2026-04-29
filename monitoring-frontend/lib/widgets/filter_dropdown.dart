@@ -24,7 +24,7 @@ class FilterDropdown extends StatelessWidget {
       dropdownItems.add(
         DropdownMenuItem<String>(
           value: null,
-          child: Text('All $label', style: const TextStyle(fontSize: 13)),
+          child: Text('Semua $label', style: const TextStyle(fontSize: 13)),
         ),
       );
     }

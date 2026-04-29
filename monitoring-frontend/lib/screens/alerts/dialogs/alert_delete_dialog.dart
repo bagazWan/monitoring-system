@@ -22,7 +22,7 @@ class AlertDeleteConfirmDialog extends StatelessWidget {
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context, false),
-          child: const Text("Cancel"),
+          child: const Text("Batal"),
         ),
         ElevatedButton(
           onPressed: () => Navigator.pop(context, true),

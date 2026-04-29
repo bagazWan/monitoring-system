@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../models/network_node.dart';
 import '../../../models/location.dart';
 import '../../../services/map_service.dart';
+import '../../../services/device_service.dart';
 import '../../../widgets/data_table.dart';
 import '../../../widgets/visual_feedback.dart';
 import '../../../widgets/search_bar.dart';
@@ -63,7 +64,7 @@ class _NetworkNodeTabState extends State<NetworkNodeTab> {
           limit: _itemsPerPage,
           search: _searchController.text.trim(),
         ),
-        _service.getLocations(),
+        DeviceService().getAllLocationOptions(),
       ]);
 
       final nodesPage = results[0] as NetworkNodePage;
@@ -111,17 +112,18 @@ class _NetworkNodeTabState extends State<NetworkNodeTab> {
     return showDialog<bool>(
       context: context,
       builder: (c) => AlertDialog(
-        title: const Text("Delete Network Node?"),
-        content: Text("Delete $name? All nodes here will be unassigned."),
+        title: const Text("Hapus node jaringan?"),
+        content: Text(
+            "Hapus $name? Semua perangkat di sini akan menjadi tidak teralokasi."),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(c, false),
-              child: const Text("Cancel")),
+              child: const Text("Batal")),
           ElevatedButton(
               onPressed: () => Navigator.pop(c, true),
               style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.red, foregroundColor: Colors.white),
-              child: const Text("Delete")),
+              child: const Text("Hapus")),
         ],
       ),
     );
@@ -147,7 +149,7 @@ class _NetworkNodeTabState extends State<NetworkNodeTab> {
               Expanded(
                 child: SearchBarWidget(
                   controller: _searchController,
-                  hintText: "Search by name",
+                  hintText: "Cari berdasarkan nama",
                 ),
               ),
               const SizedBox(width: 16),
@@ -156,7 +158,7 @@ class _NetworkNodeTabState extends State<NetworkNodeTab> {
                 child: ElevatedButton.icon(
                   onPressed: () => _openForm(),
                   icon: const Icon(Icons.add),
-                  label: const Text("Add Network Node"),
+                  label: const Text("Tambah Node Jaringan"),
                   style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.blue[700],
                       foregroundColor: Colors.white,
@@ -171,29 +173,29 @@ class _NetworkNodeTabState extends State<NetworkNodeTab> {
             EmptyStateWidget.searching(
               isSearching: _searchController.text.isNotEmpty,
               searchQuery: _searchController.text,
-              label: 'network nodes',
+              label: 'node jaringan',
             )
           else ...[
             CustomDataTable(
               columns: const [
                 DataColumn(
                     label: Expanded(
-                        child: Text("Name",
+                        child: Text("Nama",
                             textAlign: TextAlign.center,
                             style: TextStyle(fontWeight: FontWeight.bold)))),
                 DataColumn(
                     label: Expanded(
-                        child: Text("Location Name",
+                        child: Text("Nama Lokasi",
                             textAlign: TextAlign.center,
                             style: TextStyle(fontWeight: FontWeight.bold)))),
                 DataColumn(
                     label: Expanded(
-                        child: Text("Type",
+                        child: Text("Tipe",
                             textAlign: TextAlign.center,
                             style: TextStyle(fontWeight: FontWeight.bold)))),
                 DataColumn(
                     label: Expanded(
-                        child: Text("Description",
+                        child: Text("Deskripsi",
                             textAlign: TextAlign.center,
                             style: TextStyle(fontWeight: FontWeight.bold)))),
                 DataColumn(

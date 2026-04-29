@@ -38,7 +38,7 @@ class DashboardFilters extends StatelessWidget {
         SizedBox(
           width: 260,
           child: FilterDropdown(
-            label: "Location",
+            label: "Lokasi",
             value: selectedLocationFilter,
             items: locationFilters,
             onChanged: onLocationChanged,

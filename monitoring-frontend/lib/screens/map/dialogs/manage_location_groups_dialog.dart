@@ -42,7 +42,7 @@ class _ManageLocationGroupsDialogState
       if (!mounted) return;
       setState(() => _isLoading = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Failed loading groups: $e")),
+        SnackBar(content: Text("Gagal memuat group: $e")),
       );
     }
   }
@@ -69,7 +69,7 @@ class _ManageLocationGroupsDialogState
     final name = _nameController.text.trim();
     if (name.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Group name is required")),
+        const SnackBar(content: Text("Nama group diperlukan")),
       );
       return;
     }
@@ -97,12 +97,13 @@ class _ManageLocationGroupsDialogState
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-            content: Text(_editing == null ? "Group added" : "Group updated")),
+            content: Text(
+                _editing == null ? "Group ditambahkan" : "Group diperbarui")),
       );
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text("Save failed: $e")));
+          .showSnackBar(SnackBar(content: Text("Penyimpanan gagal: $e")));
     } finally {
       if (mounted) setState(() => _isSaving = false);
     }
@@ -112,17 +113,17 @@ class _ManageLocationGroupsDialogState
     final confirm = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text("Delete Group?"),
-        content: Text("Delete '${group.name}'?"),
+        title: const Text("Hapus Group?"),
+        content: Text("Hapus '${group.name}'?"),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(context, false),
-              child: const Text("Cancel")),
+              child: const Text("Batal")),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
             style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.red, foregroundColor: Colors.white),
-            child: const Text("Delete"),
+            child: const Text("Hapus"),
           ),
         ],
       ),
@@ -136,11 +137,11 @@ class _ManageLocationGroupsDialogState
       await _loadGroups();
       if (!mounted) return;
       ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text("Group deleted")));
+          .showSnackBar(const SnackBar(content: Text("Group terhapus")));
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text("Delete failed: $e")));
+          .showSnackBar(SnackBar(content: Text("Hapus gagal: $e")));
     }
   }
 
@@ -173,7 +174,7 @@ class _ManageLocationGroupsDialogState
     final displayGroups = _getSortedDisplayGroups();
 
     return AlertDialog(
-      title: const Text("Manage Location Groups"),
+      title: const Text("Konfigurasi Group Lokasi"),
       content: SizedBox(
         width: 760,
         child: _isLoading
@@ -196,17 +197,17 @@ class _ManageLocationGroupsDialogState
                           TextField(
                             controller: _nameController,
                             decoration:
-                                const InputDecoration(labelText: "Group Name"),
+                                const InputDecoration(labelText: "Nama Group"),
                           ),
                           const SizedBox(height: 12),
                           DropdownButtonFormField<int>(
                             value: _selectedParentId,
                             decoration: const InputDecoration(
-                                labelText: "Parent Section (Optional)"),
+                                labelText: "Seksi Induk (Opsional)"),
                             items: [
                               const DropdownMenuItem<int>(
                                   value: null,
-                                  child: Text("None (Top Level Section)")),
+                                  child: Text("Tidak Ada (Seksi Utama)")),
                               ..._groups
                                   .where((g) =>
                                       g.parentId == null &&
@@ -224,7 +225,7 @@ class _ManageLocationGroupsDialogState
                             controller: _descController,
                             maxLines: 2,
                             decoration:
-                                const InputDecoration(labelText: "Description"),
+                                const InputDecoration(labelText: "Deskripsi"),
                           ),
                           const SizedBox(height: 16),
                           Row(
@@ -233,14 +234,14 @@ class _ManageLocationGroupsDialogState
                                 onPressed: _isSaving ? null : _save,
                                 icon: const Icon(Icons.save),
                                 label: Text(_editing == null
-                                    ? "Add Group"
-                                    : "Update Group"),
+                                    ? "Tambah Group"
+                                    : "Perbarui Group"),
                               ),
                               if (_editing != null) ...[
                                 const SizedBox(width: 8),
                                 TextButton(
                                   onPressed: _isSaving ? null : _clearForm,
-                                  child: const Text("Cancel"),
+                                  child: const Text("Batal"),
                                 ),
                               ]
                             ],
@@ -274,9 +275,7 @@ class _ManageLocationGroupsDialogState
                                         ? FontWeight.normal
                                         : FontWeight.bold)),
                             subtitle: Text(group.description ??
-                                (isChild
-                                    ? "Child Location"
-                                    : "Top Level Section")),
+                                (isChild ? "Sub-lokasi" : "Seksi Utama")),
                             contentPadding: EdgeInsets.only(
                                 left: isChild ? 24.0 : 8.0, right: 8.0),
                             trailing: Row(
@@ -305,7 +304,7 @@ class _ManageLocationGroupsDialogState
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context, _hasChanges),
-          child: const Text("Close"),
+          child: const Text("Tutup"),
         ),
       ],
     );

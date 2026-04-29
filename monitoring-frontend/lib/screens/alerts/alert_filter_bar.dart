@@ -8,13 +8,11 @@ class AlertFilterBar extends StatelessWidget {
   final ValueChanged<String?>? onSeverityChanged;
   final VoidCallback? onClear;
 
-  // alert log tab filter
   final DateTimeRange? selectedDateRange;
   final ValueChanged<DateTimeRange?>? onDateRangeChanged;
   final String? selectedStatus;
   final ValueChanged<String?>? onStatusChanged;
 
-  // active alert tab filter
   final String? selectedLocation;
   final List<String>? locations;
   final ValueChanged<String?>? onLocationChanged;
@@ -58,7 +56,7 @@ class AlertFilterBar extends StatelessWidget {
                 icon: const Icon(Icons.calendar_month, size: 18),
                 label: Text(
                   selectedDateRange == null
-                      ? "Filter Date"
+                      ? "Filter Tanggal"
                       : "${DateFormat('dd/MM').format(selectedDateRange!.start)} - ${DateFormat('dd/MM').format(selectedDateRange!.end)}",
                   style: const TextStyle(fontSize: 12, color: Colors.black87),
                 ),
@@ -94,7 +92,7 @@ class AlertFilterBar extends StatelessWidget {
             ),
           if (onLocationChanged != null)
             FilterDropdown(
-              label: "Location",
+              label: "Lokasi",
               value: selectedLocation,
               items: locations ?? [],
               onChanged: onLocationChanged!,
@@ -108,7 +106,7 @@ class AlertFilterBar extends StatelessWidget {
             TextButton.icon(
               onPressed: onClear,
               icon: const Icon(Icons.clear_all, size: 16),
-              label: const Text("Clear"),
+              label: const Text("Reset filter"),
               style: TextButton.styleFrom(
                 foregroundColor: Colors.red[700],
                 padding:

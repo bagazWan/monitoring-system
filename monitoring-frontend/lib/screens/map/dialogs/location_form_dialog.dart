@@ -60,7 +60,7 @@ class _LocationFormDialogState extends State<LocationFormDialog> {
       if (!mounted) return;
       setState(() => _isLoadingGroups = false);
       ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Failed to load location groups: $e")));
+          SnackBar(content: Text("Gagal memuat group lokasi: $e")));
     }
   }
 
@@ -96,8 +96,7 @@ class _LocationFormDialogState extends State<LocationFormDialog> {
         longitude == null ||
         _selectedGroupId == null) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content:
-              Text("Please fill all required fields and select a group.")));
+          content: Text("Isi semua kolom yang diperlukan dan pilih group.")));
       return;
     }
 
@@ -123,12 +122,12 @@ class _LocationFormDialogState extends State<LocationFormDialog> {
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(d == null ? "Location created" : "Location updated")));
+          content: Text(d == null ? "Lokasi dibuat" : "Lokasi diperbarui")));
       Navigator.pop(context, true);
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text("Save failed: $e")));
+          .showSnackBar(SnackBar(content: Text("Save gagal: $e")));
     } finally {
       if (mounted) setState(() => _isSaving = false);
     }
@@ -151,7 +150,7 @@ class _LocationFormDialogState extends State<LocationFormDialog> {
     final displayGroups = _getSortedDisplayGroups();
 
     return AlertDialog(
-      title: Text(isEdit ? "Edit Location Point" : "Add Location Point"),
+      title: Text(isEdit ? "Edit Titik Lokasi" : "Tambah Titik Lokasi"),
       content: SizedBox(
         width: 520,
         child: _isLoadingGroups
@@ -165,20 +164,20 @@ class _LocationFormDialogState extends State<LocationFormDialog> {
                       TextFormField(
                         controller: _nameController,
                         decoration:
-                            const InputDecoration(labelText: "Location Name"),
+                            const InputDecoration(labelText: "Nama Lokasi"),
                         validator: (v) =>
                             v == null || v.trim().isEmpty ? "Required" : null,
                       ),
                       const SizedBox(height: 12),
                       TextFormField(
                         controller: _addrController,
-                        decoration: const InputDecoration(labelText: "Address"),
+                        decoration: const InputDecoration(labelText: "Alamat"),
                       ),
                       const SizedBox(height: 12),
                       TextFormField(
                         controller: _typeController,
                         decoration: const InputDecoration(
-                            labelText: "Location Type (e.g., gerbang_tol)"),
+                            labelText: "Tipe Lokasi (contoh, gerbang_tol)"),
                         validator: (v) =>
                             v == null || v.trim().isEmpty ? "Required" : null,
                       ),
@@ -186,10 +185,9 @@ class _LocationFormDialogState extends State<LocationFormDialog> {
                       DropdownButtonFormField<int>(
                         value: _selectedGroupId,
                         decoration: const InputDecoration(
-                            labelText: "Parent Section / Group",
-                            hintText: "Select a Section/Gate"),
-                        validator: (v) =>
-                            v == null ? "Please select a group" : null,
+                            labelText: "Seksi Induk / Group",
+                            hintText: "Pilih Seksi/Gerbang"),
+                        validator: (v) => v == null ? "Pilih group" : null,
                         items: displayGroups.map((group) {
                           final isChild = group.parentId != null;
                           return DropdownMenuItem<int>(
@@ -250,7 +248,7 @@ class _LocationFormDialogState extends State<LocationFormDialog> {
                         controller: _descController,
                         maxLines: 3,
                         decoration:
-                            const InputDecoration(labelText: "Description"),
+                            const InputDecoration(labelText: "Deskripsi"),
                       ),
                     ],
                   ),
@@ -260,7 +258,7 @@ class _LocationFormDialogState extends State<LocationFormDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context, false),
-          child: const Text("Cancel"),
+          child: const Text("Batal"),
         ),
         ElevatedButton(
           onPressed: (_isLoadingGroups || _isSaving) ? null : _submit,
@@ -271,7 +269,7 @@ class _LocationFormDialogState extends State<LocationFormDialog> {
                   child: CircularProgressIndicator(
                     strokeWidth: 2,
                   ))
-              : Text(isEdit ? "Save Changes" : "Create Location"),
+              : Text(isEdit ? "Simpan Perubahan" : "Buat Lokasi"),
         ),
       ],
     );

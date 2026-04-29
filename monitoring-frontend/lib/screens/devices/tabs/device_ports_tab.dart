@@ -51,10 +51,10 @@ class _DevicePortsTabState extends State<DevicePortsTab> {
       );
       await _fetchPorts();
     } catch (e) {
-      debugPrint("Resync failed: $e");
+      debugPrint("Resync gagal: $e");
       if (mounted) {
         ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text("Resync failed: $e")));
+            .showSnackBar(SnackBar(content: Text("Resync gagal: $e")));
       }
     } finally {
       if (mounted) setState(() => _resyncing = false);
@@ -100,7 +100,7 @@ class _DevicePortsTabState extends State<DevicePortsTab> {
           mainAxisSize: MainAxisSize.min,
           children: [
             const EmptyStateWidget(
-              message: "No ports found",
+              message: "Tidak ada port ditemukan",
               icon: Icons.router_outlined,
             ),
             const SizedBox(height: 12),
@@ -113,7 +113,7 @@ class _DevicePortsTabState extends State<DevicePortsTab> {
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
                   : const Icon(Icons.sync, size: 18),
-              label: const Text("Resync Ports"),
+              label: const Text("Resync Port"),
             ),
           ],
         ),

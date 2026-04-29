@@ -37,7 +37,7 @@ class _AlertAcknowledgeDialogState extends State<AlertAcknowledgeDialog> {
       Navigator.pop(context, true);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text("Note saved"),
+          content: Text("Note tersimpan"),
           backgroundColor: Colors.green,
         ),
       );
@@ -76,7 +76,7 @@ class _AlertAcknowledgeDialogState extends State<AlertAcknowledgeDialog> {
             ),
             const SizedBox(height: 12),
             Text(
-              "Alert message (LibreNMS):\n${widget.alert.message}",
+              "Pesan Alert (LibreNMS):\n${widget.alert.message}",
               style: TextStyle(fontSize: 12, color: Colors.grey[700]),
             ),
           ],
@@ -85,7 +85,7 @@ class _AlertAcknowledgeDialogState extends State<AlertAcknowledgeDialog> {
       actions: [
         TextButton(
           onPressed: _saving ? null : () => Navigator.pop(context, false),
-          child: const Text("Cancel"),
+          child: const Text("Batal"),
         ),
         ElevatedButton(
           onPressed: _saving ? null : _save,
@@ -95,7 +95,7 @@ class _AlertAcknowledgeDialogState extends State<AlertAcknowledgeDialog> {
                   width: 16,
                   child: CircularProgressIndicator(strokeWidth: 2),
                 )
-              : const Text("Save"),
+              : const Text("Simpan"),
         ),
       ],
     );

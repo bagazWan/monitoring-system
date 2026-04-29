@@ -31,11 +31,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text("Registration successful"),
+              content: Text("Registrasi berhasil"),
               backgroundColor: Colors.green,
             ),
           );
-          Navigator.pop(context); // Go back to login
+          Navigator.pop(context);
         }
       } catch (e) {
         if (mounted) {
@@ -71,11 +71,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Center(
-                      child: Text("Create Account",
+                      child: Text("Buat Akun",
                           style: TextStyle(
                               fontSize: 28, fontWeight: FontWeight.bold))),
                   const SizedBox(height: 32),
-                  _buildLabel("Full Name"),
+                  _buildLabel("Nama Lengkap"),
                   TextFormField(
                     controller: _fullNameController,
                     decoration:
@@ -106,7 +106,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     decoration:
                         const InputDecoration(border: OutlineInputBorder()),
                     validator: (val) =>
-                        val!.length < 6 ? "Minimum 6 characters" : null,
+                        val!.length < 6 ? "Minimum 6 karakter" : null,
                   ),
                   const SizedBox(height: 32),
                   SizedBox(

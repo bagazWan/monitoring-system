@@ -98,7 +98,7 @@ class _DefaultErrorWidget extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             const Text(
-              'Something went wrong',
+              'Terjadi Kesalahan',
               style: TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.bold,
@@ -119,7 +119,7 @@ class _DefaultErrorWidget extends StatelessWidget {
             ElevatedButton.icon(
               onPressed: onRetry,
               icon: const Icon(Icons.refresh),
-              label: const Text('Try Again'),
+              label: const Text('Coba Kembali'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.blue,
                 foregroundColor: Colors.white,
@@ -164,7 +164,7 @@ class AsyncErrorWidget extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             Text(
-              message ?? 'Failed to load data',
+              message ?? 'Gagal memuat data',
               style: const TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w500,
@@ -186,7 +186,7 @@ class AsyncErrorWidget extends StatelessWidget {
               TextButton.icon(
                 onPressed: onRetry,
                 icon: const Icon(Icons.refresh, size: 18),
-                label: const Text('Retry'),
+                label: const Text('Coba kembali'),
               ),
             ],
           ],
@@ -220,14 +220,14 @@ class EmptyStateWidget extends StatelessWidget {
   }) {
     if (isSearching) {
       return EmptyStateWidget(
-        message: 'No $label found matching "$searchQuery"',
+        message: 'Tidak ada $label yang cocok dengan "$searchQuery"',
         icon: Icons.search_off,
         onAction: onAction,
         actionLabel: actionLabel,
       );
     } else {
       return EmptyStateWidget(
-        message: 'No $label found',
+        message: 'Tidak ada $label ditemukan',
         icon: defaultIcon,
         onAction: onAction,
         actionLabel: actionLabel,

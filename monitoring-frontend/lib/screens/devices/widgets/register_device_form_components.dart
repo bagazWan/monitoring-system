@@ -33,12 +33,10 @@ mixin RegisterDeviceFormComponents on State<RegisterDeviceScreen> {
       ),
       child: Row(
         children: [
-          const Text("Node Type:",
-              style: TextStyle(fontWeight: FontWeight.bold)),
           const SizedBox(width: 24),
           _buildRadioChip("Device", "device"),
           const SizedBox(width: 12),
-          _buildRadioChip("Switch", "switch"),
+          _buildRadioChip("Switch/Hub", "switch"),
         ],
       ),
     );
@@ -108,8 +106,9 @@ mixin RegisterDeviceFormComponents on State<RegisterDeviceScreen> {
         border: Border.all(color: Colors.grey[200]!),
       ),
       child: CheckboxListTile(
-        title: const Text("Force Add"),
-        subtitle: const Text("Skip ICMP check (for firewalled devices)",
+        title: const Text("Tambah Paksa"),
+        subtitle: const Text(
+            "Lewati pengecekan ICMP (untuk perangkat dengan firewall aktif)",
             style: TextStyle(fontSize: 12)),
         value: state._forceAdd,
         activeColor: Colors.blue[700],

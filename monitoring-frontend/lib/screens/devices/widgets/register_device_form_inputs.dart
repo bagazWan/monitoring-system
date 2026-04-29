@@ -10,7 +10,7 @@ mixin RegisterDeviceFormInputs on State<RegisterDeviceScreen> {
           onTap: state._pickLocationWithSearch,
           child: InputDecorator(
             decoration: InputDecoration(
-              labelText: "Location",
+              labelText: "Lokasi",
               filled: true,
               fillColor: Colors.grey[50],
               isDense: true,
@@ -39,7 +39,7 @@ mixin RegisterDeviceFormInputs on State<RegisterDeviceScreen> {
           child: TextButton.icon(
             onPressed: state._openQuickAddLocationDialog,
             icon: const Icon(Icons.add, size: 18),
-            label: const Text("Add location"),
+            label: const Text("Tambah lokasi"),
           ),
         ),
       ],
@@ -123,7 +123,7 @@ mixin RegisterDeviceFormInputs on State<RegisterDeviceScreen> {
           .toList(),
       onChanged: (val) => setState(() => state._selectedNetworkNodeId = val),
       decoration: InputDecoration(
-          labelText: "Network Node",
+          labelText: "Node Jaringan",
           filled: true,
           fillColor: Colors.grey[50],
           border: OutlineInputBorder(

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import '../../../models/network_node.dart';
 import '../../../models/location.dart';
 import '../../../services/map_service.dart';
+import '../../../services/device_service.dart';
+import '../../../widgets/location_search_picker_dialog.dart';
 
 class NetworkNodeFormDialog extends StatefulWidget {
   final NetworkNode? node;
@@ -17,12 +19,10 @@ class _NetworkNodeFormDialogState extends State<NetworkNodeFormDialog> {
   bool _isLoading = false;
   bool _fetchingLocations = true;
 
-  // Controllers
   late TextEditingController _nameController;
   late TextEditingController _typeController;
   late TextEditingController _descController;
 
-  // State for Dropdown
   int? _selectedLocationId;
   List<Location> _locations = [];
 
@@ -39,7 +39,8 @@ class _NetworkNodeFormDialogState extends State<NetworkNodeFormDialog> {
 
   Future<void> _loadLocations() async {
     try {
-      final locs = await _service.getLocations();
+      final locs = await DeviceService().getAllLocationOptions();
+
       if (mounted) {
         setState(() {
           _locations = locs;
@@ -49,9 +50,18 @@ class _NetworkNodeFormDialogState extends State<NetworkNodeFormDialog> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Failed to load locations: $e")),
+          SnackBar(content: Text("Gagal memuat lokasi: $e")),
         );
       }
+    }
+  }
+
+  String _getSelectedLocationName() {
+    if (_selectedLocationId == null) return "Pilih lokasi...";
+    try {
+      return _locations.firstWhere((l) => l.id == _selectedLocationId).name;
+    } catch (e) {
+      return "Lokasi tidak diketahui";
     }
   }
 
@@ -67,7 +77,7 @@ class _NetworkNodeFormDialogState extends State<NetworkNodeFormDialog> {
     if (!_formKey.currentState!.validate()) return;
     if (_selectedLocationId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Please select a location")),
+        const SnackBar(content: Text("Pilih lokasi")),
       );
       return;
     }
@@ -109,7 +119,7 @@ class _NetworkNodeFormDialogState extends State<NetworkNodeFormDialog> {
     final isEdit = widget.node != null;
     return AlertDialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      title: Text(isEdit ? "Edit Network Node" : "Add Network Node"),
+      title: Text(isEdit ? "Edit Node Jaringan" : "Tambah Node Jaringan"),
       content: SizedBox(
         width: 500,
         child: _fetchingLocations
@@ -121,15 +131,15 @@ class _NetworkNodeFormDialogState extends State<NetworkNodeFormDialog> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      _buildField("Node Name", _nameController, required: true),
+                      _buildField("Nama Node", _nameController, required: true),
                       const SizedBox(height: 16),
-                      _buildDropdown(
-                          "Location", _selectedLocationId, _locations),
+                      _buildLocationPicker(),
                       const SizedBox(height: 16),
-                      _buildField("Node Type (e.g. ODP, Pole)", _typeController,
+                      _buildField(
+                          "Tipe Node (contoh:ODP, Pole)", _typeController,
                           required: true),
                       const SizedBox(height: 16),
-                      _buildField("Description", _descController, maxLines: 3),
+                      _buildField("Deskripsi", _descController, maxLines: 3),
                     ],
                   ),
                 ),
@@ -138,7 +148,7 @@ class _NetworkNodeFormDialogState extends State<NetworkNodeFormDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text("Cancel"),
+          child: const Text("Batal"),
         ),
         ElevatedButton(
           onPressed: _isLoading ? null : _submit,
@@ -152,7 +162,7 @@ class _NetworkNodeFormDialogState extends State<NetworkNodeFormDialog> {
                   height: 16,
                   child: CircularProgressIndicator(
                       strokeWidth: 2, color: Colors.white))
-              : Text(isEdit ? "Save Changes" : "Create Location"),
+              : Text(isEdit ? "Simpan" : "Buat Lokasi"),
         ),
       ],
     );
@@ -183,29 +193,49 @@ class _NetworkNodeFormDialogState extends State<NetworkNodeFormDialog> {
     );
   }
 
-  Widget _buildDropdown(String label, int? value, List<Location> items) {
-    return DropdownButtonFormField<int>(
-      value: value,
-      items: items
-          .map((l) => DropdownMenuItem(
-                value: l.id,
-                child: Text(l.name, style: const TextStyle(fontSize: 14)),
-              ))
-          .toList(),
-      onChanged: (val) => setState(() => _selectedLocationId = val),
-      decoration: InputDecoration(
-        labelText: label,
-        filled: true,
-        fillColor: Colors.grey[50],
-        isDense: true,
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
-        border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
-            borderSide: BorderSide(color: Colors.grey[300]!)),
-        enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
-            borderSide: BorderSide(color: Colors.grey[300]!)),
+  Widget _buildLocationPicker() {
+    return InkWell(
+      onTap: () async {
+        final selectedId = await showDialog<int>(
+          context: context,
+          builder: (context) =>
+              LocationSearchPickerDialog(locations: _locations),
+        );
+
+        if (selectedId != null) {
+          setState(() {
+            _selectedLocationId = selectedId;
+          });
+        }
+      },
+      child: InputDecorator(
+        decoration: InputDecoration(
+          labelText: "Lokasi",
+          filled: true,
+          fillColor: Colors.grey[50],
+          isDense: true,
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+          border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: Colors.grey[300]!)),
+          enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: Colors.grey[300]!)),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Expanded(
+              child: Text(
+                _getSelectedLocationName(),
+                style: const TextStyle(fontSize: 14),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            const Icon(Icons.search, size: 20, color: Colors.grey),
+          ],
+        ),
       ),
     );
   }

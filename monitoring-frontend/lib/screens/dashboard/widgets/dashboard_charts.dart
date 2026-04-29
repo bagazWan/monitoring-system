@@ -26,7 +26,7 @@ class DashboardCharts extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          "Performance Charts",
+          "Grafik Performa Jaringan",
           style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 16),
@@ -132,7 +132,7 @@ class _UptimeTrendChart extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            "Devices Uptime/Availability",
+            "Uptime Perangkat",
             style: TextStyle(fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 12),
@@ -149,8 +149,8 @@ class _UptimeTrendChart extends StatelessWidget {
   Widget _buildChart() {
     if (data.isEmpty) {
       return Center(
-        child:
-            Text("No uptime data", style: TextStyle(color: Colors.grey[500])),
+        child: Text("Tidak ada data uptime",
+            style: TextStyle(color: Colors.grey[500])),
       );
     }
 
@@ -163,7 +163,7 @@ class _UptimeTrendChart extends StatelessWidget {
 
     if (!hasAnyRealPoint) {
       return Center(
-        child: Text("No tracked uptime yet",
+        child: Text("Belum ada data uptime terlacak",
             style: TextStyle(color: Colors.grey[500])),
       );
     }

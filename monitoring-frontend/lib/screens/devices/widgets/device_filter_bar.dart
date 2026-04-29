@@ -40,13 +40,13 @@ class DeviceFilterBar extends StatelessWidget {
       crossAxisAlignment: WrapCrossAlignment.center,
       children: [
         FilterDropdown(
-          label: 'Type',
+          label: 'Tipe',
           value: selectedType,
           items: deviceTypes,
           onChanged: onTypeChanged,
         ),
         FilterDropdown(
-          label: 'Location',
+          label: 'Lokasi',
           value: selectedLocation,
           items: locations,
           onChanged: onLocationChanged,
@@ -63,7 +63,7 @@ class DeviceFilterBar extends StatelessWidget {
             child: TextButton.icon(
               onPressed: onClearFilters,
               icon: const Icon(Icons.clear_all, size: 16),
-              label: const Text('Clear', style: TextStyle(fontSize: 13)),
+              label: const Text('Reset filter', style: TextStyle(fontSize: 13)),
               style: TextButton.styleFrom(
                 foregroundColor: Colors.red[700],
                 padding: const EdgeInsets.symmetric(horizontal: 8),

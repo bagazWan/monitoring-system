@@ -18,14 +18,12 @@ class _HoverLinkState extends State<HoverLink> {
     return TextButton(
       onPressed: widget.onTap,
       style: ButtonStyle(
-        // Changes color on hover
         foregroundColor: WidgetStateProperty.resolveWith<Color>((states) {
           if (states.contains(WidgetState.hovered)) {
             return Colors.blue[900]!;
           }
           return Colors.blueAccent;
         }),
-        // Adds underline on hover
         textStyle: WidgetStateProperty.resolveWith<TextStyle>((states) {
           return TextStyle(
             fontWeight: FontWeight.bold,

@@ -26,7 +26,7 @@ class LatencyChart extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            "Average Network Latency",
+            "Rata-rata Latensi",
             style: TextStyle(fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 12),
@@ -43,15 +43,15 @@ class LatencyChart extends StatelessWidget {
   Widget _buildChart() {
     if (data.isEmpty) {
       return Center(
-        child:
-            Text("No latency data", style: TextStyle(color: Colors.grey[500])),
+        child: Text("Tidak ada data latensi",
+            style: TextStyle(color: Colors.grey[500])),
       );
     }
 
     final hasValidData = data.any((e) => e.latencyMs != null);
     if (!hasValidData) {
       return Center(
-        child: Text("Waiting for ping data...",
+        child: Text("Menunggu data ping...",
             style: TextStyle(color: Colors.grey[500])),
       );
     }

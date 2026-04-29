@@ -50,9 +50,16 @@ class MapService {
     throw Exception('Failed to load locations');
   }
 
-  Future<List<Location>> getLocations() async {
-    final response = await http.get(Uri.parse(ApiConfig.locations),
-        headers: await _getHeaders());
+  Future<List<Location>> getLocations({int? limit}) async {
+    Uri uri = Uri.parse(ApiConfig.locations);
+    if (limit != null) {
+      final queryParams = Map<String, String>.from(uri.queryParameters);
+      queryParams['limit'] = limit.toString();
+      uri = uri.replace(queryParameters: queryParams);
+    }
+
+    final response = await http.get(uri, headers: await _getHeaders());
+
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
       if (data is List) {

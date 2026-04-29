@@ -55,7 +55,7 @@ class AnalyticsLineChart extends StatelessWidget {
     final hasLocB = locationB != null && locationB != "-";
 
     if (!hasLocA && !hasLocB) {
-      return const Center(child: Text("Select a location to view metrics."));
+      return const Center(child: Text("Pilih lokasi untuk melihat metrik."));
     }
 
     final spotsA = _getSpots(dataA);
@@ -63,7 +63,7 @@ class AnalyticsLineChart extends StatelessWidget {
 
     if (spotsA.isEmpty && spotsB.isEmpty) {
       return const Center(
-          child: Text("No historical data found for this period."));
+          child: Text("Tidak ada riwayat data pada periode ini"));
     }
 
     final minX = DateTime(

@@ -4,7 +4,7 @@ import '../../../models/location.dart';
 import '../../../models/switch_summary.dart';
 import '../../../models/network_node.dart';
 import '../../../services/device_service.dart';
-import '../widgets/location_search_picker_dialog.dart';
+import '../../../widgets/location_search_picker_dialog.dart';
 
 typedef SaveCallback = Future<void> Function(Map<String, dynamic> data);
 typedef DangerActionCallback = Future<void> Function(String action);
@@ -90,7 +90,7 @@ class _DeviceGeneralTabState extends State<DeviceGeneralTab> {
 
   String _selectedLocationLabel() {
     final match = _locations.where((l) => l.id == _selectedLocationId);
-    if (match.isEmpty) return "Select location...";
+    if (match.isEmpty) return "Pilih lokasi...";
     final location = match.first;
     if ((location.groupName ?? '').isNotEmpty) {
       return "${location.name} • ${location.groupName}";
@@ -158,19 +158,20 @@ class _DeviceGeneralTabState extends State<DeviceGeneralTab> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildSectionCard("Identity Information", [
-              _buildTextField("Display Name", _nameController),
+            _buildSectionCard("Informasi Identitas", [
+              _buildTextField("Nama Tampilan", _nameController),
               const SizedBox(height: 16),
-              _buildTextField("IP Address", _ipController),
+              _buildTextField("Alamat IP", _ipController),
               const SizedBox(height: 16),
-              _buildTextField("Device Type", _typeController, required: false),
+              _buildTextField("Tipe Perangkat", _typeController,
+                  required: false),
             ]),
             const SizedBox(height: 24),
-            _buildSectionCard("Location & Details", [
+            _buildSectionCard("Lokasi & Detail", [
               InkWell(
                 onTap: _pickLocation,
                 child: InputDecorator(
-                  decoration: _inputDecoration("Location"),
+                  decoration: _inputDecoration("Lokasi"),
                   child: Text(_selectedLocationLabel()),
                 ),
               ),
@@ -183,7 +184,7 @@ class _DeviceGeneralTabState extends State<DeviceGeneralTab> {
                           DropdownMenuItem(value: s.id, child: Text(s.name)))
                       .toList(),
                   onChanged: (val) => setState(() => _selectedSwitchId = val),
-                  decoration: _inputDecoration("Connected Switch"),
+                  decoration: _inputDecoration("Switch/Hub terhubung"),
                 ),
               if (isSwitch)
                 DropdownButtonFormField<int>(
@@ -194,10 +195,10 @@ class _DeviceGeneralTabState extends State<DeviceGeneralTab> {
                       .toList(),
                   onChanged: (val) =>
                       setState(() => _selectedNetworkNodeId = val),
-                  decoration: _inputDecoration("Assigned Network Node"),
+                  decoration: _inputDecoration("Node Jaringan yang digunakan"),
                 ),
               const SizedBox(height: 16),
-              _buildTextField("Description", _descController,
+              _buildTextField("Deskripsi", _descController,
                   maxLines: 3, required: false),
             ]),
             const SizedBox(height: 24),
@@ -208,7 +209,7 @@ class _DeviceGeneralTabState extends State<DeviceGeneralTab> {
                 icon: _saving ? const SizedBox() : const Icon(Icons.save),
                 label: _saving
                     ? const CircularProgressIndicator(color: Colors.white)
-                    : const Text("SAVE CHANGES",
+                    : const Text("SIMPAN PERUBAHAN",
                         style: TextStyle(fontWeight: FontWeight.bold)),
                 style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.blue[700],
@@ -274,8 +275,9 @@ class _DeviceGeneralTabState extends State<DeviceGeneralTab> {
           const SizedBox(height: 12),
           if (isUnmonitored) ...[
             _buildRealButton(
-              title: "Reconnect to monitoring",
-              subtitle: "Restores monitoring for this device in LibreNMS.",
+              title: "Hubung kembali ke monitoring",
+              subtitle:
+                  "Mengembalikan monitoring untuk perangkat ini di LibreNMS.",
               icon: Icons.link,
               color: Colors.green,
               onTap: () => widget.onDangerAction('reconnect'),
@@ -285,7 +287,7 @@ class _DeviceGeneralTabState extends State<DeviceGeneralTab> {
             _buildRealButton(
               title: "Unregister (stop monitoring)",
               subtitle:
-                  "Keeps the record in database but stops collecting data.",
+                  "simpan data di database tetapi berhenti menerima data.",
               icon: Icons.link_off,
               color: Colors.orange,
               onTap: () => widget.onDangerAction('unregister'),
@@ -294,8 +296,8 @@ class _DeviceGeneralTabState extends State<DeviceGeneralTab> {
           ],
           const SizedBox(height: 12),
           _buildRealButton(
-            title: "Delete device completely",
-            subtitle: "Permanently removes this device and all its history.",
+            title: "Hapus perangkat",
+            subtitle: "Hapus permanen perangkat dan historinya.",
             icon: Icons.delete_forever,
             color: Colors.red,
             onTap: () => widget.onDangerAction('delete'),

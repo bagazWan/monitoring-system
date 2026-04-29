@@ -35,7 +35,7 @@ class _QuickAddLocationDialogState extends State<QuickAddLocationDialog> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Failed loading groups: $e")),
+        SnackBar(content: Text("Gagal memuat group: $e")),
       );
     }
   }
@@ -65,7 +65,7 @@ class _QuickAddLocationDialogState extends State<QuickAddLocationDialog> {
     final typeRaw = _typeController.text.trim();
     if (_selectedGroupId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Please select a Parent Section / Group")),
+        const SnackBar(content: Text("Pilih Seksi Induk / Group")),
       );
       return;
     }
@@ -86,7 +86,7 @@ class _QuickAddLocationDialogState extends State<QuickAddLocationDialog> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Failed to create location: $e")),
+        SnackBar(content: Text("Gagal membuat lokasi: $e")),
       );
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -106,7 +106,7 @@ class _QuickAddLocationDialogState extends State<QuickAddLocationDialog> {
   Widget build(BuildContext context) {
     final displayGroups = _getSortedDisplayGroups();
     return AlertDialog(
-      title: const Text("Add Location"),
+      title: const Text("Tambah Lokasi"),
       content: Form(
         key: _formKey,
         child: SizedBox(
@@ -118,14 +118,14 @@ class _QuickAddLocationDialogState extends State<QuickAddLocationDialog> {
                 controller: _nameController,
                 validator: (v) =>
                     (v == null || v.trim().isEmpty) ? "Required" : null,
-                decoration: const InputDecoration(labelText: "Display Name"),
+                decoration: const InputDecoration(labelText: "Nama Tampilan"),
               ),
               const SizedBox(height: 12),
               TextFormField(
                 controller: _typeController,
                 validator: (v) =>
                     (v == null || v.trim().isEmpty) ? "Required" : null,
-                decoration: const InputDecoration(labelText: "Location Type"),
+                decoration: const InputDecoration(labelText: "Tipe Lokasi"),
               ),
               const SizedBox(height: 12),
               DropdownButtonFormField<int>(
@@ -150,7 +150,7 @@ class _QuickAddLocationDialogState extends State<QuickAddLocationDialog> {
                 }).toList(),
                 onChanged: (v) => setState(() => _selectedGroupId = v),
                 decoration:
-                    const InputDecoration(labelText: "Parent Section / Group"),
+                    const InputDecoration(labelText: "Seksi Induk/ Group"),
               ),
               const SizedBox(height: 12),
               Row(
@@ -179,7 +179,7 @@ class _QuickAddLocationDialogState extends State<QuickAddLocationDialog> {
       actions: [
         TextButton(
           onPressed: _isLoading ? null : () => Navigator.pop(context),
-          child: const Text("Cancel"),
+          child: const Text("Batal"),
         ),
         ElevatedButton(
           onPressed: _isLoading ? null : _submit,
@@ -189,7 +189,7 @@ class _QuickAddLocationDialogState extends State<QuickAddLocationDialog> {
                   width: 16,
                   child: CircularProgressIndicator(strokeWidth: 2),
                 )
-              : const Text("Create"),
+              : const Text("Buat"),
         ),
       ],
     );

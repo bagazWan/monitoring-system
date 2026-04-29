@@ -25,14 +25,13 @@ class _LoginScreenState extends State<LoginScreen> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text("Login Successful"),
+              content: Text("Login Berhasil"),
               backgroundColor: Colors.green,
             ),
           );
         }
       } catch (e) {
         if (mounted) {
-          // Show error from backend
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text("Error: ${e.toString()}"),
@@ -72,7 +71,6 @@ class _LoginScreenState extends State<LoginScreen> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Fields
                   const Text("Username",
                       style: TextStyle(fontWeight: FontWeight.w600)),
                   const SizedBox(height: 8),
@@ -85,7 +83,6 @@ class _LoginScreenState extends State<LoginScreen> {
                     validator: (val) => val!.isEmpty ? "Required" : null,
                   ),
                   const SizedBox(height: 20),
-
                   const Text("Password",
                       style: TextStyle(fontWeight: FontWeight.w600)),
                   const SizedBox(height: 8),
@@ -96,11 +93,10 @@ class _LoginScreenState extends State<LoginScreen> {
                       prefixIcon: Icon(Icons.lock_outline),
                       border: OutlineInputBorder(),
                     ),
-                    validator: (val) => val!.length < 6 ? "Too short" : null,
+                    validator: (val) =>
+                        val!.length < 6 ? "Terlalu pendek" : null,
                   ),
                   const SizedBox(height: 32),
-
-                  // Login Button
                   SizedBox(
                     width: double.infinity,
                     height: 50,

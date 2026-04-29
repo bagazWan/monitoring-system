@@ -27,7 +27,7 @@ class _MainLayoutState extends State<MainLayout> {
 
   int _unreadAlertCount = 0;
 
-  static const int _alertsTabIndex = 4;
+  static const int _alertsTabIndex = 3;
 
   Future<void> _checkUser() async {
     try {
@@ -146,14 +146,14 @@ class _MainLayoutState extends State<MainLayout> {
       if (context.mounted) {
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Sync Complete, Statuses updated.")),
+          const SnackBar(content: Text("Sync selesai, Status terupdate.")),
         );
       }
     } catch (e) {
       if (context.mounted) {
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Sync Failed: $e")),
+          SnackBar(content: Text("Sync gagal: $e")),
         );
       }
     }
@@ -211,14 +211,15 @@ class _MainLayoutState extends State<MainLayout> {
 
     final navItems = <BottomNavigationBarItem>[
       const BottomNavigationBarItem(icon: Icon(Icons.dashboard), label: "Home"),
-      const BottomNavigationBarItem(icon: Icon(Icons.router), label: "Devices"),
       const BottomNavigationBarItem(
-          icon: Icon(Icons.location_on), label: "Map"),
-      BottomNavigationBarItem(icon: _buildAlertNavIcon(), label: "Alerts"),
+          icon: Icon(Icons.router), label: "Perangkat"),
       const BottomNavigationBarItem(
-          icon: Icon(Icons.analytics), label: "Analytics"),
+          icon: Icon(Icons.location_on), label: "Peta"),
+      BottomNavigationBarItem(icon: _buildAlertNavIcon(), label: "Alert"),
+      const BottomNavigationBarItem(
+          icon: Icon(Icons.analytics), label: "Analitik"),
       if (isAdmin)
-        const BottomNavigationBarItem(icon: Icon(Icons.people), label: "Users"),
+        const BottomNavigationBarItem(icon: Icon(Icons.people), label: "User"),
     ];
 
     return Scaffold(
@@ -240,7 +241,7 @@ class _MainLayoutState extends State<MainLayout> {
                   IconButton(
                     icon: const Icon(Icons.sync, color: Colors.blue),
                     onPressed: () => _handleSync(context),
-                    tooltip: "Sync with LibreNMS",
+                    tooltip: "Sync ke LibreNMS",
                   ),
                 TextButton.icon(
                   onPressed: _handleLogout,

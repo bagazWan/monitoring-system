@@ -16,17 +16,18 @@ class AlertDetailsDialog extends StatelessWidget {
         final dialogWidth = maxWidth < 800 ? maxWidth * 0.92 : 720.0;
 
         return AlertDialog(
-          title: const Text("Alert Details"),
+          title: const Text("Detail Alert",
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20)),
           content: SizedBox(
             width: dialogWidth,
             child: SingleChildScrollView(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _kv("Device", alert.deviceName),
-                  _kv("Location", alert.locationName),
+                  _kv("Perangkat", alert.deviceName),
+                  _kv("Lokasi", alert.locationName),
                   _kv("Severity", alert.severity),
-                  _kv("Type", alert.alertType),
+                  _kv("Tipe", alert.alertType),
                   _kv("Created At", df.format(alert.createdAt.toLocal())),
                   _kv(
                     "Cleared At",
@@ -36,15 +37,16 @@ class AlertDetailsDialog extends StatelessWidget {
                   ),
                   const Divider(height: 24),
                   const Text(
-                    "Alert Message",
-                    style: TextStyle(fontWeight: FontWeight.bold),
+                    "Pesan Alert",
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
                   ),
                   const SizedBox(height: 6),
-                  Text(alert.message.isNotEmpty ? alert.message : "-"),
+                  Text(alert.message.isNotEmpty ? alert.message : "-",
+                      style: const TextStyle(fontSize: 16)),
                   const SizedBox(height: 16),
                   const Text(
                     "Resolution Note",
-                    style: TextStyle(fontWeight: FontWeight.bold),
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
                   ),
                   const SizedBox(height: 6),
                   Text(
@@ -52,6 +54,7 @@ class AlertDetailsDialog extends StatelessWidget {
                             alert.resolutionNote!.trim().isNotEmpty)
                         ? alert.resolutionNote!
                         : "-",
+                    style: const TextStyle(fontSize: 16),
                   ),
                   const SizedBox(height: 16),
                   _kv(
@@ -74,7 +77,7 @@ class AlertDetailsDialog extends StatelessWidget {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text("Close"),
+              child: const Text("Tutup"),
             ),
           ],
         );
@@ -87,7 +90,7 @@ class AlertDetailsDialog extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 6),
       child: RichText(
         text: TextSpan(
-          style: const TextStyle(color: Colors.black87, fontSize: 13),
+          style: const TextStyle(color: Colors.black87, fontSize: 16),
           children: [
             TextSpan(
               text: "$k: ",

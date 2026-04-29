@@ -38,14 +38,14 @@ class AnalyticsSidebar extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text("Locations",
+          const Text("Lokasi",
               style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
           const SizedBox(height: 16),
-          _buildDropdown("Location 1", locationA, onLocationAChanged),
+          _buildDropdown("Lokasi 1", locationA, onLocationAChanged),
           const SizedBox(height: 16),
-          _buildDropdown("Location 2", locationB, onLocationBChanged),
+          _buildDropdown("Lokasi 2", locationB, onLocationBChanged),
           const SizedBox(height: 32),
-          const Text("Timeframe",
+          const Text("Periode Waktu",
               style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
           const SizedBox(height: 16),
           SizedBox(
@@ -67,7 +67,7 @@ class AnalyticsSidebar extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 32),
-          const Text("Metric",
+          const Text("Metrik",
               style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
           const SizedBox(height: 16),
           Container(
@@ -86,7 +86,7 @@ class AnalyticsSidebar extends StatelessWidget {
                   DropdownMenuItem(
                       value: 'outbound', child: Text('Outbound (Mbps)')),
                   DropdownMenuItem(
-                      value: 'latency', child: Text('Latency (ms)')),
+                      value: 'latency', child: Text('Latensi (ms)')),
                 ],
                 onChanged: (val) {
                   if (val != null) onMetricChanged(val);

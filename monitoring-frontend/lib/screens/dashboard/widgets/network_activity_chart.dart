@@ -68,14 +68,14 @@ class _NetworkActivityChartState extends State<NetworkActivityChart> {
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         const Text(
-          'Network Traffic',
+          'Trafik Jaringan',
           style: TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.w600,
           ),
         ),
         Text(
-          'Last 30 minutes',
+          '30 menit terakhir',
           style: TextStyle(
             fontSize: 12,
             color: Colors.grey[500],
@@ -199,7 +199,7 @@ class _NetworkActivityChartState extends State<NetworkActivityChart> {
     if (widget.data.isEmpty) {
       return Center(
         child: Text(
-          'No traffic data available',
+          'Tidak ada data trafik yang tersedia',
           style: TextStyle(color: Colors.grey[500], fontSize: 14),
         ),
       );

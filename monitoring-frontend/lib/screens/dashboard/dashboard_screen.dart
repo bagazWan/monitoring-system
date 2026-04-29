@@ -304,7 +304,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         }
                         if (stats == null) {
                           return const EmptyStateWidget(
-                              message: "No dashboard data available",
+                              message: "Tidak ada data dashboard yang tersedia",
                               icon: Icons.dashboard_customize_outlined);
                         }
 
@@ -325,7 +325,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                     SizedBox(
                                       width: 220,
                                       child: FilterDropdown(
-                                        label: "Location",
+                                        label: "Lokasi",
                                         value: _selectedLocationFilter.value,
                                         items: _locationFilters.value,
                                         onChanged: (val) {
@@ -337,7 +337,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                     SizedBox(
                                       width: 220,
                                       child: FilterDropdown(
-                                        label: "Device",
+                                        label: "Perangkat",
                                         value: _selectedDeviceType.value,
                                         items: _deviceTypes.value,
                                         onChanged: (val) {
@@ -369,7 +369,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                         borderRadius: BorderRadius.circular(12),
                                         border: Border.all(
                                             color: Colors.grey.shade200)),
-                                    child: Text("Scroll to load charts",
+                                    child: Text("Geser untuk memuat grafik",
                                         style:
                                             TextStyle(color: Colors.grey[500])),
                                   );
@@ -424,7 +424,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                         borderRadius: BorderRadius.circular(12),
                                         border: Border.all(
                                             color: Colors.grey.shade200)),
-                                    child: Text("Scroll to load top down",
+                                    child: Text("Geser untuk memuat data",
                                         style:
                                             TextStyle(color: Colors.grey[500])),
                                   );

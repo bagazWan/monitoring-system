@@ -5,6 +5,7 @@ import '../../../models/fo_route.dart';
 import '../../../models/network_node.dart';
 import '../../../models/location.dart';
 import '../../../services/map_service.dart';
+import '../../../services/device_service.dart';
 import '../../../widgets/data_table.dart';
 import '../../../widgets/visual_feedback.dart';
 import '../../../widgets/search_bar.dart';
@@ -68,7 +69,8 @@ class _FORouteTabState extends State<FORouteTab> {
           search: _searchController.text.trim(),
         ),
         _service.getNetworkNodes(),
-        _service.getLocations(),
+        _service.getLocations(
+            limit: 1000), //need more proper fix later (check api/locations.py)
       ]);
 
       final page = results[0] as FORoutePage;
@@ -125,7 +127,7 @@ class _FORouteTabState extends State<FORouteTab> {
     if (startLoc == null || endLoc == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-            content: Text("Error: Cannot find physical location for nodes.")),
+            content: Text("Error: Tidak bisa menemukan lokasi untuk node.")),
       );
       return;
     }
@@ -151,18 +153,18 @@ class _FORouteTabState extends State<FORouteTab> {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (c) => AlertDialog(
-        title: const Text("Delete Route?"),
+        title: const Text("Hapus jalur"),
         content: Text(
-            "Are you sure you want to delete this route between ${_nodeNameLookup[route.startNodeId]} and ${_nodeNameLookup[route.endNodeId]}?"),
+            "Apakah ingin menghapus jalur ini antara${_nodeNameLookup[route.startNodeId]} dengan ${_nodeNameLookup[route.endNodeId]}?"),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(c, false),
-              child: const Text("Cancel")),
+              child: const Text("Batal")),
           ElevatedButton(
               onPressed: () => Navigator.pop(c, true),
               style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.red, foregroundColor: Colors.white),
-              child: const Text("Delete")),
+              child: const Text("Hapus")),
         ],
       ),
     );
@@ -199,7 +201,7 @@ class _FORouteTabState extends State<FORouteTab> {
               Expanded(
                 child: SearchBarWidget(
                   controller: _searchController,
-                  hintText: "Search by connected node",
+                  hintText: "Cari berdasarkan node yang terhubung",
                 ),
               ),
               const SizedBox(width: 16),
@@ -208,7 +210,7 @@ class _FORouteTabState extends State<FORouteTab> {
                 child: ElevatedButton.icon(
                   onPressed: () => _openForm(),
                   icon: const Icon(Icons.add),
-                  label: const Text("Add FO Route"),
+                  label: const Text("Tambah Jalur FO"),
                   style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.blue[700],
                       foregroundColor: Colors.white,
@@ -223,29 +225,29 @@ class _FORouteTabState extends State<FORouteTab> {
             EmptyStateWidget.searching(
               isSearching: _searchController.text.isNotEmpty,
               searchQuery: _searchController.text,
-              label: 'FO routes',
+              label: 'jalur FO',
             )
           else ...[
             CustomDataTable(
               columns: const [
                 DataColumn(
                     label: Expanded(
-                        child: Text("Start Node",
+                        child: Text("Node Awal",
                             textAlign: TextAlign.center,
                             style: TextStyle(fontWeight: FontWeight.bold)))),
                 DataColumn(
                     label: Expanded(
-                        child: Text("End Node",
+                        child: Text("Node Akhir",
                             textAlign: TextAlign.center,
                             style: TextStyle(fontWeight: FontWeight.bold)))),
                 DataColumn(
                     label: Expanded(
-                        child: Text("Length",
+                        child: Text("Panjang",
                             textAlign: TextAlign.center,
                             style: TextStyle(fontWeight: FontWeight.bold)))),
                 DataColumn(
                     label: Expanded(
-                        child: Text("Description",
+                        child: Text("Deskripsi",
                             textAlign: TextAlign.center,
                             style: TextStyle(fontWeight: FontWeight.bold)))),
                 DataColumn(
@@ -272,7 +274,7 @@ class _FORouteTabState extends State<FORouteTab> {
                                       color: Colors.blue),
                                   onPressed: () => _openForm(route: route)),
                               IconButton(
-                                  tooltip: "Edit Shape",
+                                  tooltip: "Edit Garis",
                                   icon: const Icon(Icons.map,
                                       color: Colors.green),
                                   onPressed: () => _openMapEditor(route)),

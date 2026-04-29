@@ -72,7 +72,7 @@ class _MapScreenState extends State<MapScreen> {
         _refreshDataSilent();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('${event.name} is now ${event.newStatus}'),
+            content: Text('${event.name} sekarang ${event.newStatus}'),
             backgroundColor: event.newStatus.toLowerCase() == 'online'
                 ? Colors.green
                 : Colors.red,
@@ -185,7 +185,7 @@ class _MapScreenState extends State<MapScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text(
-                  "Device Location Map",
+                  "Lokasi Perangkat",
                   style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 24),
@@ -195,16 +195,7 @@ class _MapScreenState extends State<MapScreen> {
                   crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
                     FilterChip(
-                      label: const Text("Hide empty locations"),
-                      selected: _hideEmptyLocations,
-                      backgroundColor: Colors.white,
-                      selectedColor: Colors.white,
-                      side: const BorderSide(color: Colors.black12),
-                      onSelected: (v) =>
-                          setState(() => _hideEmptyLocations = v),
-                    ),
-                    FilterChip(
-                      label: const Text("Show routes"),
+                      label: const Text("Tampilkan jalur"),
                       selected: _showRoutes,
                       backgroundColor: Colors.white,
                       selectedColor: Colors.white,
@@ -221,7 +212,7 @@ class _MapScreenState extends State<MapScreen> {
                           }
                         },
                         icon: const Icon(Icons.dataset, size: 18),
-                        label: const Text("Location Master Data"),
+                        label: const Text("Master Data Lokasi"),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.blueAccent,
                           foregroundColor: Colors.white,

@@ -55,7 +55,7 @@ class _FORouteFormDialogState extends State<FORouteFormDialog> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Failed to load nodes: $e")),
+          SnackBar(content: Text("Gagal memuat node: $e")),
         );
       }
     }
@@ -65,14 +65,14 @@ class _FORouteFormDialogState extends State<FORouteFormDialog> {
     if (!_formKey.currentState!.validate()) return;
     if (_startNodeId == null || _endNodeId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Please select both start and end nodes")),
+        const SnackBar(content: Text("Pilih node awal dan akhir")),
       );
       return;
     }
 
     if (_startNodeId == _endNodeId) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Start and End nodes cannot be the same")),
+        const SnackBar(content: Text("Node awal dan akhir tidak bisa sama")),
       );
       return;
     }
@@ -111,7 +111,7 @@ class _FORouteFormDialogState extends State<FORouteFormDialog> {
 
     return AlertDialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      title: Text(isEdit ? "Edit FO Route" : "Add FO Route"),
+      title: Text(isEdit ? "Edit Jalur FO" : "Tambah Jalur FO"),
       content: SizedBox(
         width: 500,
         child: _fetchingNodes
@@ -123,18 +123,18 @@ class _FORouteFormDialogState extends State<FORouteFormDialog> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      _buildNodeDropdown("Start Node", _startNodeId, (val) {
+                      _buildNodeDropdown("Node Awal", _startNodeId, (val) {
                         setState(() => _startNodeId = val);
                       }),
                       const SizedBox(height: 16),
-                      _buildNodeDropdown("End Node", _endNodeId, (val) {
+                      _buildNodeDropdown("Node Akhir", _endNodeId, (val) {
                         setState(() => _endNodeId = val);
                       }),
                       const SizedBox(height: 16),
-                      _buildField("Length (meters)", _lengthController,
+                      _buildField("Panjang (meter)", _lengthController,
                           required: true, keyboard: TextInputType.number),
                       const SizedBox(height: 16),
-                      _buildField("Description", _descController, maxLines: 3),
+                      _buildField("Deskripsi", _descController, maxLines: 3),
                     ],
                   ),
                 ),
@@ -143,7 +143,7 @@ class _FORouteFormDialogState extends State<FORouteFormDialog> {
       actions: [
         TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text("Cancel")),
+            child: const Text("Batal")),
         ElevatedButton(
           onPressed: _isLoading ? null : _submit,
           style: ElevatedButton.styleFrom(
@@ -156,7 +156,7 @@ class _FORouteFormDialogState extends State<FORouteFormDialog> {
                   height: 16,
                   child: CircularProgressIndicator(
                       strokeWidth: 2, color: Colors.white))
-              : Text(isEdit ? "Save Changes" : "Create Route"),
+              : Text(isEdit ? "Simpan Perubahan" : "Buat Garis Jalur"),
         ),
       ],
     );

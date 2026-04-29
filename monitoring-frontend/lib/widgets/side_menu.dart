@@ -74,13 +74,14 @@ class _SideMenuState extends State<SideMenu> {
       const NavigationRailDestination(
           icon: Icon(Icons.dashboard), label: Text('Dashboard')),
       const NavigationRailDestination(
-          icon: Icon(Icons.video_camera_back_rounded), label: Text('Devices')),
+          icon: Icon(Icons.video_camera_back_rounded),
+          label: Text('Perangkat')),
       const NavigationRailDestination(
-          icon: Icon(Icons.location_on), label: Text('Map')),
+          icon: Icon(Icons.location_on), label: Text('Peta')),
       NavigationRailDestination(
-          icon: _buildAlertsIcon(), label: const Text('Alerts')),
+          icon: _buildAlertsIcon(), label: const Text('Alert')),
       const NavigationRailDestination(
-          icon: Icon(Icons.analytics), label: Text('Analytics')),
+          icon: Icon(Icons.analytics), label: Text('Analitik')),
     ];
 
     bool isAdmin = widget.currentUser?.role == 'admin';
@@ -88,7 +89,7 @@ class _SideMenuState extends State<SideMenu> {
     if (isAdmin) {
       destinations.add(
         const NavigationRailDestination(
-            icon: Icon(Icons.people), label: Text('Users')),
+            icon: Icon(Icons.people), label: Text('User')),
       );
     }
 

@@ -24,8 +24,8 @@ class _DashboardTopDownState extends State<DashboardTopDown> {
   @override
   Widget build(BuildContext context) {
     final options = <int, String>{
-      7: "Last 7 days",
-      30: "Last 30 days",
+      7: "7 hari terakhir",
+      30: "30 hari terakhir",
     };
 
     return Column(
@@ -36,7 +36,7 @@ class _DashboardTopDownState extends State<DashboardTopDown> {
           children: [
             const Expanded(
               child: Text(
-                "Top Locations by Critical Alert Count",
+                "List Lokasi Sering Gangguan",
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
             ),
@@ -67,7 +67,7 @@ class _DashboardTopDownState extends State<DashboardTopDown> {
         ),
         const SizedBox(height: 16),
         if (widget.stats.topDownLocations.isEmpty)
-          _buildInfoCard("No critical alerts in this period.")
+          _buildInfoCard("Tidak ada alert critical pada periode ini.")
         else
           Container(
             decoration: BoxDecoration(
@@ -97,7 +97,7 @@ class _DashboardTopDownState extends State<DashboardTopDown> {
                   final title = Text(item.locationName,
                       style: const TextStyle(fontWeight: FontWeight.bold));
                   final trailing = Text(
-                    "${item.offlineCount} issues",
+                    "${item.offlineCount} masalah",
                     style: const TextStyle(
                         color: Colors.redAccent, fontWeight: FontWeight.w600),
                   );
@@ -133,7 +133,7 @@ class _DashboardTopDownState extends State<DashboardTopDown> {
                           title: Text("$childIndex. ${child.locationName}",
                               style: const TextStyle(fontSize: 14)),
                           trailing: Text(
-                            "${child.offlineCount} issues",
+                            "${child.offlineCount} masalah",
                             style: const TextStyle(
                                 color: Colors.redAccent, fontSize: 13),
                           ),

@@ -142,9 +142,9 @@ class _AlertLogTabState extends State<AlertLogTab> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (_) => const AlertDeleteConfirmDialog(
-        title: "Delete alert",
-        message: "Are you sure you want to delete this alert log?",
-        confirmLabel: "Delete",
+        title: "Hapus alert",
+        message: "Hapus alert log ini?",
+        confirmLabel: "Hapus",
       ),
     );
 
@@ -171,10 +171,10 @@ class _AlertLogTabState extends State<AlertLogTab> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDeleteConfirmDialog(
-        title: "Delete filtered logs",
+        title: "Hapus log terfilter",
         message:
-            "This will delete $_totalItems alert logs based on the current filters. Continue?",
-        confirmLabel: "Delete All",
+            "Ini akan menghapus $_totalItems log alert berdasarkan filter saat ini",
+        confirmLabel: "Hapus Semua",
       ),
     );
 
@@ -249,7 +249,7 @@ class _AlertLogTabState extends State<AlertLogTab> {
               ? ElevatedButton.icon(
                   onPressed: _totalItems == 0 ? null : _confirmDeleteAll,
                   icon: const Icon(Icons.delete_forever, size: 18),
-                  label: const Text("Delete All"),
+                  label: const Text("Hapus Semua"),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.redAccent,
                     foregroundColor: Colors.white,
@@ -268,7 +268,7 @@ class _AlertLogTabState extends State<AlertLogTab> {
                   ? AsyncErrorWidget(error: _error!, onRetry: _fetchLogs)
                   : _logs.isEmpty
                       ? const EmptyStateWidget(
-                          message: "No logs found",
+                          message: "Tidak ada log yang ditemukan",
                           icon: Icons.history,
                         )
                       : ListView(
@@ -285,7 +285,7 @@ class _AlertLogTabState extends State<AlertLogTab> {
                             Align(
                               alignment: Alignment.centerRight,
                               child: Text(
-                                "Showing $start–$end of $_totalItems",
+                                "Menampilkan $start–$end dari $_totalItems",
                                 style: TextStyle(
                                     color: Colors.grey[600], fontSize: 12),
                               ),

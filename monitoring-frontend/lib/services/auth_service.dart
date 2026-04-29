@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '/api_config.dart';
 import '../models/user.dart';
 
@@ -9,7 +9,6 @@ class AuthService {
   static final AuthService _instance = AuthService._internal();
   factory AuthService() => _instance;
   AuthService._internal();
-  final storage = const FlutterSecureStorage();
 
   final _authStateController = StreamController<bool>.broadcast();
   Stream<bool> get authStateChanges => _authStateController.stream;
@@ -27,8 +26,9 @@ class AuthService {
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
 
-      // Store token
-      await storage.write(key: 'auth_token', value: data['access_token']);
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('auth_token', data['access_token']);
+
       _authStateController.add(true);
 
       return data;
@@ -55,7 +55,7 @@ class AuthService {
     );
 
     if (response.statusCode == 201 || response.statusCode == 200) {
-      return; // Success
+      return;
     } else {
       final errorData = jsonDecode(response.body);
       throw Exception(errorData['detail'] ?? 'Registration failed');
@@ -63,7 +63,8 @@ class AuthService {
   }
 
   Future<User> getCurrentUser() async {
-    final token = await storage.read(key: 'auth_token');
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('auth_token');
 
     if (token == null) {
       throw Exception('Not logged in');
@@ -85,30 +86,33 @@ class AuthService {
   }
 
   Future<void> logout() async {
-    await storage.delete(key: 'auth_token');
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('auth_token');
     _authStateController.add(false);
   }
 
-  // Check if logged in
   Future<bool> isLoggedIn() async {
-    final token = await storage.read(key: 'auth_token');
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('auth_token');
     return token != null;
   }
 
-  // Get token (for other services)
   Future<String?> getToken() async {
-    return await storage.read(key: 'auth_token');
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString('auth_token');
   }
 
   Future<bool> hasValidSession() async {
-    final token = await storage.read(key: 'auth_token');
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('auth_token');
+
     if (token == null) return false;
 
     try {
       await getCurrentUser();
       return true;
     } catch (_) {
-      await logout(); // clear invalid token
+      await logout();
       return false;
     }
   }

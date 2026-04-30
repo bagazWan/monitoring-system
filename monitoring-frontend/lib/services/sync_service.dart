@@ -1,29 +1,16 @@
-import 'dart:convert';
-import 'package:http/http.dart' as http;
 import '../api_config.dart';
-import '../services/auth_service.dart';
+import 'api_client.dart';
 
 class SyncService {
-  Future<Map<String, String>> _getHeaders() async {
-    final token = await AuthService().getToken();
-    return {
-      'Content-Type': 'application/json',
-      'Authorization': 'Bearer $token',
-    };
-  }
+  final ApiClient _api = ApiClient();
 
   Future<void> syncFromLibreNMS() async {
-    final response = await http.post(
-      Uri.parse(ApiConfig.syncLibreNMS),
-      headers: await _getHeaders(),
-      body: jsonEncode({
+    await _api.post(
+      ApiConfig.syncLibreNMS,
+      body: {
         "default_location_id": 1,
         "update_existing": true,
-      }),
+      },
     );
-
-    if (response.statusCode != 200) {
-      throw Exception('Sync failed: ${response.body}');
-    }
   }
 }

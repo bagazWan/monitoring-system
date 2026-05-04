@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../../models/location.dart';
-import '../../../services/map_service.dart';
+import '../../../services/location_service.dart';
 import '../../../widgets/data_table.dart';
 import '../../../widgets/visual_feedback.dart';
 import '../../../widgets/search_bar.dart';
@@ -18,7 +18,7 @@ class LocationTab extends StatefulWidget {
 }
 
 class _LocationTabState extends State<LocationTab> {
-  final MapService _service = MapService();
+  final LocationService _service = LocationService();
   bool _isLoading = true;
   List<Location> _locations = [];
   int _totalItems = 0;

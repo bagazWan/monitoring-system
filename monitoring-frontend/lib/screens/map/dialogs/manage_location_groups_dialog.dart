@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../models/location.dart';
-import '../../../services/map_service.dart';
+import '../../../services/location_service.dart';
 
 class ManageLocationGroupsDialog extends StatefulWidget {
   const ManageLocationGroupsDialog({super.key});
@@ -12,7 +12,7 @@ class ManageLocationGroupsDialog extends StatefulWidget {
 
 class _ManageLocationGroupsDialogState
     extends State<ManageLocationGroupsDialog> {
-  final MapService _service = MapService();
+  final LocationService _service = LocationService();
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _descController = TextEditingController();
 

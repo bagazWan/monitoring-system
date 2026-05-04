@@ -4,6 +4,8 @@ import '../../../models/location.dart';
 import '../../../models/switch_summary.dart';
 import '../../../models/network_node.dart';
 import '../../../services/device_service.dart';
+import '../../../services/location_service.dart';
+import '../../../services/map_service.dart';
 import '../../../widgets/location_search_picker_dialog.dart';
 
 typedef SaveCallback = Future<void> Function(Map<String, dynamic> data);
@@ -128,7 +130,7 @@ class _DeviceGeneralTabState extends State<DeviceGeneralTab> {
   Future<void> _fetchDropdowns() async {
     final service = DeviceService();
     try {
-      final allLocations = await service.getAllLocationOptions();
+      final allLocations = await LocationService().getLocationOptions();
       if (mounted && allLocations.isNotEmpty) {
         setState(() {
           _locations = allLocations;
@@ -139,7 +141,7 @@ class _DeviceGeneralTabState extends State<DeviceGeneralTab> {
         final sw = await service.getSwitches();
         if (mounted) setState(() => _switches = sw);
       } else {
-        final nodes = await service.getNetworkNodes();
+        final nodes = await MapService().getNetworkNodes();
         if (mounted) setState(() => _networkNodes = nodes);
       }
     } catch (e) {

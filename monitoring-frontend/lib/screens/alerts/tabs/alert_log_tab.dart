@@ -6,7 +6,7 @@ import '../dialogs/alert_details_dialog.dart';
 import '../dialogs/alert_delete_dialog.dart';
 import '../../../models/alert.dart';
 import '../../../services/alert_service.dart';
-import '../../../services/map_service.dart';
+import '../../../services/location_service.dart';
 import '../../../services/auth_service.dart';
 import '../../../services/websocket_service.dart';
 import '../../../../widgets/pagination.dart';
@@ -64,7 +64,7 @@ class _AlertLogTabState extends State<AlertLogTab> {
 
   Future<void> _loadLocations() async {
     try {
-      final groups = await MapService().getLocationGroups();
+      final groups = await LocationService().getLocationGroups();
       if (!mounted) return;
 
       final List<String> formattedNames = [];

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../models/network_node.dart';
 import '../../../models/location.dart';
 import '../../../services/map_service.dart';
-import '../../../services/device_service.dart';
+import '../../../services/location_service.dart';
 import '../../../widgets/location_search_picker_dialog.dart';
 
 class NetworkNodeFormDialog extends StatefulWidget {
@@ -39,7 +39,7 @@ class _NetworkNodeFormDialogState extends State<NetworkNodeFormDialog> {
 
   Future<void> _loadLocations() async {
     try {
-      final locs = await DeviceService().getAllLocationOptions();
+      final locs = await LocationService().getLocationOptions();
 
       if (mounted) {
         setState(() {

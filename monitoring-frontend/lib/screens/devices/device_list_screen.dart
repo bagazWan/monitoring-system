@@ -7,6 +7,7 @@ import 'widgets/device_filter_bar.dart';
 import 'widgets/device_card.dart';
 import '../../models/device.dart';
 import '../../services/device_service.dart';
+import '../../services/location_service.dart';
 import '../../widgets/visual_feedback.dart';
 import '../../widgets/search_bar.dart';
 import '../../widgets/pagination.dart';
@@ -97,7 +98,7 @@ class _DeviceListScreenState extends State<DeviceListScreen>
 
   Future<void> _loadLocations() async {
     try {
-      final groups = await DeviceService().getLocationGroups();
+      final groups = await LocationService().getLocationGroups();
       if (!mounted) return;
 
       final List<String> formattedNames = [];

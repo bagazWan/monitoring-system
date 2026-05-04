@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../models/device.dart';
 import '../../models/location.dart';
 import '../../services/device_service.dart';
+import '../../services/location_service.dart';
 import 'register_device_screen.dart';
 import 'tabs/device_general_tab.dart';
 import 'tabs/device_ports_tab.dart';
@@ -56,7 +57,7 @@ class _DeviceConfigScreenState extends State<DeviceConfigScreen>
 
   Future<void> _fetchLocations() async {
     try {
-      final locs = await _deviceService.getLocations();
+      final locs = await LocationService().getLocations();
       if (mounted) setState(() => _locations = locs);
     } catch (e) {
       debugPrint("Error loading locations: $e");

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../models/dashboard_stats.dart';
+import '../../services/location_service.dart';
 import '../../services/device_service.dart';
 import '../../services/dashboard_service.dart';
 import '../../services/websocket_service.dart';
@@ -19,6 +20,7 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
+  final LocationService _locationService = LocationService();
   final DeviceService _deviceService = DeviceService();
   final DashboardService _dashboardService = DashboardService();
   final ScrollController _scrollController = ScrollController();
@@ -68,7 +70,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Future<void> _initFilters() async {
     try {
-      final groups = await _deviceService.getLocationGroups();
+      final groups = await _locationService.getLocationGroups();
       final types = await _deviceService.getDeviceTypes();
       if (!mounted) return;
 

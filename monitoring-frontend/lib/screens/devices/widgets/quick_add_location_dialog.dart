@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
+import '../../../services/location_service.dart';
 import '../../../models/location.dart';
-import '../../../services/device_service.dart';
 
 class QuickAddLocationDialog extends StatefulWidget {
-  final DeviceService service;
-  const QuickAddLocationDialog({super.key, required this.service});
+  const QuickAddLocationDialog({super.key});
 
   @override
   State<QuickAddLocationDialog> createState() => _QuickAddLocationDialogState();
@@ -29,7 +28,7 @@ class _QuickAddLocationDialogState extends State<QuickAddLocationDialog> {
 
   Future<void> _loadGroups() async {
     try {
-      final groups = await widget.service.getLocationGroups();
+      final groups = await LocationService().getLocationGroups();
       if (!mounted) return;
       setState(() => _groups = groups);
     } catch (e) {
@@ -72,7 +71,7 @@ class _QuickAddLocationDialogState extends State<QuickAddLocationDialog> {
 
     setState(() => _isLoading = true);
     try {
-      final created = await widget.service.createLocationQuick({
+      final created = await LocationService().createLocation({
         "name": _nameController.text.trim(),
         "address": _nameController.text.trim(),
         "location_type": typeRaw,

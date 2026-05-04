@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../models/analytics_data_point.dart';
 import '../../services/analytic_service.dart';
-import '../../services/device_service.dart';
+import '../../services/location_service.dart';
 import 'widgets/analytics_sidebar.dart';
 import 'widgets/analytics_chart.dart';
 
@@ -14,7 +14,7 @@ class AnalyticsScreen extends StatefulWidget {
 
 class _AnalyticsScreenState extends State<AnalyticsScreen> {
   final AnalyticsService _analyticsService = AnalyticsService();
-  final DeviceService _deviceService = DeviceService();
+  final LocationService _locationService = LocationService();
 
   List<String> _locations = [];
   String? _locationA;
@@ -39,7 +39,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
 
   Future<void> _initData() async {
     try {
-      final groups = await _deviceService.getLocationGroups();
+      final groups = await _locationService.getLocationGroups();
       if (!mounted) return;
 
       final List<String> formattedNames = [];

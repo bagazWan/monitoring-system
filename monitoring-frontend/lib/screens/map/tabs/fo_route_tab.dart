@@ -5,7 +5,7 @@ import '../../../models/fo_route.dart';
 import '../../../models/network_node.dart';
 import '../../../models/location.dart';
 import '../../../services/map_service.dart';
-import '../../../services/device_service.dart';
+import '../../../services/location_service.dart';
 import '../../../widgets/data_table.dart';
 import '../../../widgets/visual_feedback.dart';
 import '../../../widgets/search_bar.dart';
@@ -69,7 +69,7 @@ class _FORouteTabState extends State<FORouteTab> {
           search: _searchController.text.trim(),
         ),
         _service.getNetworkNodes(),
-        _service.getLocations(
+        LocationService().getLocations(
             limit: 1000), //need more proper fix later (check api/locations.py)
       ]);
 

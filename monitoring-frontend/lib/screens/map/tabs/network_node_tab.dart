@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../models/network_node.dart';
 import '../../../models/location.dart';
 import '../../../services/map_service.dart';
-import '../../../services/device_service.dart';
+import '../../../services/location_service.dart';
 import '../../../widgets/data_table.dart';
 import '../../../widgets/visual_feedback.dart';
 import '../../../widgets/search_bar.dart';
@@ -64,7 +64,7 @@ class _NetworkNodeTabState extends State<NetworkNodeTab> {
           limit: _itemsPerPage,
           search: _searchController.text.trim(),
         ),
-        DeviceService().getAllLocationOptions(),
+        LocationService().getLocationOptions(),
       ]);
 
       final nodesPage = results[0] as NetworkNodePage;

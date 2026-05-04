@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../models/location.dart';
-import '../../../services/map_service.dart';
+import '../../../services/location_service.dart';
 
 class LocationFormDialog extends StatefulWidget {
   final Location? location;
@@ -12,7 +12,7 @@ class LocationFormDialog extends StatefulWidget {
 
 class _LocationFormDialogState extends State<LocationFormDialog> {
   final _formKey = GlobalKey<FormState>();
-  final _service = MapService();
+  final _service = LocationService();
 
   late TextEditingController _nameController;
   late TextEditingController _addrController;

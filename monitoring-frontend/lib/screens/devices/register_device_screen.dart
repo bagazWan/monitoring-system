@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../services/device_service.dart';
+import '../../services/location_service.dart';
+import '../../services/map_service.dart';
 import '../../models/location.dart';
 import '../../models/switch_summary.dart';
 import '../../models/device.dart';
@@ -73,9 +75,9 @@ class _RegisterDeviceScreenState extends State<RegisterDeviceScreen>
 
   Future<void> _loadDropdowns() async {
     try {
-      final locations = await _service.getAllLocationOptions();
+      final locations = await LocationService().getLocationOptions();
       final switches = await _service.getSwitches();
-      final nodes = await _service.getNetworkNodes();
+      final nodes = await MapService().getNetworkNodes();
       if (!mounted) return;
       setState(() {
         _locations = locations;
@@ -93,11 +95,11 @@ class _RegisterDeviceScreenState extends State<RegisterDeviceScreen>
   Future<void> _openQuickAddLocationDialog() async {
     final created = await showDialog<Location>(
       context: context,
-      builder: (context) => QuickAddLocationDialog(service: _service),
+      builder: (context) => const QuickAddLocationDialog(),
     );
 
     if (created != null) {
-      final refreshed = await _service.getAllLocationOptions();
+      final refreshed = await LocationService().getLocationOptions();
       if (!mounted) return;
       setState(() {
         _locations = refreshed;

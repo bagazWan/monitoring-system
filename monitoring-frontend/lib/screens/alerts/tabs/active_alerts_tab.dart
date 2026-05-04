@@ -2,7 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../../models/alert.dart';
 import '../../../services/alert_service.dart';
-import '../../../services/map_service.dart';
+import '../../../services/location_service.dart';
 import '../../../services/websocket_service.dart';
 import '../../../widgets/alert_card.dart';
 import '../../../widgets/visual_feedback.dart';
@@ -46,7 +46,7 @@ class _ActiveAlertsTabState extends State<ActiveAlertsTab> {
 
   Future<void> _loadLocations() async {
     try {
-      final groups = await MapService().getLocationGroups();
+      final groups = await LocationService().getLocationGroups();
       if (!mounted) return;
 
       final List<String> formattedNames = [];

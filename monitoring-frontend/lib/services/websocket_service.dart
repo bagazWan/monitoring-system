@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
-import '../api_config.dart';
+import '../config/api_config.dart';
 
 class StatusChangeEvent {
   final String nodeType;

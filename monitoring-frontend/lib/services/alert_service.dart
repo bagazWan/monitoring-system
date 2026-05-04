@@ -1,72 +1,44 @@
-import 'dart:convert';
-import 'package:http/http.dart' as http;
-import '../api_config.dart';
+import 'api_client.dart';
+import '../config/api_config.dart';
 import '../models/alert.dart';
-import '../services/auth_service.dart';
+import '../services/location_service.dart';
 
 class AlertService {
   static final AlertService _instance = AlertService._internal();
   factory AlertService() => _instance;
   AlertService._internal();
 
-  Future<Map<String, String>> _getHeaders() async {
-    final token = await AuthService().getToken();
-    return {
-      'Content-Type': 'application/json',
-      'Authorization': 'Bearer $token',
-    };
-  }
+  final ApiClient _api = ApiClient();
 
   Future<List<Alert>> getActiveAlerts(
       {String? severity, String? locationName}) async {
-    final queryParams = <String>[];
+    final params = <String, String>{};
 
     if (severity != null && severity.isNotEmpty && severity != 'all') {
-      queryParams.add('severity=${Uri.encodeQueryComponent(severity)}');
+      params['severity'] = severity;
     }
     if (locationName != null && locationName.isNotEmpty) {
-      queryParams
-          .add('location_name=${Uri.encodeQueryComponent(locationName)}');
+      params['location_name'] = locationName;
     }
 
-    final query = queryParams.isEmpty ? '' : '?${queryParams.join('&')}';
+    final uri = Uri.parse('${ApiConfig.alerts}/active')
+        .replace(queryParameters: params.isEmpty ? null : params);
+    final response = await _api.get(uri.toString());
 
-    final response = await http.get(
-      Uri.parse('${ApiConfig.alerts}/active$query'),
-      headers: await _getHeaders(),
-    );
-
-    if (response.statusCode == 200) {
-      final List<dynamic> data = json.decode(response.body);
-      return data.map((json) => Alert.fromJson(json)).toList();
-    } else {
-      throw Exception('Failed to load active alerts');
-    }
+    return ApiClient.parseListOrItems<Alert>(response, Alert.fromJson);
   }
 
   Future<List<String>> getAlertLocations({String? status}) async {
-    final response = await http.get(
-      Uri.parse(ApiConfig.locationOptions),
-      headers: await _getHeaders(),
-    );
+    final locations = await LocationService().getLocationOptions();
 
-    if (response.statusCode == 200) {
-      final List<dynamic> data = json.decode(response.body);
+    final options = locations
+        .map((loc) => loc.groupName?.trim() ?? '')
+        .where((name) => name.isNotEmpty)
+        .toSet()
+        .toList()
+      ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
 
-      final options = <String>{};
-      for (final raw in data) {
-        final item = raw as Map<String, dynamic>;
-        final groupName = (item['group_name'] ?? '').toString().trim();
-        if (groupName.isNotEmpty) {
-          options.add(groupName);
-        }
-      }
-
-      final list = options.toList()
-        ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
-      return list;
-    }
-    throw Exception('Failed to load alert locations');
+    return options;
   }
 
   Future<AlertPage> getAlertLogs({
@@ -78,68 +50,42 @@ class AlertService {
     int page = 1,
     int limit = 10,
   }) async {
-    final queryParams = <String>[];
+    final params = <String, String>{
+      'page': page.toString(),
+      'limit': limit.toString(),
+    };
 
-    if (status != null && status.isNotEmpty) {
-      queryParams.add('status_filter=${Uri.encodeQueryComponent(status)}');
-    }
+    if (status != null && status.isNotEmpty) params['status_filter'] = status;
     if (severity != null && severity.isNotEmpty && severity != 'all') {
-      queryParams.add('severity=${Uri.encodeQueryComponent(severity)}');
+      params['severity'] = severity;
     }
     if (locationName != null && locationName.isNotEmpty) {
-      queryParams
-          .add('location_name=${Uri.encodeQueryComponent(locationName)}');
+      params['location_name'] = locationName;
     }
-    if (startDate != null) {
-      queryParams.add(
-          'start_date=${Uri.encodeQueryComponent(startDate.toIso8601String())}');
-    }
+    if (startDate != null) params['start_date'] = startDate.toIso8601String();
+
     if (endDate != null) {
       final endInclusive =
           DateTime(endDate.year, endDate.month, endDate.day, 23, 59, 59, 999);
-      queryParams.add(
-          'end_date=${Uri.encodeQueryComponent(endInclusive.toIso8601String())}');
+      params['end_date'] = endInclusive.toIso8601String();
     }
 
-    queryParams.add('page=$page');
-    queryParams.add('limit=$limit');
+    final uri = Uri.parse('${ApiConfig.alerts}/')
+        .replace(queryParameters: params.isEmpty ? null : params);
+    final response = await _api.get(uri.toString());
 
-    final query = '?${queryParams.join('&')}';
-
-    final response = await http.get(
-      Uri.parse('${ApiConfig.alerts}/$query'),
-      headers: await _getHeaders(),
-    );
-
-    if (response.statusCode == 200) {
-      return AlertPage.fromJson(json.decode(response.body));
-    }
-    throw Exception('Failed to load alert logs');
+    return AlertPage.fromJson(response);
   }
 
   Future<void> acknowledgeAlert(int alertId, String resolutionNote) async {
-    final response = await http.patch(
-      Uri.parse('${ApiConfig.alerts}/$alertId'),
-      headers: await _getHeaders(),
-      body: json.encode({
-        'resolution_note': resolutionNote,
-      }),
+    await _api.patch(
+      '${ApiConfig.alerts}/$alertId',
+      body: {'resolution_note': resolutionNote},
     );
-
-    if (response.statusCode != 200) {
-      throw Exception('Failed to resolve alert');
-    }
   }
 
   Future<void> deleteAlert(int alertId) async {
-    final response = await http.delete(
-      Uri.parse('${ApiConfig.alerts}/$alertId'),
-      headers: await _getHeaders(),
-    );
-
-    if (response.statusCode != 204 && response.statusCode != 200) {
-      throw Exception('Failed to delete alert');
-    }
+    await _api.delete('${ApiConfig.alerts}/$alertId');
   }
 
   Future<int> deleteAlertLogs({
@@ -149,39 +95,28 @@ class AlertService {
     String? status,
     String? locationName,
   }) async {
-    final queryParams = <String>[];
+    final params = <String, String>{};
 
-    if (status != null && status.isNotEmpty) {
-      queryParams.add('status_filter=${Uri.encodeQueryComponent(status)}');
-    }
+    if (status != null && status.isNotEmpty) params['status_filter'] = status;
     if (severity != null && severity.isNotEmpty && severity != 'all') {
-      queryParams.add('severity=${Uri.encodeQueryComponent(severity)}');
+      params['severity'] = severity;
     }
     if (locationName != null && locationName.isNotEmpty) {
-      queryParams
-          .add('location_name=${Uri.encodeQueryComponent(locationName)}');
+      params['location_name'] = locationName;
     }
-    if (startDate != null) {
-      queryParams.add(
-          'start_date=${Uri.encodeQueryComponent(startDate.toIso8601String())}');
-    }
+    if (startDate != null) params['start_date'] = startDate.toIso8601String();
+
     if (endDate != null) {
       final endInclusive =
           DateTime(endDate.year, endDate.month, endDate.day, 23, 59, 59, 999);
-      queryParams.add(
-          'end_date=${Uri.encodeQueryComponent(endInclusive.toIso8601String())}');
+      params['end_date'] = endInclusive.toIso8601String();
     }
 
-    final query = queryParams.isEmpty ? '' : '?${queryParams.join('&')}';
+    final uri = Uri.parse('${ApiConfig.alerts}/')
+        .replace(queryParameters: params.isEmpty ? null : params);
 
-    final response = await http.delete(
-      Uri.parse('${ApiConfig.alerts}/$query'),
-      headers: await _getHeaders(),
-    );
+    final response = await _api.delete(uri.toString());
 
-    if (response.statusCode == 200) {
-      return (json.decode(response.body)['deleted'] ?? 0) as int;
-    }
-    throw Exception('Failed to delete alert logs');
+    return (response['deleted'] ?? 0) as int;
   }
 }

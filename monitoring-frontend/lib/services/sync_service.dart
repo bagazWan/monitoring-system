@@ -1,5 +1,5 @@
-import '../api_config.dart';
 import 'api_client.dart';
+import '../config/api_config.dart';
 
 class SyncService {
   final ApiClient _api = ApiClient();

@@ -1,17 +1,9 @@
-import 'dart:convert';
-import 'package:http/http.dart' as http;
-import '../api_config.dart';
+import 'api_client.dart';
+import '../config/api_config.dart';
 import '../models/analytics_data_point.dart';
-import 'auth_service.dart';
 
 class AnalyticsService {
-  Future<Map<String, String>> _getHeaders() async {
-    final token = await AuthService().getToken();
-    return {
-      'Content-Type': 'application/json',
-      'Authorization': 'Bearer $token',
-    };
-  }
+  final ApiClient _api = ApiClient();
 
   Future<List<AnalyticsDataPoint>> getHistoricalMetrics({
     required DateTime startDate,
@@ -21,7 +13,7 @@ class AnalyticsService {
     final endInclusive =
         DateTime(endDate.year, endDate.month, endDate.day, 23, 59, 59, 999);
 
-    final params = {
+    final params = <String, String>{
       'start_date': startDate.toUtc().toIso8601String(),
       'end_date': endInclusive.toUtc().toIso8601String(),
       'location_name': locationName,
@@ -29,13 +21,9 @@ class AnalyticsService {
 
     final uri =
         Uri.parse(ApiConfig.analyticsHistory).replace(queryParameters: params);
-    final response = await http.get(uri, headers: await _getHeaders());
+    final response = await _api.get(uri.toString());
 
-    if (response.statusCode == 200) {
-      final List<dynamic> data = json.decode(response.body);
-      return data.map((json) => AnalyticsDataPoint.fromJson(json)).toList();
-    } else {
-      throw Exception('Failed to load analytics history');
-    }
+    return ApiClient.parseListOrItems<AnalyticsDataPoint>(
+        response, AnalyticsDataPoint.fromJson);
   }
 }

@@ -1,5 +1,5 @@
-import '../api_config.dart';
 import 'api_client.dart';
+import '../config/api_config.dart';
 import '../models/user.dart';
 
 class UserService {
@@ -34,5 +34,12 @@ class UserService {
 
   Future<void> deleteUser(int id) async {
     await _api.delete('${ApiConfig.users}/$id');
+  }
+
+  Future<void> changeOwnPassword(String oldPassword, String newPassword) async {
+    await _api.post('${ApiConfig.users}/me/change-password', body: {
+      'old_password': oldPassword,
+      'new_password': newPassword,
+    });
   }
 }

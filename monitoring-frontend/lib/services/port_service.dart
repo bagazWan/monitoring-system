@@ -1,66 +1,38 @@
-import 'dart:convert';
-import 'package:http/http.dart' as http;
-import '../api_config.dart';
+import 'api_client.dart';
+import '../config/api_config.dart';
 import '../models/librenms_port.dart';
-import '../services/auth_service.dart';
 
 class PortsService {
-  Future<Map<String, String>> _getHeaders() async {
-    final token = await AuthService().getToken();
-    return {
-      'Content-Type': 'application/json',
-      'Authorization': 'Bearer $token',
-    };
-  }
+  final ApiClient _api = ApiClient();
 
-  Future<List<LibreNMSPort>> getPorts({
-    int? deviceId,
-    int? switchId,
-  }) async {
-    final query =
-        deviceId != null ? '?device_id=$deviceId' : '?switch_id=$switchId';
+  Future<List<LibreNMSPort>> getPorts({int? deviceId, int? switchId}) async {
+    final params = <String, String>{};
+    if (deviceId != null) params['device_id'] = deviceId.toString();
+    if (switchId != null) params['switch_id'] = switchId.toString();
 
-    final response = await http.get(
-        Uri.parse(
-            '${ApiConfig.baseUrl}${ApiConfig.apiVersion}/librenms-ports$query'),
-        headers: await _getHeaders());
+    final uri = Uri.parse(ApiConfig.libreNMSPorts).replace(
+      queryParameters: params.isEmpty ? null : params,
+    );
 
-    if (response.statusCode == 200) {
-      final List<dynamic> data = jsonDecode(response.body);
-      return data.map((j) => LibreNMSPort.fromJson(j)).toList();
-    }
+    final response = await _api.get(uri.toString());
 
-    throw Exception('Failed to load ports: ${response.body}');
+    return ApiClient.parseListOrItems<LibreNMSPort>(
+        response, LibreNMSPort.fromJson);
   }
 
   Future<void> updatePort(int portRowId, Map<String, dynamic> payload) async {
-    final response = await http.patch(
-      Uri.parse(
-          '${ApiConfig.baseUrl}${ApiConfig.apiVersion}/librenms-ports/$portRowId'),
-      headers: await _getHeaders(),
-      body: jsonEncode(payload),
-    );
-
-    if (response.statusCode != 200) {
-      throw Exception('Failed to update port: ${response.body}');
-    }
+    await _api.patch('${ApiConfig.libreNMSPorts}/$portRowId', body: payload);
   }
 
-  Future<void> resyncPorts({
-    int? deviceId,
-    int? switchId,
-  }) async {
-    final query =
-        deviceId != null ? '?device_id=$deviceId' : '?switch_id=$switchId';
+  Future<void> resyncPorts({int? deviceId, int? switchId}) async {
+    final params = <String, String>{};
+    if (deviceId != null) params['device_id'] = deviceId.toString();
+    if (switchId != null) params['switch_id'] = switchId.toString();
 
-    final response = await http.post(
-      Uri.parse(
-          '${ApiConfig.baseUrl}${ApiConfig.apiVersion}/librenms-ports/resync$query'),
-      headers: await _getHeaders(),
+    final uri = Uri.parse('${ApiConfig.libreNMSPorts}/resync').replace(
+      queryParameters: params.isEmpty ? null : params,
     );
 
-    if (response.statusCode != 202 && response.statusCode != 200) {
-      throw Exception('Failed to resync ports: ${response.body}');
-    }
+    await _api.post(uri.toString());
   }
 }

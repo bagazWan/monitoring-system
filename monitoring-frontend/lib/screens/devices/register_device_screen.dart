@@ -6,7 +6,8 @@ import '../../models/location.dart';
 import '../../models/switch_summary.dart';
 import '../../models/device.dart';
 import '../../models/network_node.dart';
-import '../../widgets/location_search_picker_dialog.dart';
+import '../../widgets/dialogs/location_search_picker_dialog.dart';
+import '../../widgets/common/app_text_field.dart';
 import 'widgets/quick_add_location_dialog.dart';
 
 part 'widgets/register_device_layout.dart';

@@ -6,7 +6,9 @@ import '../../../models/network_node.dart';
 import '../../../services/device_service.dart';
 import '../../../services/location_service.dart';
 import '../../../services/map_service.dart';
-import '../../../widgets/location_search_picker_dialog.dart';
+import '../../../widgets/common/app_text_field.dart';
+import '../../../widgets/common/loading_button.dart';
+import '../../../widgets/dialogs/location_search_picker_dialog.dart';
 
 typedef SaveCallback = Future<void> Function(Map<String, dynamic> data);
 typedef DangerActionCallback = Future<void> Function(String action);
@@ -46,6 +48,20 @@ class _DeviceGeneralTabState extends State<DeviceGeneralTab> {
   List<NetworkNode> _networkNodes = [];
   bool _saving = false;
 
+  InputDecoration get _sharedDropdownDecoration => InputDecoration(
+        filled: true,
+        fillColor: Colors.grey[50],
+        isDense: true,
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+        border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: BorderSide(color: Colors.grey[300]!)),
+        enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: BorderSide(color: Colors.grey[300]!)),
+      );
+
   @override
   void initState() {
     super.initState();
@@ -55,6 +71,7 @@ class _DeviceGeneralTabState extends State<DeviceGeneralTab> {
         TextEditingController(text: widget.node.description ?? "");
     _typeController = TextEditingController(text: widget.node.deviceType ?? "");
     _selectedLocationId = widget.node.locationId;
+
     if (widget.node.nodeKind == 'device') {
       _selectedSwitchId = widget.node.switchId;
     } else if (widget.node.nodeKind == 'switch') {
@@ -128,17 +145,14 @@ class _DeviceGeneralTabState extends State<DeviceGeneralTab> {
   }
 
   Future<void> _fetchDropdowns() async {
-    final service = DeviceService();
     try {
       final allLocations = await LocationService().getLocationOptions();
       if (mounted && allLocations.isNotEmpty) {
-        setState(() {
-          _locations = allLocations;
-        });
+        setState(() => _locations = allLocations);
       }
 
       if (widget.node.nodeKind == 'device') {
-        final sw = await service.getSwitches();
+        final sw = await DeviceService().getSwitches();
         if (mounted) setState(() => _switches = sw);
       } else {
         final nodes = await MapService().getNetworkNodes();
@@ -161,19 +175,31 @@ class _DeviceGeneralTabState extends State<DeviceGeneralTab> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _buildSectionCard("Informasi Identitas", [
-              _buildTextField("Nama Tampilan", _nameController),
+              AppTextField(
+                  label: "Nama Tampilan",
+                  controller: _nameController,
+                  isRequired: true),
               const SizedBox(height: 16),
-              _buildTextField("Alamat IP", _ipController),
+              AppTextField(
+                  label: "Alamat IP",
+                  controller: _ipController,
+                  isRequired: true),
               const SizedBox(height: 16),
-              _buildTextField("Tipe Perangkat", _typeController,
-                  required: false),
+              AppTextField(
+                  label: "Tipe Perangkat", controller: _typeController),
             ]),
             const SizedBox(height: 24),
             _buildSectionCard("Lokasi & Detail", [
               InkWell(
                 onTap: _pickLocation,
                 child: InputDecorator(
-                  decoration: _inputDecoration("Lokasi"),
+                  decoration: _sharedDropdownDecoration.copyWith(
+                    labelText: "Lokasi",
+                    focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide:
+                            const BorderSide(color: Colors.blue, width: 1.5)),
+                  ),
                   child: Text(_selectedLocationLabel()),
                 ),
               ),
@@ -186,7 +212,8 @@ class _DeviceGeneralTabState extends State<DeviceGeneralTab> {
                           DropdownMenuItem(value: s.id, child: Text(s.name)))
                       .toList(),
                   onChanged: (val) => setState(() => _selectedSwitchId = val),
-                  decoration: _inputDecoration("Switch/Hub terhubung"),
+                  decoration: _sharedDropdownDecoration.copyWith(
+                      labelText: "Switch/Hub terhubung"),
                 ),
               if (isSwitch)
                 DropdownButtonFormField<int>(
@@ -197,29 +224,19 @@ class _DeviceGeneralTabState extends State<DeviceGeneralTab> {
                       .toList(),
                   onChanged: (val) =>
                       setState(() => _selectedNetworkNodeId = val),
-                  decoration: _inputDecoration("Node Jaringan yang digunakan"),
+                  decoration: _sharedDropdownDecoration.copyWith(
+                      labelText: "Node Jaringan yang digunakan"),
                 ),
               const SizedBox(height: 16),
-              _buildTextField("Deskripsi", _descController,
-                  maxLines: 3, required: false),
+              AppTextField(
+                  label: "Deskripsi", controller: _descController, maxLines: 3),
             ]),
             const SizedBox(height: 24),
-            SizedBox(
-              width: double.infinity,
-              height: 48,
-              child: ElevatedButton.icon(
-                icon: _saving ? const SizedBox() : const Icon(Icons.save),
-                label: _saving
-                    ? const CircularProgressIndicator(color: Colors.white)
-                    : const Text("SIMPAN PERUBAHAN",
-                        style: TextStyle(fontWeight: FontWeight.bold)),
-                style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.blue[700],
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8))),
-                onPressed: _saving ? null : _handleSave,
-              ),
+            LoadingButton(
+              isLoading: _saving,
+              onPressed: _handleSave,
+              label: "SIMPAN PERUBAHAN",
+              icon: Icons.save,
             ),
             const SizedBox(height: 40),
             _buildDangerZone(),
@@ -332,7 +349,6 @@ class _DeviceGeneralTabState extends State<DeviceGeneralTab> {
               Text(subtitle,
                   style: TextStyle(
                       fontSize: 11,
-                      fontWeight: FontWeight.normal,
                       color: isFilled ? Colors.white70 : Colors.grey[700])),
             ],
           ),
@@ -373,35 +389,5 @@ class _DeviceGeneralTabState extends State<DeviceGeneralTab> {
         ),
       );
     }
-  }
-
-  Widget _buildTextField(String label, TextEditingController controller,
-      {int maxLines = 1, bool required = true}) {
-    return TextFormField(
-      controller: controller,
-      maxLines: maxLines,
-      validator: (v) =>
-          (required && (v == null || v.isEmpty)) ? "Required" : null,
-      decoration: _inputDecoration(label),
-    );
-  }
-
-  InputDecoration _inputDecoration(String label) {
-    return InputDecoration(
-      labelText: label,
-      filled: true,
-      fillColor: Colors.grey[50],
-      isDense: true,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
-      border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: BorderSide(color: Colors.grey[300]!)),
-      enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: BorderSide(color: Colors.grey[300]!)),
-      focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: Colors.blue, width: 1.5)),
-    );
   }
 }

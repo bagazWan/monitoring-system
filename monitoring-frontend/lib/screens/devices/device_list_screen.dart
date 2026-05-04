@@ -8,9 +8,9 @@ import 'widgets/device_card.dart';
 import '../../models/device.dart';
 import '../../services/device_service.dart';
 import '../../services/location_service.dart';
-import '../../widgets/visual_feedback.dart';
-import '../../widgets/search_bar.dart';
-import '../../widgets/pagination.dart';
+import '../../widgets/common/visual_feedback.dart';
+import '../../widgets/components/search_bar.dart';
+import '../../widgets/layout/pagination.dart';
 import '../../providers/metrics_provider.dart';
 
 part 'widgets/device_list_widgets.dart';

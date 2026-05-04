@@ -4,8 +4,8 @@ import '../../../models/alert.dart';
 import '../../../services/alert_service.dart';
 import '../../../services/location_service.dart';
 import '../../../services/websocket_service.dart';
-import '../../../widgets/alert_card.dart';
-import '../../../widgets/visual_feedback.dart';
+import '../../../widgets/components/alert_card.dart';
+import '../../../widgets/common/visual_feedback.dart';
 import '../dialogs/alert_acknowledge_dialog.dart';
 import '../alert_filter_bar.dart';
 

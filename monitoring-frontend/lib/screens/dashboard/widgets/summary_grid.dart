@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../providers/metrics_provider.dart';
 import '../../../models/dashboard_stats.dart';
-import '../../../widgets/summary_card.dart';
+import '../../../widgets/components/summary_card.dart';
 import '../../../utils/bandwidth_formatter.dart';
 
 class DashboardSummaryGrid extends StatelessWidget {

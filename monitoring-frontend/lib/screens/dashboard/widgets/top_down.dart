@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../models/dashboard_stats.dart';
-import '../../../widgets/filter_dropdown.dart';
+import '../../../widgets/components/filter_dropdown.dart';
 
 class DashboardTopDown extends StatefulWidget {
   final DashboardStats stats;

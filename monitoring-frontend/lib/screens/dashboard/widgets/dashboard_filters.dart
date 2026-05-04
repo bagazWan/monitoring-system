@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../../widgets/filter_dropdown.dart';
+import '../../../widgets/components/filter_dropdown.dart';
 
 class DashboardFilters extends StatelessWidget {
   final bool isLoading;

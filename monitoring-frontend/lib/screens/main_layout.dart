@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import '../../widgets/side_menu.dart';
-import '../../widgets/alert_notification.dart';
+import '../../widgets/layout/side_menu.dart';
+import '../../widgets/components/alert_notification.dart';
 import '../../services/auth_service.dart';
 import '../../services/sync_service.dart';
 import '../../services/websocket_service.dart';

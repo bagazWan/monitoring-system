@@ -3,14 +3,14 @@ import 'package:flutter/material.dart';
 import '../alert_filter_bar.dart';
 import '../alert_log_table.dart';
 import '../dialogs/alert_details_dialog.dart';
-import '../dialogs/alert_delete_dialog.dart';
 import '../../../models/alert.dart';
 import '../../../services/alert_service.dart';
 import '../../../services/location_service.dart';
 import '../../../services/auth_service.dart';
 import '../../../services/websocket_service.dart';
-import '../../../../widgets/pagination.dart';
-import '../../../../widgets/visual_feedback.dart';
+import '../../../../widgets/layout/pagination.dart';
+import '../../../../widgets/common/visual_feedback.dart';
+import '../../../../widgets/dialogs/delete_confirm_dialog.dart';
 
 class AlertLogTab extends StatefulWidget {
   const AlertLogTab({super.key});
@@ -141,7 +141,7 @@ class _AlertLogTabState extends State<AlertLogTab> {
   Future<void> _confirmDelete(Alert alert) async {
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (_) => const AlertDeleteConfirmDialog(
+      builder: (_) => const DeleteConfirmDialog(
         title: "Hapus alert",
         message: "Hapus alert log ini?",
         confirmLabel: "Hapus",
@@ -170,7 +170,7 @@ class _AlertLogTabState extends State<AlertLogTab> {
   Future<void> _confirmDeleteAll() async {
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (_) => AlertDeleteConfirmDialog(
+      builder: (_) => DeleteConfirmDialog(
         title: "Hapus log terfilter",
         message:
             "Ini akan menghapus $_totalItems log alert berdasarkan filter saat ini",

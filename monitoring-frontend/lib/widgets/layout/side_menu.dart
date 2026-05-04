@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../models/user.dart';
+import '../../models/user.dart';
 
 class SideMenu extends StatefulWidget {
   final int selectedIndex;

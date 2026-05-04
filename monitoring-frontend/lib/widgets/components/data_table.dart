@@ -10,6 +10,18 @@ class CustomDataTable extends StatefulWidget {
     required this.rows,
   });
 
+  static DataColumn column(String label,
+      {bool isExpanded = true, TextAlign textAlign = TextAlign.center}) {
+    final textWidget = Text(
+      label,
+      textAlign: textAlign,
+      style: const TextStyle(fontWeight: FontWeight.bold),
+    );
+    return DataColumn(
+      label: isExpanded ? Expanded(child: textWidget) : textWidget,
+    );
+  }
+
   @override
   State<CustomDataTable> createState() => _CustomDataTableState();
 }

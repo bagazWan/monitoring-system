@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import '../../widgets/filter_dropdown.dart';
+import '../../widgets/components/filter_dropdown.dart';
 
 class AlertFilterBar extends StatelessWidget {
   final VoidCallback? onRefresh;

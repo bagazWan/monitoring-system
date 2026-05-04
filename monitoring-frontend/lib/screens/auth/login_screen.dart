@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../services/auth_service.dart';
-import '../../widgets/hover_link.dart';
+import '../../widgets/common/hover_link.dart';
+import '../../widgets/common/app_text_field.dart';
+import '../../widgets/common/loading_button.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -25,18 +27,15 @@ class _LoginScreenState extends State<LoginScreen> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text("Login Berhasil"),
-              backgroundColor: Colors.green,
-            ),
+                content: Text("Login Berhasil"), backgroundColor: Colors.green),
           );
         }
       } catch (e) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text("Error: ${e.toString()}"),
-              backgroundColor: Colors.red,
-            ),
+                content: Text("Error: ${e.toString()}"),
+                backgroundColor: Colors.red),
           );
         }
       } finally {
@@ -71,51 +70,27 @@ class _LoginScreenState extends State<LoginScreen> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text("Username",
-                      style: TextStyle(fontWeight: FontWeight.w600)),
-                  const SizedBox(height: 8),
-                  TextFormField(
+                  AppTextField(
+                    label: "Username",
                     controller: _usernameController,
-                    decoration: const InputDecoration(
-                      prefixIcon: Icon(Icons.person_outline),
-                      border: OutlineInputBorder(),
-                    ),
-                    validator: (val) => val!.isEmpty ? "Required" : null,
+                    prefixIcon: const Icon(Icons.person_outline),
+                    isRequired: true,
                   ),
                   const SizedBox(height: 20),
-                  const Text("Password",
-                      style: TextStyle(fontWeight: FontWeight.w600)),
-                  const SizedBox(height: 8),
-                  TextFormField(
+                  AppTextField(
+                    label: "Password",
                     controller: _passwordController,
+                    prefixIcon: const Icon(Icons.lock_outline),
                     obscureText: true,
-                    decoration: const InputDecoration(
-                      prefixIcon: Icon(Icons.lock_outline),
-                      border: OutlineInputBorder(),
-                    ),
                     validator: (val) =>
-                        val!.length < 6 ? "Terlalu pendek" : null,
+                        val == null || val.length < 6 ? "Terlalu pendek" : null,
                   ),
                   const SizedBox(height: 32),
-                  SizedBox(
-                    width: double.infinity,
+                  LoadingButton(
+                    isLoading: _isLoading,
+                    onPressed: _handleLogin,
+                    label: "Log In",
                     height: 50,
-                    child: ElevatedButton(
-                      onPressed: _isLoading ? null : _handleLogin,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.blueAccent,
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8)),
-                      ),
-                      child: _isLoading
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(
-                                  color: Colors.white))
-                          : const Text("Log In"),
-                    ),
                   ),
                   const SizedBox(height: 16),
                   Row(

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../../models/location.dart';
 import '../../../services/location_service.dart';
+import '../../../widgets/common/app_text_field.dart';
+import '../../../widgets/common/loading_button.dart';
 
 class LocationFormDialog extends StatefulWidget {
   final Location? location;
@@ -23,8 +25,8 @@ class _LocationFormDialogState extends State<LocationFormDialog> {
 
   int? _selectedGroupId;
   bool _isLoadingGroups = true;
-  List<LocationGroup> _groups = [];
   bool _isSaving = false;
+  List<LocationGroup> _groups = [];
 
   @override
   void initState() {
@@ -161,32 +163,40 @@ class _LocationFormDialogState extends State<LocationFormDialog> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      TextFormField(
+                      AppTextField(
+                        label: "Nama Lokasi",
                         controller: _nameController,
-                        decoration:
-                            const InputDecoration(labelText: "Nama Lokasi"),
-                        validator: (v) =>
-                            v == null || v.trim().isEmpty ? "Required" : null,
+                        isRequired: true,
                       ),
                       const SizedBox(height: 12),
-                      TextFormField(
+                      AppTextField(
+                        label: "Alamat",
                         controller: _addrController,
-                        decoration: const InputDecoration(labelText: "Alamat"),
                       ),
                       const SizedBox(height: 12),
-                      TextFormField(
+                      AppTextField(
+                        label: "Tipe Lokasi (contoh, gerbang_tol)",
                         controller: _typeController,
-                        decoration: const InputDecoration(
-                            labelText: "Tipe Lokasi (contoh, gerbang_tol)"),
-                        validator: (v) =>
-                            v == null || v.trim().isEmpty ? "Required" : null,
+                        isRequired: true,
                       ),
                       const SizedBox(height: 12),
                       DropdownButtonFormField<int>(
                         value: _selectedGroupId,
-                        decoration: const InputDecoration(
-                            labelText: "Seksi Induk / Group",
-                            hintText: "Pilih Seksi/Gerbang"),
+                        decoration: InputDecoration(
+                          labelText: "Seksi Induk / Group",
+                          hintText: "Pilih Seksi/Gerbang",
+                          filled: true,
+                          fillColor: Colors.grey[50],
+                          isDense: true,
+                          contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 16),
+                          border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: BorderSide(color: Colors.grey[300]!)),
+                          enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: BorderSide(color: Colors.grey[300]!)),
+                        ),
                         validator: (v) => v == null ? "Pilih group" : null,
                         items: displayGroups.map((group) {
                           final isChild = group.parentId != null;
@@ -217,11 +227,10 @@ class _LocationFormDialogState extends State<LocationFormDialog> {
                       Row(
                         children: [
                           Expanded(
-                            child: TextFormField(
+                            child: AppTextField(
+                              label: "Latitude",
                               controller: _latController,
                               keyboardType: TextInputType.number,
-                              decoration:
-                                  const InputDecoration(labelText: "Latitude"),
                               validator: (v) =>
                                   v == null || double.tryParse(v.trim()) == null
                                       ? "Required"
@@ -230,11 +239,10 @@ class _LocationFormDialogState extends State<LocationFormDialog> {
                           ),
                           const SizedBox(width: 16),
                           Expanded(
-                            child: TextFormField(
+                            child: AppTextField(
+                              label: "Longitude",
                               controller: _lngController,
                               keyboardType: TextInputType.number,
-                              decoration:
-                                  const InputDecoration(labelText: "Longitude"),
                               validator: (v) =>
                                   v == null || double.tryParse(v.trim()) == null
                                       ? "Required"
@@ -244,11 +252,10 @@ class _LocationFormDialogState extends State<LocationFormDialog> {
                         ],
                       ),
                       const SizedBox(height: 12),
-                      TextFormField(
+                      AppTextField(
+                        label: "Deskripsi",
                         controller: _descController,
                         maxLines: 3,
-                        decoration:
-                            const InputDecoration(labelText: "Deskripsi"),
                       ),
                     ],
                   ),
@@ -260,16 +267,12 @@ class _LocationFormDialogState extends State<LocationFormDialog> {
           onPressed: () => Navigator.pop(context, false),
           child: const Text("Batal"),
         ),
-        ElevatedButton(
-          onPressed: (_isLoadingGroups || _isSaving) ? null : _submit,
-          child: _isSaving
-              ? const SizedBox(
-                  height: 20,
-                  width: 20,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                  ))
-              : Text(isEdit ? "Simpan Perubahan" : "Buat Lokasi"),
+        LoadingButton(
+          isLoading: _isLoadingGroups || _isSaving,
+          onPressed: _submit,
+          label: isEdit ? "Simpan Perubahan" : "Buat Lokasi",
+          width: 160,
+          height: 40,
         ),
       ],
     );

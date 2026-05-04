@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../models/librenms_port.dart';
 import '../../../services/port_service.dart';
-import '../../../widgets/visual_feedback.dart';
+import '../../../widgets/common/visual_feedback.dart';
 
 class DevicePortsTab extends StatefulWidget {
   final int? deviceId;

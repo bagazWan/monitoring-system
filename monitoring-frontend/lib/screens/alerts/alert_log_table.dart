@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../models/alert.dart';
-import '../../../../widgets/data_table.dart';
+import '../../../../widgets/components/data_table.dart';
 
 class AlertLogTable extends StatelessWidget {
   final List<Alert> logs;
@@ -21,23 +21,18 @@ class AlertLogTable extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return CustomDataTable(
-      columns: const [
-        DataColumn(
-            label: Text('Waktu muncul',
-                style: TextStyle(fontWeight: FontWeight.bold))),
-        DataColumn(
-            label: Text('Waktu selesai',
-                style: TextStyle(fontWeight: FontWeight.bold))),
-        DataColumn(
-            label: Text('Severity',
-                style: TextStyle(fontWeight: FontWeight.bold))),
-        DataColumn(
-            label: Text('Perangkat',
-                style: TextStyle(fontWeight: FontWeight.bold))),
-        DataColumn(
-            label:
-                Text('Lokasi', style: TextStyle(fontWeight: FontWeight.bold))),
-        DataColumn(label: Text('')),
+      columns: [
+        CustomDataTable.column('Waktu muncul',
+            isExpanded: false, textAlign: TextAlign.left),
+        CustomDataTable.column('Waktu selesai',
+            isExpanded: false, textAlign: TextAlign.left),
+        CustomDataTable.column('Severity',
+            isExpanded: false, textAlign: TextAlign.left),
+        CustomDataTable.column('Perangkat',
+            isExpanded: false, textAlign: TextAlign.left),
+        CustomDataTable.column('Lokasi',
+            isExpanded: false, textAlign: TextAlign.left),
+        const DataColumn(label: Text('')),
       ],
       rows: logs.map((a) {
         return DataRow(

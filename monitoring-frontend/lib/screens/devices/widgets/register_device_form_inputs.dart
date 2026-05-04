@@ -1,6 +1,20 @@
 part of '../register_device_screen.dart';
 
 mixin RegisterDeviceFormInputs on State<RegisterDeviceScreen> {
+  InputDecoration get _sharedDropdownDecoration => InputDecoration(
+        filled: true,
+        fillColor: Colors.grey[50],
+        isDense: true,
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+        border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: BorderSide(color: Colors.grey[300]!)),
+        enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: BorderSide(color: Colors.grey[300]!)),
+      );
+
   Widget buildLocationSelector() {
     final state = this as _RegisterDeviceScreenState;
     return Column(
@@ -9,19 +23,8 @@ mixin RegisterDeviceFormInputs on State<RegisterDeviceScreen> {
         InkWell(
           onTap: state._pickLocationWithSearch,
           child: InputDecorator(
-            decoration: InputDecoration(
+            decoration: _sharedDropdownDecoration.copyWith(
               labelText: "Lokasi",
-              filled: true,
-              fillColor: Colors.grey[50],
-              isDense: true,
-              contentPadding:
-                  const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
-              border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide(color: Colors.grey[300]!)),
-              enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide(color: Colors.grey[300]!)),
               focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8),
                   borderSide: const BorderSide(color: Colors.blue, width: 1.5)),
@@ -51,32 +54,14 @@ mixin RegisterDeviceFormInputs on State<RegisterDeviceScreen> {
       IconData? icon,
       TextInputType keyboard = TextInputType.text,
       int maxLines = 1}) {
-    return TextFormField(
+    return AppTextField(
+      label: label,
       controller: controller,
+      isRequired: required,
+      prefixIcon:
+          icon != null ? Icon(icon, size: 18, color: Colors.grey[500]) : null,
       keyboardType: keyboard,
       maxLines: maxLines,
-      style: const TextStyle(fontSize: 14),
-      validator:
-          required ? (v) => v == null || v.isEmpty ? "Required" : null : null,
-      decoration: InputDecoration(
-        labelText: label,
-        prefixIcon:
-            icon != null ? Icon(icon, size: 18, color: Colors.grey[500]) : null,
-        filled: true,
-        fillColor: Colors.grey[50],
-        isDense: true,
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
-        border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
-            borderSide: BorderSide(color: Colors.grey[300]!)),
-        enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
-            borderSide: BorderSide(color: Colors.grey[300]!)),
-        focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
-            borderSide: const BorderSide(color: Colors.blue, width: 1.5)),
-      ),
     );
   }
 
@@ -93,20 +78,7 @@ mixin RegisterDeviceFormInputs on State<RegisterDeviceScreen> {
               ))
           .toList(),
       onChanged: onChanged,
-      decoration: InputDecoration(
-        labelText: label,
-        filled: true,
-        fillColor: Colors.grey[50],
-        isDense: true,
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
-        border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
-            borderSide: BorderSide(color: Colors.grey[300]!)),
-        enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
-            borderSide: BorderSide(color: Colors.grey[300]!)),
-      ),
+      decoration: _sharedDropdownDecoration.copyWith(labelText: label),
     );
   }
 
@@ -122,13 +94,8 @@ mixin RegisterDeviceFormInputs on State<RegisterDeviceScreen> {
               ))
           .toList(),
       onChanged: (val) => setState(() => state._selectedNetworkNodeId = val),
-      decoration: InputDecoration(
-          labelText: "Node Jaringan",
-          filled: true,
-          fillColor: Colors.grey[50],
-          border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(color: Colors.grey[300]!))),
+      decoration:
+          _sharedDropdownDecoration.copyWith(labelText: "Node Jaringan"),
     );
   }
 }

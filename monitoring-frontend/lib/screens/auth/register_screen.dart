@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../services/auth_service.dart';
-import '../../widgets/hover_link.dart';
+import '../../widgets/common/hover_link.dart';
+import '../../widgets/common/app_text_field.dart';
+import '../../widgets/common/loading_button.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -75,59 +77,38 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           style: TextStyle(
                               fontSize: 28, fontWeight: FontWeight.bold))),
                   const SizedBox(height: 32),
-                  _buildLabel("Nama Lengkap"),
-                  TextFormField(
+                  AppTextField(
+                    label: "Nama Lengkap",
                     controller: _fullNameController,
-                    decoration:
-                        const InputDecoration(border: OutlineInputBorder()),
-                    validator: (val) => val!.isEmpty ? "Required" : null,
+                    isRequired: true,
                   ),
                   const SizedBox(height: 16),
-                  _buildLabel("Username"),
-                  TextFormField(
+                  AppTextField(
+                    label: "Username",
                     controller: _usernameController,
-                    decoration:
-                        const InputDecoration(border: OutlineInputBorder()),
-                    validator: (val) => val!.isEmpty ? "Required" : null,
+                    isRequired: true,
                   ),
                   const SizedBox(height: 16),
-                  _buildLabel("Email"),
-                  TextFormField(
+                  AppTextField(
+                    label: "Email",
                     controller: _emailController,
-                    decoration:
-                        const InputDecoration(border: OutlineInputBorder()),
-                    validator: (val) => val!.isEmpty ? "Required" : null,
+                    isRequired: true,
                   ),
                   const SizedBox(height: 16),
-                  _buildLabel("Password"),
-                  TextFormField(
+                  AppTextField(
+                    label: "Password",
                     controller: _passwordController,
                     obscureText: true,
-                    decoration:
-                        const InputDecoration(border: OutlineInputBorder()),
-                    validator: (val) =>
-                        val!.length < 6 ? "Minimum 6 karakter" : null,
+                    validator: (val) => val == null || val.length < 6
+                        ? "Minimum 6 karakter"
+                        : null,
                   ),
                   const SizedBox(height: 32),
-                  SizedBox(
-                    width: double.infinity,
+                  LoadingButton(
+                    isLoading: _isLoading,
+                    onPressed: _handleRegister,
+                    label: "Register",
                     height: 50,
-                    child: ElevatedButton(
-                      onPressed: _isLoading ? null : _handleRegister,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.blueAccent,
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8)),
-                      ),
-                      child: _isLoading
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(
-                                  color: Colors.white))
-                          : const Text("Register"),
-                    ),
                   ),
                   const SizedBox(height: 16),
                   Row(
@@ -146,13 +127,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
           ),
         ),
       ),
-    );
-  }
-
-  Widget _buildLabel(String label) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8.0),
-      child: Text(label, style: const TextStyle(fontWeight: FontWeight.w600)),
     );
   }
 }

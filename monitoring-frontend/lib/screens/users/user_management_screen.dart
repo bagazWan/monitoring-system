@@ -3,10 +3,12 @@ import 'package:flutter/material.dart';
 import '../../models/user.dart';
 import '../../services/user_service.dart';
 import '../../services/websocket_service.dart';
-import '../../widgets/search_bar.dart';
-import '../../widgets/pagination.dart';
-import '../../widgets/data_table.dart';
-import '../../widgets/visual_feedback.dart';
+import '../../utils/search_pagination_mixin.dart';
+import '../../widgets/components/table_action_header.dart';
+import '../../widgets/layout/pagination.dart';
+import '../../widgets/components/data_table.dart';
+import '../../widgets/common/visual_feedback.dart';
+import '../../widgets/dialogs/delete_confirm_dialog.dart';
 import 'user_form_dialog.dart';
 
 class UserManagementScreen extends StatefulWidget {
@@ -16,7 +18,8 @@ class UserManagementScreen extends StatefulWidget {
   State<UserManagementScreen> createState() => _UserManagementScreenState();
 }
 
-class _UserManagementScreenState extends State<UserManagementScreen> {
+class _UserManagementScreenState extends State<UserManagementScreen>
+    with SearchPaginationMixin {
   final UserService _userService = UserService();
   StreamSubscription<StatusChangeEvent>? _statusSubscription;
 
@@ -26,33 +29,22 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
   int _totalItems = 0;
   String? _error;
 
-  final TextEditingController _searchController = TextEditingController();
-  int _currentPage = 1;
-  final int _itemsPerPage = 10;
-  Timer? _searchDebounce;
-
   @override
   void initState() {
     super.initState();
     _fetchUsers(initial: true);
     _initWebSocket();
-    _searchController.addListener(_onSearchChanged);
   }
 
   @override
   void dispose() {
-    _searchController.dispose();
     _statusSubscription?.cancel();
-    _searchDebounce?.cancel();
     super.dispose();
   }
 
-  void _onSearchChanged() {
-    _searchDebounce?.cancel();
-    _searchDebounce = Timer(const Duration(milliseconds: 350), () {
-      setState(() => _currentPage = 1);
-      _fetchUsers();
-    });
+  @override
+  void onSearchTriggered() {
+    _fetchUsers();
   }
 
   void _initWebSocket() {
@@ -73,23 +65,16 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
   }
 
   Future<void> _fetchUsers({bool initial = false}) async {
-    if (initial) {
-      setState(() {
-        _isLoading = true;
-        _error = null;
-      });
-    } else {
-      setState(() {
-        _isFetching = true;
-        _error = null;
-      });
-    }
+    setState(() {
+      initial ? _isLoading = true : _isFetching = true;
+      _error = null;
+    });
 
     try {
       final page = await _userService.getUsers(
-        page: _currentPage,
-        limit: _itemsPerPage,
-        search: _searchController.text.trim(),
+        page: currentPage,
+        limit: itemsPerPage,
+        search: searchController.text.trim(),
       );
 
       page.items.sort((a, b) => a.id.compareTo(b.id));
@@ -101,13 +86,6 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
           _isLoading = false;
           _isFetching = false;
         });
-
-        final totalPages = (_totalItems / _itemsPerPage).ceil().clamp(1, 9999);
-        if (_currentPage > totalPages) {
-          setState(() {
-            _currentPage = totalPages;
-          });
-        }
       }
     } catch (e) {
       if (mounted) {
@@ -120,7 +98,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
     }
   }
 
-  int get _totalPages => (_totalItems / _itemsPerPage).ceil().clamp(1, 9999);
+  int get _totalPages => (_totalItems / itemsPerPage).ceil().clamp(1, 9999);
 
   Future<void> _openUserDialog({User? user}) async {
     final result = await showDialog(
@@ -128,24 +106,32 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
       barrierDismissible: false,
       builder: (context) => UserFormDialog(user: user),
     );
+    if (result == true) _fetchUsers();
+  }
 
-    if (result == true) {
+  Future<void> _deleteUser(int userId) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (_) => const DeleteConfirmDialog(
+        title: "Hapus user",
+        message: "Apakah yakin menghapus user ini ?",
+      ),
+    );
+
+    if (confirm == true) {
+      await _userService.deleteUser(userId);
       _fetchUsers();
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
-    }
-
+    if (_isLoading) return const Center(child: CircularProgressIndicator());
     if (_error != null) {
       return AsyncErrorWidget(
-        error: _error!,
-        onRetry: () => _fetchUsers(initial: true),
-        message: 'Failed to load users',
-      );
+          error: _error!,
+          onRetry: () => _fetchUsers(initial: true),
+          message: 'Failed to load users');
     }
 
     return Scaffold(
@@ -154,49 +140,40 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
         onRefresh: () => _fetchUsers(initial: true),
         child: CustomScrollView(
           slivers: [
-            SliverToBoxAdapter(child: _buildHeader()),
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text("Manajemen User",
+                        style: TextStyle(
+                            fontSize: 24, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 24),
+                    TableActionHeader(
+                      searchController: searchController,
+                      searchHint: 'Cari berdasarkan username atau nama',
+                      buttonLabel: 'Tambah User',
+                      buttonIcon: Icons.add,
+                      onButtonPressed: () => _openUserDialog(),
+                    ),
+                  ],
+                ),
+              ),
+            ),
             _buildUsersTable(),
-            SliverToBoxAdapter(child: _buildPagination()),
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: PaginationWidget(
+                  currentPage: currentPage,
+                  totalPages: _totalPages,
+                  onPageChanged: handlePageChanged,
+                ),
+              ),
+            ),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildHeader() {
-    return Padding(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            "Manajemen User",
-            style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 24),
-          Row(
-            children: [
-              Expanded(
-                child: SearchBarWidget(
-                  controller: _searchController,
-                  hintText: 'Cari berdasarkan username atau nama',
-                ),
-              ),
-              const SizedBox(width: 16),
-              ElevatedButton.icon(
-                onPressed: () => _openUserDialog(),
-                icon: const Icon(Icons.add),
-                label: const Text('Tambah User'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.blueAccent,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8)),
-                ),
-              ),
-            ],
-          ),
-        ],
       ),
     );
   }
@@ -205,8 +182,8 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
     if (_users.isEmpty) {
       return SliverFillRemaining(
         child: EmptyStateWidget.searching(
-          isSearching: _searchController.text.isNotEmpty,
-          searchQuery: _searchController.text,
+          isSearching: searchController.text.isNotEmpty,
+          searchQuery: searchController.text,
           label: 'users',
           defaultIcon: Icons.people_outline,
         ),
@@ -216,102 +193,41 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
     return SliverPadding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       sliver: SliverToBoxAdapter(
-        child: Column(
-          children: [
-            CustomDataTable(
-              columns: const [
-                DataColumn(
-                    label: Expanded(
-                        child: Text("Username",
-                            style: TextStyle(fontWeight: FontWeight.bold)))),
-                DataColumn(
-                    label: Expanded(
-                        child: Text("Nama lengkap",
-                            style: TextStyle(fontWeight: FontWeight.bold)))),
-                DataColumn(
-                    label: Expanded(
-                        child: Text("Email",
-                            style: TextStyle(fontWeight: FontWeight.bold)))),
-                DataColumn(
-                    label: Expanded(
-                        child: Text("Role",
-                            textAlign: TextAlign.center,
-                            style: TextStyle(fontWeight: FontWeight.bold)))),
-                DataColumn(
-                    label: Expanded(
-                        child: Text("Actions",
-                            textAlign: TextAlign.center,
-                            style: TextStyle(fontWeight: FontWeight.bold)))),
-              ],
-              rows: _users.map((user) {
-                return DataRow(cells: [
-                  DataCell(Text(user.username,
-                      style: const TextStyle(fontWeight: FontWeight.w500))),
-                  DataCell(Text(user.fullName)),
-                  DataCell(Text(user.email)),
-                  DataCell(Center(child: _buildRoleBadge(user.role))),
-                  DataCell(Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      IconButton(
-                        tooltip: 'Edit',
-                        icon: const Icon(Icons.edit, color: Colors.blue),
-                        onPressed: () => _openUserDialog(user: user),
-                      ),
-                      IconButton(
-                        tooltip: 'Hapus',
-                        icon: const Icon(Icons.delete, color: Colors.red),
-                        onPressed: () => _deleteUser(user.id),
-                      ),
-                    ],
-                  )),
-                ]);
-              }).toList(),
-            ),
+        child: CustomDataTable(
+          columns: [
+            CustomDataTable.column("Username"),
+            CustomDataTable.column("Nama lengkap"),
+            CustomDataTable.column("Email"),
+            CustomDataTable.column("Role"),
+            CustomDataTable.column("Actions"),
           ],
+          rows: _users.map((user) {
+            return DataRow(cells: [
+              DataCell(Text(user.username,
+                  style: const TextStyle(fontWeight: FontWeight.w500))),
+              DataCell(Text(user.fullName)),
+              DataCell(Text(user.email)),
+              DataCell(Center(child: _buildRoleBadge(user.role))),
+              DataCell(Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  IconButton(
+                    tooltip: 'Edit',
+                    icon: const Icon(Icons.edit, color: Colors.blue),
+                    onPressed: () => _openUserDialog(user: user),
+                  ),
+                  IconButton(
+                    tooltip: 'Hapus',
+                    icon: const Icon(Icons.delete, color: Colors.red),
+                    onPressed: () => _deleteUser(user.id),
+                  ),
+                ],
+              )),
+            ]);
+          }).toList(),
         ),
       ),
     );
-  }
-
-  Widget _buildPagination() {
-    return Padding(
-      padding: const EdgeInsets.all(16.0),
-      child: PaginationWidget(
-        currentPage: _currentPage,
-        totalPages: _totalPages,
-        onPageChanged: (page) {
-          setState(() => _currentPage = page);
-          _fetchUsers();
-        },
-      ),
-    );
-  }
-
-  Future<void> _deleteUser(int userId) async {
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text("Hapus user"),
-        content: const Text("Apakah yakin menghapus user ini ?"),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text("Batal"),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            child: const Text("Hapus"),
-          ),
-        ],
-      ),
-    );
-
-    if (confirm != true) return;
-
-    await _userService.deleteUser(userId);
-    _fetchUsers();
   }
 
   Widget _buildRoleBadge(String role) {

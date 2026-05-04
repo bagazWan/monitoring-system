@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../../models/user.dart';
 import '../../../services/user_service.dart';
+import '../../../widgets/common/app_text_field.dart';
+import '../../../widgets/common/loading_button.dart';
 
 class UserFormDialog extends StatefulWidget {
   final User? user;
@@ -96,12 +98,27 @@ class _UserFormDialogState extends State<UserFormDialog> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                _buildTextField("Username", _usernameController,
-                    required: true),
+                AppTextField(
+                  label: "Username",
+                  controller: _usernameController,
+                  isRequired: true,
+                ),
                 const SizedBox(height: 16),
-                _buildTextField("Nama Lengkap", _fullNameController),
+                AppTextField(
+                  label: "Nama Lengkap",
+                  controller: _fullNameController,
+                ),
                 const SizedBox(height: 16),
-                _buildTextField("Email", _emailController, email: true),
+                AppTextField(
+                  label: "Email",
+                  controller: _emailController,
+                  validator: (v) {
+                    if (v != null && v.isNotEmpty && !v.contains('@')) {
+                      return "Email invalid";
+                    }
+                    return null;
+                  },
+                ),
                 const SizedBox(height: 16),
                 DropdownButtonFormField<String>(
                   value: _selectedRole,
@@ -112,16 +129,33 @@ class _UserFormDialogState extends State<UserFormDialog> {
                           ))
                       .toList(),
                   onChanged: (v) => setState(() => _selectedRole = v!),
-                  decoration: _inputDecoration("Role"),
+                  decoration: InputDecoration(
+                    labelText: "Role",
+                    filled: true,
+                    fillColor: Colors.grey[50],
+                    isDense: true,
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 16),
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: BorderSide(color: Colors.grey[300]!)),
+                    enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: BorderSide(color: Colors.grey[300]!)),
+                    focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide:
+                            const BorderSide(color: Colors.blue, width: 1.5)),
+                  ),
                 ),
                 const SizedBox(height: 16),
-                _buildTextField(
-                  isEdit
+                AppTextField(
+                  label: isEdit
                       ? "Password (Kosongkan untuk menggunakan data saat ini)"
                       : "Password",
-                  _passwordController,
-                  required: !isEdit,
-                  obscure: true,
+                  controller: _passwordController,
+                  isRequired: !isEdit,
+                  obscureText: true,
                 ),
               ],
             ),
@@ -133,55 +167,14 @@ class _UserFormDialogState extends State<UserFormDialog> {
           onPressed: () => Navigator.pop(context),
           child: const Text("Batal"),
         ),
-        ElevatedButton(
-          onPressed: _isLoading ? null : _submit,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.blue[700],
-            foregroundColor: Colors.white,
-          ),
-          child: _isLoading
-              ? const SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(
-                      strokeWidth: 2, color: Colors.white))
-              : Text(isEdit ? "Simpan" : "Buat User"),
+        LoadingButton(
+          isLoading: _isLoading,
+          onPressed: _submit,
+          label: isEdit ? "Simpan" : "Buat User",
+          width: 120,
+          height: 40,
         ),
       ],
-    );
-  }
-
-  Widget _buildTextField(String label, TextEditingController controller,
-      {bool required = false, bool obscure = false, bool email = false}) {
-    return TextFormField(
-      controller: controller,
-      obscureText: obscure,
-      validator: (v) {
-        if (required && (v == null || v.isEmpty)) return "Required";
-        if (email && v != null && v.isNotEmpty && !v.contains('@')) {
-          return "Email invalid";
-        }
-        return null;
-      },
-      decoration: _inputDecoration(label),
-    );
-  }
-
-  InputDecoration _inputDecoration(String label) {
-    return InputDecoration(
-      labelText: label,
-      filled: true,
-      fillColor: Colors.grey[50],
-      isDense: true,
-      border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: BorderSide(color: Colors.grey[300]!)),
-      enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: BorderSide(color: Colors.grey[300]!)),
-      focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: Colors.blue, width: 1.5)),
     );
   }
 }

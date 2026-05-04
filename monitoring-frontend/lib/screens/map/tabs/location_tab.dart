@@ -1,11 +1,12 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../../models/location.dart';
 import '../../../services/location_service.dart';
-import '../../../widgets/data_table.dart';
-import '../../../widgets/visual_feedback.dart';
-import '../../../widgets/search_bar.dart';
-import '../../../widgets/pagination.dart';
+import '../../../utils/search_pagination_mixin.dart';
+import '../../../widgets/components/table_action_header.dart';
+import '../../../widgets/components/data_table.dart';
+import '../../../widgets/common/visual_feedback.dart';
+import '../../../widgets/layout/pagination.dart';
+import '../../../widgets/dialogs/delete_confirm_dialog.dart';
 import '../dialogs/location_form_dialog.dart';
 import '../dialogs/manage_location_groups_dialog.dart';
 
@@ -17,49 +18,32 @@ class LocationTab extends StatefulWidget {
   State<LocationTab> createState() => _LocationTabState();
 }
 
-class _LocationTabState extends State<LocationTab> {
+class _LocationTabState extends State<LocationTab> with SearchPaginationMixin {
   final LocationService _service = LocationService();
   bool _isLoading = true;
   List<Location> _locations = [];
   int _totalItems = 0;
   String? _error;
 
-  final TextEditingController _searchController = TextEditingController();
-  Timer? _searchDebounce;
-  int _currentPage = 1;
-  final int _itemsPerPage = 10;
-
   @override
   void initState() {
     super.initState();
     _fetchData(showLoader: true);
-    _searchController.addListener(_onSearchChanged);
   }
 
   @override
-  void dispose() {
-    _searchController.dispose();
-    _searchDebounce?.cancel();
-    super.dispose();
-  }
-
-  void _onSearchChanged() {
-    _searchDebounce?.cancel();
-    _searchDebounce = Timer(const Duration(milliseconds: 350), () {
-      _currentPage = 1;
-      _fetchData(showLoader: false);
-    });
+  void onSearchTriggered() {
+    _fetchData(showLoader: false);
   }
 
   Future<void> _fetchData({required bool showLoader}) async {
-    if (showLoader) {
-      setState(() => _isLoading = true);
-    }
+    if (showLoader) setState(() => _isLoading = true);
+
     try {
       final page = await _service.getLocationsPage(
-        page: _currentPage,
-        limit: _itemsPerPage,
-        search: _searchController.text.trim(),
+        page: currentPage,
+        limit: itemsPerPage,
+        search: searchController.text.trim(),
       );
       if (!mounted) return;
       setState(() {
@@ -100,39 +84,27 @@ class _LocationTabState extends State<LocationTab> {
   }
 
   Future<void> _delete(Location location) async {
-    final confirm = await _showDeleteConfirm(location.name);
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (c) => DeleteConfirmDialog(
+        title: "Hapus lokasi?",
+        message:
+            "Hapus ${location.name}? Semua perangkat di sini akan menjadi tidak teralokasi.",
+      ),
+    );
+
     if (confirm == true) {
       try {
         await _service.deleteLocation(location.id);
         widget.onChanged?.call();
         _fetchData(showLoader: true);
       } catch (e) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text("Error: $e")));
+        if (mounted) {
+          ScaffoldMessenger.of(context)
+              .showSnackBar(SnackBar(content: Text("Error: $e")));
+        }
       }
     }
-  }
-
-  Future<bool?> _showDeleteConfirm(String name) {
-    return showDialog<bool>(
-      context: context,
-      builder: (c) => AlertDialog(
-        title: const Text("Hapus lokasi?"),
-        content: Text(
-            "Hapus $name? Semua perangkat di sini akan menjadi tidak teralokasi."),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(c, false),
-              child: const Text("Batal")),
-          ElevatedButton(
-              onPressed: () => Navigator.pop(c, true),
-              style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.red, foregroundColor: Colors.white),
-              child: const Text("Hapus")),
-        ],
-      ),
-    );
   }
 
   @override
@@ -143,22 +115,20 @@ class _LocationTabState extends State<LocationTab> {
           error: _error!, onRetry: () => _fetchData(showLoader: true));
     }
 
-    final totalPages = (_totalItems / _itemsPerPage).ceil();
+    final totalPages = (_totalItems / itemsPerPage).ceil();
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: SearchBarWidget(
-                  controller: _searchController,
-                  hintText: "Cari berdasarkan nama, alamat, atau group",
-                ),
-              ),
-              const SizedBox(width: 12),
+          TableActionHeader(
+            searchController: searchController,
+            searchHint: "Cari berdasarkan nama, alamat, atau group",
+            buttonLabel: "Tambah Lokasi",
+            buttonIcon: Icons.add,
+            onButtonPressed: () => _openForm(),
+            additionalActions: [
               SizedBox(
                 height: 40,
                 child: ElevatedButton.icon(
@@ -175,60 +145,23 @@ class _LocationTabState extends State<LocationTab> {
                   ),
                 ),
               ),
-              const SizedBox(width: 12),
-              SizedBox(
-                height: 40,
-                child: ElevatedButton.icon(
-                  onPressed: () => _openForm(),
-                  icon: const Icon(Icons.add),
-                  label: const Text("Tambah Lokasi"),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.blue[700],
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 20, vertical: 12),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8)),
-                  ),
-                ),
-              ),
             ],
           ),
           const SizedBox(height: 16),
           if (_locations.isEmpty)
             EmptyStateWidget.searching(
-              isSearching: _searchController.text.isNotEmpty,
-              searchQuery: _searchController.text,
+              isSearching: searchController.text.isNotEmpty,
+              searchQuery: searchController.text,
               label: 'lokasi',
             )
           else ...[
             CustomDataTable(
-              columns: const [
-                DataColumn(
-                    label: Expanded(
-                        child: Text("Nama",
-                            textAlign: TextAlign.center,
-                            style: TextStyle(fontWeight: FontWeight.bold)))),
-                DataColumn(
-                    label: Expanded(
-                        child: Text("Group",
-                            textAlign: TextAlign.center,
-                            style: TextStyle(fontWeight: FontWeight.bold)))),
-                DataColumn(
-                    label: Expanded(
-                        child: Text("Alamat",
-                            textAlign: TextAlign.center,
-                            style: TextStyle(fontWeight: FontWeight.bold)))),
-                DataColumn(
-                    label: Expanded(
-                        child: Text("Deskripsi",
-                            textAlign: TextAlign.center,
-                            style: TextStyle(fontWeight: FontWeight.bold)))),
-                DataColumn(
-                    label: Expanded(
-                        child: Text("Action",
-                            textAlign: TextAlign.center,
-                            style: TextStyle(fontWeight: FontWeight.bold)))),
+              columns: [
+                CustomDataTable.column("Nama"),
+                CustomDataTable.column("Group"),
+                CustomDataTable.column("Alamat"),
+                CustomDataTable.column("Deskripsi"),
+                CustomDataTable.column("Action"),
               ],
               rows: _locations
                   .map((loc) => DataRow(cells: [
@@ -255,12 +188,9 @@ class _LocationTabState extends State<LocationTab> {
             ),
             const SizedBox(height: 16),
             PaginationWidget(
-              currentPage: _currentPage,
+              currentPage: currentPage,
               totalPages: totalPages > 0 ? totalPages : 1,
-              onPageChanged: (page) {
-                setState(() => _currentPage = page);
-                _fetchData(showLoader: true);
-              },
+              onPageChanged: handlePageChanged,
             ),
           ],
         ],

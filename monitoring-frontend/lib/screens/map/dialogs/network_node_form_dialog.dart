@@ -3,7 +3,9 @@ import '../../../models/network_node.dart';
 import '../../../models/location.dart';
 import '../../../services/map_service.dart';
 import '../../../services/location_service.dart';
-import '../../../widgets/location_search_picker_dialog.dart';
+import '../../../widgets/common/app_text_field.dart';
+import '../../../widgets/common/loading_button.dart';
+import '../../../widgets/dialogs/location_search_picker_dialog.dart';
 
 class NetworkNodeFormDialog extends StatefulWidget {
   final NetworkNode? node;
@@ -40,7 +42,6 @@ class _NetworkNodeFormDialogState extends State<NetworkNodeFormDialog> {
   Future<void> _loadLocations() async {
     try {
       final locs = await LocationService().getLocationOptions();
-
       if (mounted) {
         setState(() {
           _locations = locs;
@@ -99,15 +100,11 @@ class _NetworkNodeFormDialogState extends State<NetworkNodeFormDialog> {
       } else {
         await _service.updateNetworkNode(widget.node!.id, data);
       }
-
-      if (mounted) {
-        Navigator.pop(context, true);
-      }
+      if (mounted) Navigator.pop(context, true);
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Error: $e")),
-        );
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text("Error: $e")));
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -131,15 +128,25 @@ class _NetworkNodeFormDialogState extends State<NetworkNodeFormDialog> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      _buildField("Nama Node", _nameController, required: true),
+                      AppTextField(
+                        label: "Nama Node",
+                        controller: _nameController,
+                        isRequired: true,
+                      ),
                       const SizedBox(height: 16),
                       _buildLocationPicker(),
                       const SizedBox(height: 16),
-                      _buildField(
-                          "Tipe Node (contoh:ODP, Pole)", _typeController,
-                          required: true),
+                      AppTextField(
+                        label: "Tipe Node (contoh:ODP, Pole)",
+                        controller: _typeController,
+                        isRequired: true,
+                      ),
                       const SizedBox(height: 16),
-                      _buildField("Deskripsi", _descController, maxLines: 3),
+                      AppTextField(
+                        label: "Deskripsi",
+                        controller: _descController,
+                        maxLines: 3,
+                      ),
                     ],
                   ),
                 ),
@@ -150,46 +157,14 @@ class _NetworkNodeFormDialogState extends State<NetworkNodeFormDialog> {
           onPressed: () => Navigator.pop(context),
           child: const Text("Batal"),
         ),
-        ElevatedButton(
-          onPressed: _isLoading ? null : _submit,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.blue[700],
-            foregroundColor: Colors.white,
-          ),
-          child: _isLoading
-              ? const SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(
-                      strokeWidth: 2, color: Colors.white))
-              : Text(isEdit ? "Simpan" : "Buat Lokasi"),
+        LoadingButton(
+          isLoading: _isLoading,
+          onPressed: _submit,
+          label: isEdit ? "Simpan" : "Buat Lokasi",
+          width: 140,
+          height: 40,
         ),
       ],
-    );
-  }
-
-  Widget _buildField(String label, TextEditingController ctrl,
-      {bool required = false, int maxLines = 1}) {
-    return TextFormField(
-      controller: ctrl,
-      maxLines: maxLines,
-      style: const TextStyle(fontSize: 14),
-      validator:
-          required ? (v) => (v == null || v.isEmpty) ? "Required" : null : null,
-      decoration: InputDecoration(
-        labelText: label,
-        filled: true,
-        fillColor: Colors.grey[50],
-        isDense: true,
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
-        border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
-            borderSide: BorderSide(color: Colors.grey[300]!)),
-        enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
-            borderSide: BorderSide(color: Colors.grey[300]!)),
-      ),
     );
   }
 
@@ -201,11 +176,8 @@ class _NetworkNodeFormDialogState extends State<NetworkNodeFormDialog> {
           builder: (context) =>
               LocationSearchPickerDialog(locations: _locations),
         );
-
         if (selectedId != null) {
-          setState(() {
-            _selectedLocationId = selectedId;
-          });
+          setState(() => _selectedLocationId = selectedId);
         }
       },
       child: InputDecorator(

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import '../../../models/fo_route.dart';
 import '../../../models/network_node.dart';
 import '../../../services/map_service.dart';
+import '../../../widgets/common/app_text_field.dart';
+import '../../../widgets/common/loading_button.dart';
 
 class FORouteFormDialog extends StatefulWidget {
   final FORoute? route;
@@ -131,10 +133,18 @@ class _FORouteFormDialogState extends State<FORouteFormDialog> {
                         setState(() => _endNodeId = val);
                       }),
                       const SizedBox(height: 16),
-                      _buildField("Panjang (meter)", _lengthController,
-                          required: true, keyboard: TextInputType.number),
+                      AppTextField(
+                        label: "Panjang (meter)",
+                        controller: _lengthController,
+                        isRequired: true,
+                        keyboardType: TextInputType.number,
+                      ),
                       const SizedBox(height: 16),
-                      _buildField("Deskripsi", _descController, maxLines: 3),
+                      AppTextField(
+                        label: "Deskripsi",
+                        controller: _descController,
+                        maxLines: 3,
+                      ),
                     ],
                   ),
                 ),
@@ -144,49 +154,14 @@ class _FORouteFormDialogState extends State<FORouteFormDialog> {
         TextButton(
             onPressed: () => Navigator.pop(context),
             child: const Text("Batal")),
-        ElevatedButton(
-          onPressed: _isLoading ? null : _submit,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.blue[700],
-            foregroundColor: Colors.white,
-          ),
-          child: _isLoading
-              ? const SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(
-                      strokeWidth: 2, color: Colors.white))
-              : Text(isEdit ? "Simpan Perubahan" : "Buat Garis Jalur"),
+        LoadingButton(
+          isLoading: _isLoading,
+          onPressed: _submit,
+          label: isEdit ? "Simpan Perubahan" : "Buat Garis Jalur",
+          width: 180,
+          height: 40,
         ),
       ],
-    );
-  }
-
-  Widget _buildField(String label, TextEditingController ctrl,
-      {bool required = false,
-      int maxLines = 1,
-      TextInputType keyboard = TextInputType.text}) {
-    return TextFormField(
-      controller: ctrl,
-      maxLines: maxLines,
-      keyboardType: keyboard,
-      style: const TextStyle(fontSize: 14),
-      validator:
-          required ? (v) => (v == null || v.isEmpty) ? "Required" : null : null,
-      decoration: InputDecoration(
-        labelText: label,
-        filled: true,
-        fillColor: Colors.grey[50],
-        isDense: true,
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
-        border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
-            borderSide: BorderSide(color: Colors.grey[300]!)),
-        enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
-            borderSide: BorderSide(color: Colors.grey[300]!)),
-      ),
     );
   }
 

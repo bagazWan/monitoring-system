@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import '../models/alert.dart';
+import '../../models/alert.dart';
 
 class AlertCard extends StatelessWidget {
   final Alert alert;

@@ -4,7 +4,7 @@ import 'package:provider/provider.dart';
 import 'screens/auth/register_screen.dart';
 import 'screens/auth/auth_gate.dart';
 import 'screens/devices/register_device_screen.dart';
-import 'widgets/visual_feedback.dart';
+import 'widgets/common/visual_feedback.dart';
 import 'screens/map/location_management_screen.dart';
 import 'providers/metrics_provider.dart';
 

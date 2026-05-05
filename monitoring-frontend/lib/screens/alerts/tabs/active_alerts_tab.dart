@@ -76,7 +76,6 @@ class _ActiveAlertsTabState extends State<ActiveAlertsTab> {
           _isLoading = false;
         });
       }
-      _loadLocations();
     } catch (e) {
       if (mounted) {
         setState(() {

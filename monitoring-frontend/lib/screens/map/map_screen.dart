@@ -70,15 +70,6 @@ class _MapScreenState extends State<MapScreen> {
     _statusSubscription = wsService.statusChanges.listen((event) {
       if (mounted) {
         _refreshDataSilent();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('${event.name} sekarang ${event.newStatus}'),
-            backgroundColor: event.newStatus.toLowerCase() == 'online'
-                ? Colors.green
-                : Colors.red,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
       }
     });
   }

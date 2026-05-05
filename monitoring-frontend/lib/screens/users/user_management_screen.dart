@@ -49,19 +49,7 @@ class _UserManagementScreenState extends State<UserManagementScreen>
 
   void _initWebSocket() {
     final wsService = WebSocketService();
-    _statusSubscription = wsService.statusChanges.listen((event) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('${event.name} sekarang ${event.newStatus}'),
-            backgroundColor: event.newStatus.toLowerCase() == 'online'
-                ? Colors.green
-                : Colors.red,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      }
-    });
+    _statusSubscription = wsService.statusChanges.listen((event) {});
   }
 
   Future<void> _fetchUsers({bool initial = false}) async {

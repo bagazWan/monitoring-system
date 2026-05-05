@@ -76,14 +76,16 @@ class _RegisterDeviceScreenState extends State<RegisterDeviceScreen>
 
   Future<void> _loadDropdowns() async {
     try {
-      final locations = await LocationService().getLocationOptions();
-      final switches = await _service.getSwitches();
-      final nodes = await MapService().getNetworkNodes();
+      final results = await Future.wait([
+        LocationService().getLocationOptions(),
+        _service.getSwitches(),
+        MapService().getNetworkNodes(),
+      ]);
       if (!mounted) return;
       setState(() {
-        _locations = locations;
-        _switches = switches;
-        _networkNodes = nodes;
+        _locations = results[0] as List<Location>;
+        _switches = results[1] as List<SwitchSummary>;
+        _networkNodes = results[2] as List<NetworkNode>;
       });
     } catch (e) {
       if (mounted) {

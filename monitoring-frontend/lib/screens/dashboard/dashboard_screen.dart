@@ -1,5 +1,9 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'widgets/network_activity_chart.dart';
+import 'widgets/summary_grid.dart';
+import 'widgets/top_down.dart';
+import 'widgets/dashboard_charts.dart';
 import '../../models/dashboard_stats.dart';
 import '../../services/location_service.dart';
 import '../../services/device_service.dart';
@@ -7,10 +11,7 @@ import '../../services/dashboard_service.dart';
 import '../../services/websocket_service.dart';
 import '../../widgets/common/visual_feedback.dart';
 import '../../widgets/components/filter_dropdown.dart';
-import 'widgets/network_activity_chart.dart';
-import 'widgets/summary_grid.dart';
-import 'widgets/top_down.dart';
-import 'widgets/dashboard_charts.dart';
+import '../../utils/location_group_formatter.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -74,23 +75,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       final types = await _deviceService.getDeviceTypes();
       if (!mounted) return;
 
-      final List<String> formattedNames = [];
-      final parents = groups.where((g) => g.parentId == null).toList()
-        ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
-
-      for (final parent in parents) {
-        formattedNames.add(parent.name);
-        final children = groups
-            .where((g) => g.parentId == parent.groupId)
-            .toList()
-          ..sort(
-              (a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
-        for (final child in children) {
-          formattedNames.add("   ↳ ${child.name}");
-        }
-      }
-
-      _locationFilters.value = formattedNames;
+      _locationFilters.value = LocationGroupFormatter.formatNames(groups);
       _deviceTypes.value = types;
       _isLoadingFilters.value = false;
     } catch (_) {
@@ -287,173 +272,152 @@ class _DashboardScreenState extends State<DashboardScreen> {
           physics: const AlwaysScrollableScrollPhysics(),
           child: Padding(
             padding: const EdgeInsets.all(24),
-            child: ValueListenableBuilder<bool>(
-              valueListenable: _isStatsLoading,
-              builder: (context, loading, _) {
-                return ValueListenableBuilder<Object?>(
-                  valueListenable: _statsError,
-                  builder: (context, error, _) {
-                    return ValueListenableBuilder<DashboardStats?>(
-                      valueListenable: _dashboardStats,
-                      builder: (context, stats, _) {
-                        if (loading && stats == null) {
-                          return const Center(
-                              child: CircularProgressIndicator());
-                        }
-                        if (error != null) {
-                          return AsyncErrorWidget(
-                              error: error, onRetry: _handleManualRefresh);
-                        }
-                        if (stats == null) {
-                          return const EmptyStateWidget(
-                              message: "Tidak ada data dashboard yang tersedia",
-                              icon: Icons.dashboard_customize_outlined);
-                        }
+            child: ListenableBuilder(
+              listenable: Listenable.merge(
+                  [_isStatsLoading, _statsError, _dashboardStats]),
+              builder: (context, _) {
+                final loading = _isStatsLoading.value;
+                final error = _statsError.value;
+                final stats = _dashboardStats.value;
 
-                        return Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                if (loading && stats == null) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                if (error != null) {
+                  return AsyncErrorWidget(
+                      error: error, onRetry: _handleManualRefresh);
+                }
+                if (stats == null) {
+                  return const EmptyStateWidget(
+                      message: "Tidak ada data dashboard yang tersedia",
+                      icon: Icons.dashboard_customize_outlined);
+                }
+
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text("Overview",
+                        style: TextStyle(
+                            fontSize: 24, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 24),
+                    ValueListenableBuilder<bool>(
+                      valueListenable: _isLoadingFilters,
+                      builder: (context, isLoading, _) {
+                        return Wrap(
+                          spacing: 16,
+                          runSpacing: 16,
                           children: [
-                            const Text("Overview",
-                                style: TextStyle(
-                                    fontSize: 24, fontWeight: FontWeight.bold)),
-                            const SizedBox(height: 24),
-                            ValueListenableBuilder<bool>(
-                              valueListenable: _isLoadingFilters,
-                              builder: (context, isLoading, _) {
-                                return Wrap(
-                                  spacing: 16,
-                                  runSpacing: 16,
-                                  children: [
-                                    SizedBox(
-                                      width: 220,
-                                      child: FilterDropdown(
-                                        label: "Lokasi",
-                                        value: _selectedLocationFilter.value,
-                                        items: _locationFilters.value,
-                                        onChanged: (val) {
-                                          _selectedLocationFilter.value = val;
-                                          _onFilterChanged();
-                                        },
-                                      ),
-                                    ),
-                                    SizedBox(
-                                      width: 220,
-                                      child: FilterDropdown(
-                                        label: "Perangkat",
-                                        value: _selectedDeviceType.value,
-                                        items: _deviceTypes.value,
-                                        onChanged: (val) {
-                                          _selectedDeviceType.value = val;
-                                          _onFilterChanged();
-                                        },
-                                      ),
-                                    ),
-                                  ],
-                                );
-                              },
+                            SizedBox(
+                              width: 220,
+                              child: FilterDropdown(
+                                label: "Lokasi",
+                                value: _selectedLocationFilter.value,
+                                items: _locationFilters.value,
+                                onChanged: (val) {
+                                  _selectedLocationFilter.value = val;
+                                  _onFilterChanged();
+                                },
+                              ),
                             ),
-                            const SizedBox(height: 20),
-                            DashboardSummaryGrid(
-                                stats: stats,
-                                offlineCount:
-                                    stats.totalDevices - stats.onlineDevices),
-                            const SizedBox(height: 30),
-                            ValueListenableBuilder<bool>(
-                              valueListenable: _chartsVisible,
-                              builder: (context, visible, _) {
-                                if (!visible) {
-                                  return Container(
-                                    key: _chartsKey,
-                                    height: 320,
-                                    alignment: Alignment.center,
-                                    decoration: BoxDecoration(
-                                        color: Colors.white,
-                                        borderRadius: BorderRadius.circular(12),
-                                        border: Border.all(
-                                            color: Colors.grey.shade200)),
-                                    child: Text("Geser untuk memuat grafik",
-                                        style:
-                                            TextStyle(color: Colors.grey[500])),
-                                  );
-                                }
-                                return Container(
-                                  key: _chartsKey,
-                                  child: ValueListenableBuilder<
-                                      List<NetworkActivityData>>(
-                                    valueListenable: _trafficData,
-                                    builder: (context, traffic, _) =>
-                                        ValueListenableBuilder<bool>(
-                                      valueListenable: _isTrafficLoading,
-                                      builder: (context, trafficLoading, _) =>
-                                          ValueListenableBuilder<
-                                              List<UptimeTrendPoint>>(
-                                        valueListenable: _uptimeTrendData,
-                                        builder: (context, uptime, _) =>
-                                            ValueListenableBuilder<bool>(
-                                          valueListenable: _isUptimeLoading,
-                                          builder:
-                                              (context, uptimeLoading, _) =>
-                                                  ValueListenableBuilder<
-                                                      List<DashboardTraffic>>(
-                                            valueListenable: _rawTrafficData,
-                                            builder: (context, rawTraffic, _) =>
-                                                DashboardCharts(
-                                              trafficData: traffic,
-                                              rawTrafficData: rawTraffic,
-                                              isTrafficLoading: trafficLoading,
-                                              uptimeData: uptime,
-                                              isUptimeLoading: uptimeLoading,
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                );
-                              },
-                            ),
-                            const SizedBox(height: 30),
-                            ValueListenableBuilder<bool>(
-                              valueListenable: _topDownVisible,
-                              builder: (context, visible, _) {
-                                if (!visible) {
-                                  return Container(
-                                    key: _topDownKey,
-                                    height: 220,
-                                    alignment: Alignment.center,
-                                    decoration: BoxDecoration(
-                                        color: Colors.white,
-                                        borderRadius: BorderRadius.circular(12),
-                                        border: Border.all(
-                                            color: Colors.grey.shade200)),
-                                    child: Text("Geser untuk memuat data",
-                                        style:
-                                            TextStyle(color: Colors.grey[500])),
-                                  );
-                                }
-                                return Container(
-                                  key: _topDownKey,
-                                  child: ValueListenableBuilder<int>(
-                                    valueListenable: _topDownWindowDays,
-                                    builder: (context, windowDays, _) {
-                                      return DashboardTopDown(
-                                        stats: stats,
-                                        selectedWindowDays: windowDays,
-                                        onWindowChanged: (window) {
-                                          _topDownWindowDays.value = window;
-                                          _refreshDashboard();
-                                        },
-                                      );
-                                    },
-                                  ),
-                                );
-                              },
+                            SizedBox(
+                              width: 220,
+                              child: FilterDropdown(
+                                label: "Perangkat",
+                                value: _selectedDeviceType.value,
+                                items: _deviceTypes.value,
+                                onChanged: (val) {
+                                  _selectedDeviceType.value = val;
+                                  _onFilterChanged();
+                                },
+                              ),
                             ),
                           ],
                         );
                       },
-                    );
-                  },
+                    ),
+                    const SizedBox(height: 20),
+                    DashboardSummaryGrid(
+                        stats: stats,
+                        offlineCount: stats.totalDevices - stats.onlineDevices),
+                    const SizedBox(height: 30),
+                    ValueListenableBuilder<bool>(
+                      valueListenable: _chartsVisible,
+                      builder: (context, visible, _) {
+                        if (!visible) {
+                          return Container(
+                            key: _chartsKey,
+                            height: 320,
+                            alignment: Alignment.center,
+                            decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(12),
+                                border:
+                                    Border.all(color: Colors.grey.shade200)),
+                            child: Text("Geser untuk memuat grafik",
+                                style: TextStyle(color: Colors.grey[500])),
+                          );
+                        }
+
+                        return Container(
+                          key: _chartsKey,
+                          child: ListenableBuilder(
+                            listenable: Listenable.merge([
+                              _trafficData,
+                              _isTrafficLoading,
+                              _uptimeTrendData,
+                              _isUptimeLoading,
+                              _rawTrafficData,
+                            ]),
+                            builder: (context, _) {
+                              return DashboardCharts(
+                                trafficData: _trafficData.value,
+                                rawTrafficData: _rawTrafficData.value,
+                                isTrafficLoading: _isTrafficLoading.value,
+                                uptimeData: _uptimeTrendData.value,
+                                isUptimeLoading: _isUptimeLoading.value,
+                              );
+                            },
+                          ),
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 30),
+                    ValueListenableBuilder<bool>(
+                      valueListenable: _topDownVisible,
+                      builder: (context, visible, _) {
+                        if (!visible) {
+                          return Container(
+                            key: _topDownKey,
+                            height: 220,
+                            alignment: Alignment.center,
+                            decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(12),
+                                border:
+                                    Border.all(color: Colors.grey.shade200)),
+                            child: Text("Geser untuk memuat data",
+                                style: TextStyle(color: Colors.grey[500])),
+                          );
+                        }
+                        return Container(
+                          key: _topDownKey,
+                          child: ValueListenableBuilder<int>(
+                            valueListenable: _topDownWindowDays,
+                            builder: (context, windowDays, _) {
+                              return DashboardTopDown(
+                                stats: stats,
+                                selectedWindowDays: windowDays,
+                                onWindowChanged: (window) {
+                                  _topDownWindowDays.value = window;
+                                  _refreshDashboard();
+                                },
+                              );
+                            },
+                          ),
+                        );
+                      },
+                    ),
+                  ],
                 );
               },
             ),

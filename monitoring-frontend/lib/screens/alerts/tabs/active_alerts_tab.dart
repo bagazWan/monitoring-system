@@ -1,13 +1,14 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import '../dialogs/alert_acknowledge_dialog.dart';
+import '../alert_filter_bar.dart';
 import '../../../models/alert.dart';
 import '../../../services/alert_service.dart';
 import '../../../services/location_service.dart';
 import '../../../services/websocket_service.dart';
 import '../../../widgets/components/alert_card.dart';
 import '../../../widgets/common/visual_feedback.dart';
-import '../dialogs/alert_acknowledge_dialog.dart';
-import '../alert_filter_bar.dart';
+import '../../../utils/location_group_formatter.dart';
 
 class ActiveAlertsTab extends StatefulWidget {
   final bool isTechnicianOrAdmin;
@@ -48,38 +49,7 @@ class _ActiveAlertsTabState extends State<ActiveAlertsTab> {
     try {
       final groups = await LocationService().getLocationGroups();
       if (!mounted) return;
-
-      final List<String> formattedNames = [];
-      final parents = groups.where((g) => g.parentId == null).toList()
-        ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
-
-      for (final parent in parents) {
-        formattedNames.add(parent.name);
-        final children = groups
-            .where((g) => g.parentId == parent.groupId)
-            .toList()
-          ..sort(
-              (a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
-
-        for (final child in children) {
-          formattedNames.add("   ↳ ${child.name}");
-        }
-      }
-
-      final accountedFor = groups
-          .where((g) =>
-              g.parentId == null || parents.any((p) => p.groupId == g.parentId))
-          .map((e) => e.groupId)
-          .toSet();
-      final orphans = groups
-          .where((g) => !accountedFor.contains(g.groupId))
-          .toList()
-        ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
-      for (final orphan in orphans) {
-        formattedNames.add(orphan.name);
-      }
-
-      setState(() => _locations = formattedNames);
+      setState(() => _locations = LocationGroupFormatter.formatNames(groups));
     } catch (_) {}
   }
 

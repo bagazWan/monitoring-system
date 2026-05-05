@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import '../alert_filter_bar.dart';
 import '../alert_log_table.dart';
 import '../dialogs/alert_details_dialog.dart';
@@ -11,6 +12,7 @@ import '../../../services/websocket_service.dart';
 import '../../../../widgets/layout/pagination.dart';
 import '../../../../widgets/common/visual_feedback.dart';
 import '../../../../widgets/dialogs/delete_confirm_dialog.dart';
+import '../../../../utils/location_group_formatter.dart';
 
 class AlertLogTab extends StatefulWidget {
   const AlertLogTab({super.key});
@@ -66,38 +68,7 @@ class _AlertLogTabState extends State<AlertLogTab> {
     try {
       final groups = await LocationService().getLocationGroups();
       if (!mounted) return;
-
-      final List<String> formattedNames = [];
-      final parents = groups.where((g) => g.parentId == null).toList()
-        ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
-
-      for (final parent in parents) {
-        formattedNames.add(parent.name);
-        final children = groups
-            .where((g) => g.parentId == parent.groupId)
-            .toList()
-          ..sort(
-              (a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
-
-        for (final child in children) {
-          formattedNames.add("   ↳ ${child.name}");
-        }
-      }
-
-      final accountedFor = groups
-          .where((g) =>
-              g.parentId == null || parents.any((p) => p.groupId == g.parentId))
-          .map((e) => e.groupId)
-          .toSet();
-      final orphans = groups
-          .where((g) => !accountedFor.contains(g.groupId))
-          .toList()
-        ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
-      for (final orphan in orphans) {
-        formattedNames.add(orphan.name);
-      }
-
-      setState(() => _locations = formattedNames);
+      setState(() => _locations = LocationGroupFormatter.formatNames(groups));
     } catch (_) {}
   }
 
@@ -164,7 +135,6 @@ class _AlertLogTabState extends State<AlertLogTab> {
     }
 
     await _fetchLogs();
-    _loadLocations();
   }
 
   Future<void> _confirmDeleteAll() async {
@@ -191,7 +161,6 @@ class _AlertLogTabState extends State<AlertLogTab> {
 
     _currentPage = 1;
     await _fetchLogs();
-    _loadLocations();
   }
 
   @override
@@ -277,7 +246,8 @@ class _AlertLogTabState extends State<AlertLogTab> {
                             AlertLogTable(
                               logs: _logs,
                               isAdmin: _isAdmin,
-                              formatDate: _fmt,
+                              formatDate: (dt) =>
+                                  DateFormat('dd/MM HH:mm').format(dt),
                               onDetails: _openDetails,
                               onDelete: _confirmDelete,
                             ),
@@ -304,13 +274,5 @@ class _AlertLogTabState extends State<AlertLogTab> {
         ),
       ],
     );
-  }
-
-  static String _fmt(DateTime dt) {
-    final mm = dt.minute.toString().padLeft(2, '0');
-    final hh = dt.hour.toString().padLeft(2, '0');
-    final dd = dt.day.toString().padLeft(2, '0');
-    final mo = dt.month.toString().padLeft(2, '0');
-    return "$dd/$mo $hh:$mm";
   }
 }

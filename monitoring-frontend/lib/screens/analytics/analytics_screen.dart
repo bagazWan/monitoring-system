@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
+import 'widgets/analytics_sidebar.dart';
+import 'widgets/analytics_chart.dart';
 import '../../models/analytics_data_point.dart';
 import '../../services/analytic_service.dart';
 import '../../services/location_service.dart';
-import 'widgets/analytics_sidebar.dart';
-import 'widgets/analytics_chart.dart';
+import '../../utils/location_group_formatter.dart';
 
 class AnalyticsScreen extends StatefulWidget {
   const AnalyticsScreen({super.key});
@@ -41,24 +42,8 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     try {
       final groups = await _locationService.getLocationGroups();
       if (!mounted) return;
-
-      final List<String> formattedNames = [];
-      formattedNames.add("-");
-
-      final parents = groups.where((g) => g.parentId == null).toList()
-        ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
-
-      for (final parent in parents) {
-        formattedNames.add(parent.name);
-        final children = groups
-            .where((g) => g.parentId == parent.groupId)
-            .toList()
-          ..sort(
-              (a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
-        for (final child in children) {
-          formattedNames.add("   ↳ ${child.name}");
-        }
-      }
+      final formattedNames = LocationGroupFormatter.formatNames(groups);
+      formattedNames.insert(0, "-");
 
       setState(() {
         _locations = formattedNames;

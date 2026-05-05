@@ -1,10 +1,10 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../models/user.dart';
-import '../../services/auth_service.dart';
 import 'widgets/device_filter_bar.dart';
 import 'widgets/device_card.dart';
+import '../../models/user.dart';
+import '../../services/auth_service.dart';
 import '../../models/device.dart';
 import '../../services/device_service.dart';
 import '../../services/location_service.dart';
@@ -12,6 +12,7 @@ import '../../widgets/common/visual_feedback.dart';
 import '../../widgets/components/search_bar.dart';
 import '../../widgets/layout/pagination.dart';
 import '../../providers/metrics_provider.dart';
+import '../../utils/location_group_formatter.dart';
 
 part 'widgets/device_list_widgets.dart';
 
@@ -101,35 +102,7 @@ class _DeviceListScreenState extends State<DeviceListScreen>
       final groups = await LocationService().getLocationGroups();
       if (!mounted) return;
 
-      final List<String> formattedNames = [];
-      final parents = groups.where((g) => g.parentId == null).toList()
-        ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
-
-      for (final parent in parents) {
-        formattedNames.add(parent.name);
-        final children = groups
-            .where((g) => g.parentId == parent.groupId)
-            .toList()
-          ..sort(
-              (a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
-
-        for (final child in children) {
-          formattedNames.add("   ↳ ${child.name}");
-        }
-      }
-
-      final accountedFor = groups
-          .where((g) =>
-              g.parentId == null || parents.any((p) => p.groupId == g.parentId))
-          .map((e) => e.groupId)
-          .toSet();
-      final orphans = groups
-          .where((g) => !accountedFor.contains(g.groupId))
-          .toList()
-        ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
-      for (final orphan in orphans) {
-        formattedNames.add(orphan.name);
-      }
+      final formattedNames = LocationGroupFormatter.formatNames(groups);
 
       if (_selectedLocation != null &&
           !formattedNames.contains(_selectedLocation)) {
@@ -176,7 +149,6 @@ class _DeviceListScreenState extends State<DeviceListScreen>
         _totalItems = page.total;
         _isLoading = false;
       });
-      _loadLocations();
     } catch (e) {
       setState(() {
         _error = e.toString();

@@ -19,7 +19,6 @@ from sqlalchemy.orm import Session
 router = APIRouter(prefix="/users", tags=["Users"])
 
 
-# Get all users (Admin)
 @router.get("", response_model=UserPageResponse)
 def get_all_users(
     page: int = Query(1, ge=1),
@@ -47,7 +46,6 @@ def get_all_users(
     return {"items": items, "total": total, "page": page, "page_size": limit}
 
 
-# Get specific user (Admin)
 @router.get("/{user_id}", response_model=UserResponse)
 def get_user(
     user_id: int,
@@ -65,7 +63,6 @@ def get_user(
     return user
 
 
-# Create user (Admin)
 @router.post("", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 def create_user(
     user_data: UserCreate,
@@ -94,7 +91,6 @@ def create_user(
     return new_user
 
 
-# Update profile
 @router.patch("/me", response_model=UserResponse)
 def update_own_profile(
     user_data: UserUpdateSelf,
@@ -112,7 +108,6 @@ def update_own_profile(
     return current_user
 
 
-# Change password
 @router.post("/me/change-password")
 def change_own_password(
     password_data: UserChangePassword,
@@ -132,7 +127,6 @@ def change_own_password(
     return {"message": "Password changed successfully"}
 
 
-# Update user (Admin)
 @router.patch("/{user_id}", response_model=UserResponse)
 def update_user(
     user_id: int,
@@ -148,8 +142,11 @@ def update_user(
             detail=f"User with id {user_id} not found",
         )
 
-    # Update fields
     update_data = user_data.model_dump(exclude_unset=True)
+
+    if "password" in update_data:
+        raw_password = update_data.pop("password")
+        user.password_hash = get_password_hash(raw_password)
 
     for field, value in update_data.items():
         setattr(user, field, value)
@@ -160,7 +157,6 @@ def update_user(
     return user
 
 
-# Delete user (Admin)
 @router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_user(
     user_id: int, db: Session = Depends(get_db), admin: User = Depends(require_admin)

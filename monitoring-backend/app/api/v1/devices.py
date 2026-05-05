@@ -15,10 +15,10 @@ from app.schemas.device import (
     DeviceWithLocation,
     NodePageResponse,
 )
-from app.services.librenms_service import LibreNMSService
+from app.services.librenms.client import LibreNMSService
 from app.services.locations_service import apply_location_name_filter
-from app.services.metrics_cache_service import MetricsCacheService
-from app.services.node_metrics import calculate_device_metrics
+from app.services.metrics.cache import MetricsCacheService
+from app.services.metrics.metrics_calculators import calculate_device_metrics
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import false, func, or_
 from sqlalchemy.orm import Session

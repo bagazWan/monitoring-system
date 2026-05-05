@@ -4,8 +4,8 @@ from typing import Any, Dict, Optional
 from sqlalchemy.orm import Session
 
 from app.models import Device, Switch
-from app.services.librenms_ports_service import discover_and_store_ports_for
-from app.services.librenms_service import LibreNMSService
+from app.services.librenms.client import LibreNMSService
+from app.services.librenms.ports import discover_and_store_ports_for
 
 
 class SyncService:
@@ -17,9 +17,6 @@ class SyncService:
     async def sync_all_from_librenms(
         self, update_existing: bool = False
     ) -> Dict[str, Any]:
-        """
-        Fetches ALL devices from LibreNMS and syncs them to local DB.
-        """
         all_devices = await self.librenms.get_devices()
 
         stats = {
@@ -167,7 +164,6 @@ class SyncService:
     def _find_existing_device(
         self, librenms_id: int, ip: str, hostname: str
     ) -> Optional[Device]:
-        """Matches by ID, then IP, then Hostname to avoid duplicates."""
         existing = (
             self.db.query(Device)
             .filter(Device.librenms_device_id == librenms_id)

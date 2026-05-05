@@ -25,7 +25,7 @@ router = APIRouter(prefix="/locations", tags=["Locations"])
 @router.get("", response_model=LocationPageResponse)
 def get_all_locations(
     page: int = Query(1, ge=1),
-    limit: int = Query(10, ge=1, le=200),
+    limit: int = Query(10, ge=1, le=1000),
     search: Optional[str] = Query(None),
     location_type: Optional[str] = Query(None),
     group_id: Optional[int] = Query(None),

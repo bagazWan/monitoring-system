@@ -4,8 +4,8 @@ from app.api.dependencies import require_technician_or_admin
 from app.core.database import get_db
 from app.models import Device, LibreNMSPort, Switch, User
 from app.schemas.librenms_port import LibreNMSPortResponse, LibreNMSPortUpdate
-from app.services.librenms_ports_service import discover_and_store_ports_for
-from app.services.librenms_service import LibreNMSService
+from app.services.librenms.client import LibreNMSService
+from app.services.librenms.ports import discover_and_store_ports_for
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 

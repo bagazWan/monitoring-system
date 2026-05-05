@@ -10,8 +10,8 @@ from app.schemas.switch import (
     SwitchUpdate,
     SwitchWithLocation,
 )
-from app.services.librenms_service import LibreNMSService
-from app.services.node_metrics import calculate_switch_metrics
+from app.services.librenms.client import LibreNMSService
+from app.services.metrics.metrics_calculators import calculate_switch_metrics
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 

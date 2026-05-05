@@ -1,16 +1,16 @@
-from app.services.alerts_service import (
+from app.services.librenms.client import LibreNMSService
+from app.services.monitoring.alerts_poller import (
     process_librenms_alerts,
     start_alerts_poller_task,
     stop_alerts_poller_task,
     sync_alerts_once,
 )
-from app.services.librenms_service import LibreNMSService
-from app.services.status_poller import (
+from app.services.monitoring.status_sync import (
     poll_and_broadcast_status,
     start_status_poller_task,
     stop_status_poller_task,
 )
-from app.services.websocket_manager import ConnectionManager, ws_manager
+from app.services.monitoring.websocket_manager import ConnectionManager, ws_manager
 
 __all__ = [
     # LibreNMS

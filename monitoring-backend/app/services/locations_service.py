@@ -5,7 +5,8 @@ from sqlalchemy import func, or_
 from sqlalchemy.orm import Query, Session, aliased
 
 from app.models import Location, LocationGroup
-from app.utils.constant import LOCATION_TYPE_ALIASES, LOCATION_TYPE_LABELS
+from app.services.normalizer import normalize_location_type
+from app.utils.constant import LOCATION_TYPE_LABELS
 
 
 def resolve_location_ids(
@@ -25,14 +26,6 @@ def resolve_location_ids(
         return [-1]
 
     return None
-
-
-def normalize_location_type(raw: Optional[str]) -> str:
-    v = (raw or "").strip().lower()
-    v = " ".join(v.split())
-    if v in LOCATION_TYPE_ALIASES:
-        return LOCATION_TYPE_ALIASES[v]
-    return v.replace(" ", "_")
 
 
 def type_label(v: Optional[str]) -> str:

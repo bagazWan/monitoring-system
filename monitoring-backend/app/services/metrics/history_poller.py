@@ -2,13 +2,15 @@ import asyncio
 import logging
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy.orm import Session
-
 from app.core.database import SessionLocal
 from app.models import Device, Switch
 from app.models.bandwidth import DeviceBandwidth, SwitchBandwidth
-from app.services.librenms_service import LibreNMSService
-from app.services.node_metrics import calculate_device_metrics, calculate_switch_metrics
+from app.services.librenms.client import LibreNMSService
+from app.services.metrics.metrics_calculators import (
+    calculate_device_metrics,
+    calculate_switch_metrics,
+)
+from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
 

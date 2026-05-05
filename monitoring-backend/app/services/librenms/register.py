@@ -7,8 +7,8 @@ from sqlalchemy.orm import Session
 from app.core.database import SessionLocal
 from app.models import Device, Switch
 from app.schemas.device import LibreNMSRegisterRequest
-from app.services.librenms_ports_service import discover_and_store_ports_for
-from app.services.librenms_service import LibreNMSService
+from app.services.librenms.client import LibreNMSService
+from app.services.librenms.ports import discover_and_store_ports_for
 
 logger = logging.getLogger(__name__)
 
@@ -17,15 +17,6 @@ def infer_node_type_from_sysdescr(sys_descr: str) -> str:
     sys_descr_l = (sys_descr or "").lower()
     is_switch = ("switch" in sys_descr_l) and ("routeros" not in sys_descr_l)
     return "switch" if is_switch else "device"
-
-
-def normalize_node_type(node_type: str | None) -> str | None:
-    if node_type is None:
-        return None
-    nt = node_type.strip().lower()
-    if nt in {"device", "switch"}:
-        return nt
-    return None
 
 
 async def safe_discover_ports(

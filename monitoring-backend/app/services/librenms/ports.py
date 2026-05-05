@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-from sqlalchemy.orm import Session
-
 from app.models import Device, LibreNMSPort, Switch
-from app.services.librenms_service import LibreNMSService
+from app.services.librenms.client import LibreNMSService
+from sqlalchemy.orm import Session
 
 VOLATILE_PREFIXES = ("veth", "br-", "virbr", "tun", "tap")
 

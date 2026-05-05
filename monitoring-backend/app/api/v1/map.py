@@ -1,7 +1,7 @@
 from app.core.database import get_db
 from app.models import Device, FORoute, Location, NetworkNode, Switch
 from app.schemas.network_map import MapTopologyResponse
-from app.services.metrics_service import aggregate_port_metrics_by_node
+from app.services.metrics.aggregation import aggregate_port_metrics_by_node
 from app.utils.thresholds import evaluate_device_severity, evaluate_switch_severity
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
@@ -24,14 +24,6 @@ async def get_map_topology(db: Session = Depends(get_db)):
         switch_capacity,
         _,
     ) = await aggregate_port_metrics_by_node(db, None)
-
-    def _status_to_severity(status: str) -> str:
-        s = (status or "").lower()
-        if s == "offline":
-            return "red"
-        if s == "warning":
-            return "yellow"
-        return "green"
 
     return {
         "locations": [

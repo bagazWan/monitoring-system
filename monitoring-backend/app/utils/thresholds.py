@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal, Optional
 
+from app.services.normalizer import normalize_device_type
+
 Severity = Literal["green", "yellow", "red"]
 
 
@@ -42,12 +44,6 @@ DEVICE_THRESHOLDS = {
     "pc": {"latency": LatencyThreshold(warning=90.0, critical=150.0)},
     "hp": {"latency": LatencyThreshold(warning=90.0, critical=150.0)},
 }
-
-
-def _normalize_device_type(value: Optional[str]) -> Optional[str]:
-    if not value:
-        return None
-    return value.strip().lower().replace("_", " ")
 
 
 def _severity_rank(sev: Severity) -> int:
@@ -117,7 +113,7 @@ def evaluate_device_severity(
     inbound_mbps: float,
     outbound_mbps: float,
 ) -> Severity:
-    key = _normalize_device_type(device_type)
+    key = normalize_device_type(device_type)
     if not key:
         return "green"
 
@@ -135,7 +131,7 @@ def evaluate_device_severity(
 def evaluate_device_latency_severity(
     device_type: Optional[str], latency_ms: Optional[float]
 ) -> Severity:
-    key = _normalize_device_type(device_type)
+    key = normalize_device_type(device_type)
     if not key:
         return "green"
 
@@ -149,7 +145,7 @@ def evaluate_device_latency_severity(
 def evaluate_switch_severity(
     utilization_percent: Optional[float], device_type: Optional[str] = "switch"
 ) -> Severity:
-    key = _normalize_device_type(device_type) or "switch"
+    key = normalize_device_type(device_type) or "switch"
     conf = DEVICE_THRESHOLDS.get(key)
     if not conf or "utilization" not in conf:
         return "green"

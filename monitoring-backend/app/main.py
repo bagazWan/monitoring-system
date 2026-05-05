@@ -24,16 +24,16 @@ from app.api.v1 import (
     websocket,
 )
 from app.core.config import settings
-from app.services.alerts_service import (
-    start_alerts_poller_task,
-    stop_alerts_poller_task,
-)
-from app.services.librenms_service import LibreNMSService
-from app.services.metrics_history_poller import (
+from app.services.librenms.client import LibreNMSService
+from app.services.metrics.history_poller import (
     start_metrics_history_poller,
     stop_metrics_history_poller,
 )
-from app.services.status_poller import (
+from app.services.monitoring.alerts_poller import (
+    start_alerts_poller_task,
+    stop_alerts_poller_task,
+)
+from app.services.monitoring.status_sync import (
     start_status_poller_task,
     stop_status_poller_task,
 )

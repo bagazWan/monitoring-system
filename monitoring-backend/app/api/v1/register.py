@@ -5,13 +5,13 @@ from app.api.dependencies import require_technician_or_admin
 from app.core.database import get_db
 from app.models import Device, LibreNMSPort, Location, Switch, User
 from app.schemas.device import LibreNMSRegisterRequest
-from app.services.librenms_service import LibreNMSService
-from app.services.register_service import (
+from app.services.librenms.client import LibreNMSService
+from app.services.librenms.register import (
     infer_node_type_from_sysdescr,
-    normalize_node_type,
     safe_discover_ports,
     schedule_port_retry_if_needed,
 )
+from app.services.normalizer import normalize_node_type
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 

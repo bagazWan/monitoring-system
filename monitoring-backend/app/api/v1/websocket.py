@@ -1,6 +1,6 @@
 import logging
 
-from app.services.websocket_manager import ws_manager
+from app.services.monitoring.websocket_manager import ws_manager
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 logger = logging.getLogger(__name__)

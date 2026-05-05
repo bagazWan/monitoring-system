@@ -15,8 +15,8 @@ from app.models import (
     Switch,
     SwitchAlert,
 )
-from app.services.metrics_service import add_interval, aggregate_port_rates
-from app.services.ping_probe import ping_probe
+from app.services.metrics.aggregation import add_interval, aggregate_port_rates
+from app.services.metrics.ping import ping_probe
 
 
 async def get_current_average_latency(

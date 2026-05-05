@@ -22,7 +22,7 @@ import asyncio
 import logging
 from typing import Any, Dict, List, Optional, Set
 
-from app.services.websocket_manager import ws_manager
+from app.services.monitoring.websocket_manager import ws_manager
 
 logger = logging.getLogger(__name__)
 

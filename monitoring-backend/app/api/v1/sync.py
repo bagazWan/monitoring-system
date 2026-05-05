@@ -1,9 +1,9 @@
 from app.api.dependencies import require_admin
 from app.core.database import get_db
 from app.models import User
-from app.services.alerts_service import sync_alerts_once
-from app.services.librenms_service import LibreNMSService
-from app.services.sync_service import SyncService
+from app.services.librenms.client import LibreNMSService
+from app.services.librenms.sync import SyncService
+from app.services.monitoring.alerts_poller import sync_alerts_once
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 

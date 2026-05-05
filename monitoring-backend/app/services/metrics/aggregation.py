@@ -8,7 +8,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.models import Device, LibreNMSPort, Switch
-from app.services.librenms_service import LibreNMSService
+from app.services.librenms.client import LibreNMSService
 
 logger = logging.getLogger(__name__)
 

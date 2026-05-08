@@ -13,8 +13,8 @@ from app.services.monitoring.threshold import (
     sync_switch_threshold_alert,
 )
 from app.services.monitoring.websocket_manager import ws_manager
+from app.services.settings_cache import settings_cache
 from app.utils.thresholds import (
-    DEVICE_THRESHOLDS,
     evaluate_device_latency_severity,
     evaluate_device_severity,
     evaluate_switch_severity,
@@ -44,7 +44,6 @@ def append_status_history_if_changed(
 
 
 async def evaluate_node_state(db: Session, node, node_type: str) -> tuple[str, bool]:
-    """Evaluates node health. Returns (new_status, changed_bool)"""
     node_id = getattr(node, f"{node_type}_id")
 
     cache_dict = (
@@ -70,21 +69,19 @@ async def evaluate_node_state(db: Session, node, node_type: str) -> tuple[str, b
     if lnms_id and lnms_id in state.cached_librenms_status_map:
         raw_status = state.cached_librenms_status_map[lnms_id]["status"]
 
+    sys_config = settings_cache.get_system_config()
+    offline_req = sys_config.offline_fail_required if sys_config else 3
+    recovery_req = sys_config.recovery_success_required if sys_config else 2
+
     if raw_status == "offline":
         succ_dict[node_id] = 0
         fail_dict[node_id] = fail_dict.get(node_id, 0) + 1
-        new_status = (
-            "offline"
-            if fail_dict[node_id] >= state.OFFLINE_FAIL_REQUIRED
-            else "warning"
-        )
+        new_status = "offline" if fail_dict[node_id] >= offline_req else "warning"
     else:
         fail_dict[node_id] = 0
         succ_dict[node_id] = succ_dict.get(node_id, 0) + 1
         new_status = (
-            "online"
-            if succ_dict[node_id] >= state.RECOVERY_SUCCESS_REQUIRED
-            else old_status or "online"
+            "online" if succ_dict[node_id] >= recovery_req else old_status or "online"
         )
 
     changed = old_status != new_status
@@ -176,37 +173,36 @@ def sync_threshold_alerts_logic(
                 data_found=True,
             )
 
-        device_type_key = (device.device_type or "").strip().lower().replace("_", " ")
-        if (
-            device_type_key in DEVICE_THRESHOLDS
-            and "latency" in DEVICE_THRESHOLDS[device_type_key]
-        ):
+        rules = settings_cache.get_rules_for_device(device.device_type)
+        has_latency_rule = any(r.metric_type == "latency" for r in rules)
+
+        if has_latency_rule:
             lnms_id = device.librenms_device_id
             latency_ms = latency_by_lnms_id.get(int(lnms_id)) if lnms_id else None
             cached_dev = MetricsCacheService.get_device(device.device_id)
             if cached_dev and cached_dev.get("latency_ms") is not None:
                 latency_ms = cached_dev["latency_ms"]
 
-            latency_sev = evaluate_device_latency_severity(
-                device.device_type, latency_ms
-            )
-            sync_device_latency_alert(
-                db,
-                device_id=device.device_id,
-                severity=latency_sev,
-                message=f"Latency: {latency_ms:.2f} ms"
-                if latency_ms is not None
-                else "Latency unavailable",
-                data_found=latency_ms is not None,
-            )
-        else:
-            sync_device_latency_alert(
-                db,
-                device_id=device.device_id,
-                severity="green",
-                message="Latency rule not configured",
-                data_found=True,
-            )
+                latency_sev = evaluate_device_latency_severity(
+                    device.device_type, latency_ms
+                )
+                sync_device_latency_alert(
+                    db,
+                    device_id=device.device_id,
+                    severity=latency_sev,
+                    message=f"Latency: {latency_ms:.2f} ms"
+                    if latency_ms is not None
+                    else "Latency unavailable",
+                    data_found=latency_ms is not None,
+                )
+            else:
+                sync_device_latency_alert(
+                    db,
+                    device_id=device.device_id,
+                    severity="green",
+                    message="Latency rule not configured",
+                    data_found=True,
+                )
 
     for switch in switches:
         status = (switch.status or "").lower()

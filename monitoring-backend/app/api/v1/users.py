@@ -3,10 +3,11 @@ from typing import Optional
 from app.api.dependencies import get_current_user, require_admin
 from app.core.database import get_db
 from app.core.security import get_password_hash, verify_password
-from app.models.user import User
+from app.models.user import User, UserNotificationSetting
 from app.schemas.user import (
     UserChangePassword,
     UserCreate,
+    UserNotificationUpdate,
     UserPageResponse,
     UserResponse,
     UserUpdate,
@@ -69,7 +70,6 @@ def create_user(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_admin),
 ):
-    # Check if username exists
     existing_user = db.query(User).filter(User.username == user_data.username).first()
     if existing_user:
         raise HTTPException(
@@ -82,6 +82,10 @@ def create_user(
         password_hash=get_password_hash(user_data.password),
         full_name=user_data.full_name,
         role=user_data.role,
+    )
+
+    new_user.notification_setting = UserNotificationSetting(
+        enable_popups=True, notification_level="all"
     )
 
     db.add(new_user)
@@ -114,13 +118,11 @@ def change_own_password(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    # Verify old password
     if not verify_password(password_data.old_password, current_user.password_hash):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Incorrect current password"
         )
 
-    # Update password
     current_user.password_hash = get_password_hash(password_data.new_password)
     db.commit()
 
@@ -179,3 +181,29 @@ def delete_user(
     db.commit()
 
     return None
+
+
+@router.patch("/me/notifications")
+def update_own_notifications(
+    settings_data: UserNotificationUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if not current_user.notification_setting:
+        current_user.notification_setting = UserNotificationSetting(
+            user_id=current_user.user_id
+        )
+        db.add(current_user.notification_setting)
+
+    current_user.notification_setting.enable_popups = settings_data.enable_popups
+    current_user.notification_setting.notification_level = (
+        settings_data.notification_level
+    )
+
+    db.commit()
+
+    return {
+        "message": "Notification preferences updated successfully",
+        "enable_popups": settings_data.enable_popups,
+        "notification_level": settings_data.notification_level,
+    }

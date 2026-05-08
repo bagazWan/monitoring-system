@@ -1,111 +1,46 @@
-from __future__ import annotations
-
-from dataclasses import dataclass
 from typing import Literal, Optional
 
 from app.services.normalizer import normalize_device_type
+from app.services.settings_cache import settings_cache
 
 Severity = Literal["green", "yellow", "red"]
-
-
-@dataclass(frozen=True)
-class DirectionalBandwidthThreshold:
-    in_warning_low: Optional[float] = None
-    in_critical_low: Optional[float] = None
-    out_warning_low: Optional[float] = None
-    out_critical_low: Optional[float] = None
-
-
-@dataclass(frozen=True)
-class UtilizationThreshold:
-    warning: float
-    critical: float
-
-
-@dataclass(frozen=True)
-class LatencyThreshold:
-    warning: float
-    critical: float
-
-
-DEVICE_THRESHOLDS = {
-    "cctv": {
-        "throughput_directional": DirectionalBandwidthThreshold(
-            in_warning_low=0.02,  # 20 Kbps
-            in_critical_low=0.005,  # 5 Kbps
-            out_warning_low=1.5,  # 1.5 Mbps
-            out_critical_low=0.7,  # 0.7 Mbps
-        ),
-        "latency": LatencyThreshold(warning=30.0, critical=100.0),
-    },
-    "switch": {"utilization": UtilizationThreshold(warning=70.0, critical=90.0)},
-    "router": {"utilization": UtilizationThreshold(warning=70.0, critical=90.0)},
-    "access point": {"utilization": UtilizationThreshold(warning=50.0, critical=75.0)},
-    "pc": {"latency": LatencyThreshold(warning=90.0, critical=150.0)},
-    "hp": {"latency": LatencyThreshold(warning=90.0, critical=150.0)},
-}
 
 
 def _severity_rank(sev: Severity) -> int:
     return {"green": 0, "yellow": 1, "red": 2}[sev]
 
 
-def evaluate_utilization(
-    utilization_percent: Optional[float], threshold: UtilizationThreshold
+def evaluate_dynamic_metric(
+    value: Optional[float], metric_type: str, device_type: str
 ) -> Severity:
-    if utilization_percent is None:
+    if value is None:
         return "green"
-    if utilization_percent >= threshold.critical:
-        return "red"
-    if utilization_percent >= threshold.warning:
-        return "yellow"
-    return "green"
 
-
-def evaluate_latency(
-    latency_ms: Optional[float], threshold: LatencyThreshold
-) -> Severity:
-    if latency_ms is None:
+    key = normalize_device_type(device_type)
+    if not key:
         return "green"
-    if latency_ms >= threshold.critical:
-        return "red"
-    if latency_ms >= threshold.warning:
-        return "yellow"
-    return "green"
 
+    rules = settings_cache.get_rules_for_device(key)
+    highest_severity: Severity = "green"
 
-def evaluate_directional_bandwidth(
-    in_mbps: Optional[float],
-    out_mbps: Optional[float],
-    threshold: DirectionalBandwidthThreshold,
-) -> Severity:
-    result: Severity = "green"
+    for rule in rules:
+        if rule.metric_type == metric_type:
+            is_warning = False
+            is_critical = False
 
-    if in_mbps is not None:
-        if (
-            threshold.in_critical_low is not None
-            and in_mbps < threshold.in_critical_low
-        ):
-            result = "red"
-        elif (
-            threshold.in_warning_low is not None and in_mbps < threshold.in_warning_low
-        ):
-            result = "yellow"
+            if rule.condition == "above":
+                is_critical = value >= rule.critical_value
+                is_warning = value >= rule.warning_value
+            elif rule.condition == "below":
+                is_critical = value <= rule.critical_value
+                is_warning = value <= rule.warning_value
 
-    out_result: Severity = "green"
-    if out_mbps is not None:
-        if (
-            threshold.out_critical_low is not None
-            and out_mbps < threshold.out_critical_low
-        ):
-            out_result = "red"
-        elif (
-            threshold.out_warning_low is not None
-            and out_mbps < threshold.out_warning_low
-        ):
-            out_result = "yellow"
+            current_sev = "red" if is_critical else "yellow" if is_warning else "green"
 
-    return out_result if _severity_rank(out_result) > _severity_rank(result) else result
+            if _severity_rank(current_sev) > _severity_rank(highest_severity):
+                highest_severity = current_sev
+
+    return highest_severity
 
 
 def evaluate_device_severity(
@@ -113,41 +48,23 @@ def evaluate_device_severity(
     inbound_mbps: float,
     outbound_mbps: float,
 ) -> Severity:
-    key = normalize_device_type(device_type)
-    if not key:
-        return "green"
+    sev_in = evaluate_dynamic_metric(inbound_mbps, "bandwidth_in", device_type)
+    sev_out = evaluate_dynamic_metric(outbound_mbps, "bandwidth_out", device_type)
 
-    conf = DEVICE_THRESHOLDS.get(key)
-    if not conf:
-        return "green"
-
-    directional = conf.get("throughput_directional")
-    if directional:
-        return evaluate_directional_bandwidth(inbound_mbps, outbound_mbps, directional)
-
+    if "red" in (sev_in, sev_out):
+        return "red"
+    if "yellow" in (sev_in, sev_out):
+        return "yellow"
     return "green"
 
 
 def evaluate_device_latency_severity(
     device_type: Optional[str], latency_ms: Optional[float]
 ) -> Severity:
-    key = normalize_device_type(device_type)
-    if not key:
-        return "green"
-
-    conf = DEVICE_THRESHOLDS.get(key)
-    if not conf or "latency" not in conf:
-        return "green"
-
-    return evaluate_latency(latency_ms, conf["latency"])
+    return evaluate_dynamic_metric(latency_ms, "latency", device_type)
 
 
 def evaluate_switch_severity(
     utilization_percent: Optional[float], device_type: Optional[str] = "switch"
 ) -> Severity:
-    key = normalize_device_type(device_type) or "switch"
-    conf = DEVICE_THRESHOLDS.get(key)
-    if not conf or "utilization" not in conf:
-        return "green"
-
-    return evaluate_utilization(utilization_percent, conf["utilization"])
+    return "green"

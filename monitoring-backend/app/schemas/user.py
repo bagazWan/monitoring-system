@@ -16,7 +16,6 @@ class UserRegister(BaseModel):
     )
 
 
-# User create by admin
 class UserCreate(BaseModel):
     username: str = Field(..., min_length=1, max_length=255, description="User name")
     email: EmailStr
@@ -31,7 +30,6 @@ class UserCreate(BaseModel):
     )
 
 
-# User update by admin
 class UserUpdate(BaseModel):
     username: Optional[str] = Field(
         None, min_length=1, max_length=255, description="User name"
@@ -45,7 +43,6 @@ class UserUpdate(BaseModel):
     role: Optional[str] = Field(None, description="User role")
 
 
-# Updating own user profile
 class UserUpdateSelf(BaseModel):
     username: Optional[str] = Field(None, min_length=1, max_length=255)
     full_name: Optional[str] = Field(None, min_length=1, max_length=255)
@@ -60,6 +57,19 @@ class UserChangePassword(BaseModel):
     confirm_password: str = Field(..., description="Confirm new password")
 
 
+class UserNotificationSettingResponse(BaseModel):
+    enable_popups: bool
+    notification_level: str
+
+    class Config:
+        from_attributes = True
+
+
+class UserNotificationUpdate(BaseModel):
+    enable_popups: bool
+    notification_level: str
+
+
 class UserResponse(BaseModel):
     user_id: int
     username: str
@@ -68,6 +78,7 @@ class UserResponse(BaseModel):
     role: str
     created_at: datetime
     updated_at: datetime
+    notification_setting: Optional[UserNotificationSettingResponse] = None
 
     class Config:
         from_attributes = True

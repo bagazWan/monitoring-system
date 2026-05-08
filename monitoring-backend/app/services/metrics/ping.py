@@ -4,6 +4,7 @@ import time
 from typing import Dict, Optional, Tuple
 
 from app.core.config import settings
+from app.services.settings_cache import settings_cache
 
 logger = logging.getLogger(__name__)
 
@@ -27,12 +28,20 @@ class PingProbe:
         return latency
 
     async def _run_fping(self, host: str) -> Optional[float]:
+        sys_config = settings_cache.get_system_config()
+        probe_count = (
+            sys_config.ping_probe_count if sys_config else settings.PING_PROBE_COUNT
+        )
+        timeout_ms = (
+            sys_config.ping_timeout_ms if sys_config else settings.PING_PROBE_TIMEOUT_MS
+        )
+
         cmd = [
             settings.PING_PROBE_PATH,
             "-C",
-            str(settings.PING_PROBE_COUNT),
+            str(probe_count),
             "-t",
-            str(settings.PING_PROBE_TIMEOUT_MS),
+            str(timeout_ms),
             host,
         ]
 
@@ -101,12 +110,20 @@ class PingProbe:
         if not hosts or not settings.PING_PROBE_ENABLED:
             return {}
 
+        sys_config = settings_cache.get_system_config()
+        probe_count = (
+            sys_config.ping_probe_count if sys_config else settings.PING_PROBE_COUNT
+        )
+        timeout_ms = (
+            sys_config.ping_timeout_ms if sys_config else settings.PING_PROBE_TIMEOUT_MS
+        )
+
         cmd = [
             settings.PING_PROBE_PATH,
             "-C",
-            str(settings.PING_PROBE_COUNT),
+            str(probe_count),
             "-t",
-            str(settings.PING_PROBE_TIMEOUT_MS),
+            str(timeout_ms),
             "-q",
         ] + hosts
 

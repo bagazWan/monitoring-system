@@ -8,9 +8,10 @@ from app.models.location_group import LocationGroup
 from app.models.network_node import NetworkNode
 from app.models.problem_category import ProblemCategory
 from app.models.replacement import DeviceReplacement, SwitchReplacement
+from app.models.setting import SystemConfig, ThresholdRule
 from app.models.status_history import StatusHistory
 from app.models.switch import Switch
-from app.models.user import User
+from app.models.user import User, UserNotificationSetting
 
 __all__ = [
     "User",
@@ -29,4 +30,7 @@ __all__ = [
     "DeviceReplacement",
     "LibreNMSPort",
     "StatusHistory",
+    "UserNotificationSetting",
+    "SystemConfig",
+    "ThresholdRule",
 ]

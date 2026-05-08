@@ -3,14 +3,14 @@ import logging
 from datetime import datetime, timezone
 from typing import Optional
 
+from sqlalchemy.orm import Session
+
 from app.models import Alert, Device, Switch, SwitchAlert
 from app.notifications import notify_all_channels
-from sqlalchemy.orm import Session
+from app.services.settings_cache import settings_cache
 
 logger = logging.getLogger(__name__)
 
-CLEAR_STREAK_REQUIRED = 2
-RAISE_STREAK_REQUIRED = 2
 
 # Unified streak tracking: Key = (node_type, node_id, alert_type)
 _clear_streaks: dict[tuple[str, int, str], int] = {}
@@ -72,11 +72,23 @@ def sync_node_alert(
     severity: str,
     message: str,
     data_found: bool,
-    clear_streak_required: int = CLEAR_STREAK_REQUIRED,
-    raise_streak_required: int = RAISE_STREAK_REQUIRED,
+    clear_streak_required: Optional[int] = None,
+    raise_streak_required: Optional[int] = None,
 ) -> None:
     if not data_found:
         return
+
+    sys_config = settings_cache.get_system_config()
+    clear_req = (
+        clear_streak_required
+        if clear_streak_required is not None
+        else (sys_config.alert_clear_streak if sys_config else 2)
+    )
+    raise_req = (
+        raise_streak_required
+        if raise_streak_required is not None
+        else (sys_config.alert_raise_streak if sys_config else 2)
+    )
 
     mapped = _map_severity(severity)
     k = (node_type, node_id, alert_type)
@@ -86,7 +98,7 @@ def sync_node_alert(
     if mapped is None:
         streak = _clear_streaks.get(k, 0) + 1
         _clear_streaks[k] = streak
-        if streak < clear_streak_required:
+        if streak < clear_req:
             return
 
         if latest and latest.status in ("active", "1"):
@@ -116,7 +128,7 @@ def sync_node_alert(
     _clear_streaks[k] = 0
     raise_streak = _raise_streaks.get(k, 0) + 1
     _raise_streaks[k] = raise_streak
-    if raise_streak < raise_streak_required:
+    if raise_streak < raise_req:
         return
 
     if latest and latest.status in ("cleared", "0"):

@@ -14,9 +14,9 @@ from app.services.metrics.aggregation import (
     to_float,
 )
 from app.services.metrics.ping import ping_probe
-from app.services.normalizer import normalize_device_type, status_to_severity
+from app.services.normalizer import status_to_severity
+from app.services.settings_cache import settings_cache
 from app.utils.thresholds import (
-    DEVICE_THRESHOLDS,
     evaluate_device_latency_severity,
     evaluate_device_severity,
     evaluate_switch_severity,
@@ -154,8 +154,11 @@ async def calculate_device_metrics(
         res["severity"] = evaluate_device_severity(
             device.device_type, res["in_mbps"], res["out_mbps"]
         )
-        dt_key = normalize_device_type(device.device_type)
-        if dt_key in DEVICE_THRESHOLDS and "latency" in DEVICE_THRESHOLDS[dt_key]:
+
+        rules = settings_cache.get_rules_for_device(device.device_type)
+        has_latency_rule = any(r.metric_type == "latency" for r in rules)
+
+        if has_latency_rule:
             res["latency_severity"] = evaluate_device_latency_severity(
                 device.device_type, latency_ms
             )

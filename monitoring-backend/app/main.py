@@ -23,7 +23,11 @@ from app.api.v1 import (
     users,
     websocket,
 )
+from app.api.v1 import (
+    settings as settings_router,
+)
 from app.core.config import settings
+from app.core.database import SessionLocal
 from app.services.librenms.client import LibreNMSService
 from app.services.metrics.history_poller import (
     start_metrics_history_poller,
@@ -37,6 +41,7 @@ from app.services.monitoring.status_sync import (
     start_status_poller_task,
     stop_status_poller_task,
 )
+from app.services.settings_cache import settings_cache
 
 logger = logging.getLogger(__name__)
 
@@ -63,6 +68,14 @@ _status_tracking_task: Optional[asyncio.Task] = None
 
 @app.on_event("startup")
 async def on_startup():
+    try:
+        db = SessionLocal()
+        settings_cache.refresh_cache(db)
+    except Exception as e:
+        logger.error(f"Failed to load settings cache on startup: {e}")
+    finally:
+        db.close()
+
     global _alerts_poller_task, _status_tracking_task
     if settings.LIBRENMS_ALERTS_ENABLED:
         _alerts_poller_task = start_alerts_poller_task(
@@ -114,3 +127,4 @@ app.include_router(websocket.router, prefix="/api/v1")
 app.include_router(librenms_ports.router, prefix="/api/v1")
 app.include_router(register.router, prefix="/api/v1")
 app.include_router(analytics.router, prefix="/api/v1")
+app.include_router(settings_router.router, prefix="/api/v1")

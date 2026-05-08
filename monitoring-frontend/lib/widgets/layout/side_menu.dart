@@ -82,6 +82,8 @@ class _SideMenuState extends State<SideMenu> {
           icon: _buildAlertsIcon(), label: const Text('Alert')),
       const NavigationRailDestination(
           icon: Icon(Icons.analytics), label: Text('Analitik')),
+      const NavigationRailDestination(
+          icon: Icon(Icons.settings), label: Text('Pengaturan'))
     ];
 
     bool isAdmin = widget.currentUser?.role == 'admin';

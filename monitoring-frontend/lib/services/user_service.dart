@@ -42,4 +42,17 @@ class UserService {
       'new_password': newPassword,
     });
   }
+
+  Future<Map<String, dynamic>> getCurrentUser() async {
+    final response = await _api.get(ApiConfig.me);
+    return response as Map<String, dynamic>;
+  }
+
+  Future<void> updateOwnNotifications(
+      bool enablePopups, String notificationLevel) async {
+    await _api.patch('${ApiConfig.users}/me/notifications', body: {
+      'enable_popups': enablePopups,
+      'notification_level': notificationLevel,
+    });
+  }
 }

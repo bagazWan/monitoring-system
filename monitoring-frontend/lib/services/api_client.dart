@@ -62,6 +62,21 @@ class ApiClient {
     }
   }
 
+  Future<dynamic> put(String url, {Map<String, dynamic>? body}) async {
+    try {
+      final response = await _client
+          .put(
+            Uri.parse(url),
+            headers: await _getHeaders(),
+            body: body != null ? jsonEncode(body) : null,
+          )
+          .timeout(_timeout);
+      return _processResponse(response);
+    } on TimeoutException {
+      throw Exception('Request timed out');
+    }
+  }
+
   Future<dynamic> patch(String url, {Map<String, dynamic>? body}) async {
     try {
       final response = await _client

@@ -12,6 +12,7 @@ import 'alerts/alert_screen.dart';
 import 'users/user_management_screen.dart';
 import 'map/map_screen.dart';
 import 'analytics/analytics_screen.dart';
+import 'settings/setting_screen.dart';
 
 class MainLayout extends StatefulWidget {
   const MainLayout({super.key});
@@ -39,6 +40,9 @@ class _MainLayoutState extends State<MainLayout> {
   }
 
   void _goToPage(int index) {
+    if (_currentPageIndex == 5 && index != 5) {
+      _checkUser();
+    }
     setState(() {
       _currentPageIndex = index;
       if (index == _alertsTabIndex) {
@@ -77,6 +81,17 @@ class _MainLayoutState extends State<MainLayout> {
 
       final severity =
           (alertData['severity'] ?? 'info').toString().toLowerCase();
+
+      final popupsEnabled =
+          _currentUser?.notificationSetting?.enablePopups ?? true;
+      if (!popupsEnabled) return;
+
+      final notifLevel =
+          _currentUser?.notificationSetting?.notificationLevel ?? 'all';
+      if (notifLevel == 'critical' && severity != 'critical') return;
+      if (notifLevel == 'warning_critical' &&
+          (severity != 'critical' && severity != 'warning')) return;
+
       final rawMessage =
           (alertData['message'] ?? 'New System Alert').toString();
       final message = _sanitizeAlertMessage(rawMessage);
@@ -202,6 +217,7 @@ class _MainLayoutState extends State<MainLayout> {
       const MapScreen(),
       const AlertScreen(),
       const AnalyticsScreen(),
+      SettingsScreen(currentUser: _currentUser),
       if (isAdmin) const UserManagementScreen(),
     ];
 
@@ -218,6 +234,8 @@ class _MainLayoutState extends State<MainLayout> {
       BottomNavigationBarItem(icon: _buildAlertNavIcon(), label: "Alert"),
       const BottomNavigationBarItem(
           icon: Icon(Icons.analytics), label: "Analitik"),
+      const BottomNavigationBarItem(
+          icon: Icon(Icons.settings), label: "Pengaturan"),
       if (isAdmin)
         const BottomNavigationBarItem(icon: Icon(Icons.people), label: "User"),
     ];

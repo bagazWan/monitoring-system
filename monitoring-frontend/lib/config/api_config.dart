@@ -35,6 +35,7 @@ class ApiConfig {
   static const String registerLibreNMS =
       '$baseUrl$apiVersion/register/librenms';
   static const String libreNMSPorts = '$baseUrl$apiVersion/librenms-ports';
+  static const String settings = '$baseUrl$apiVersion/settings';
   static String get wsUrl {
     return baseUrl
         .replaceFirst('http://', 'ws://')

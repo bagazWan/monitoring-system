@@ -4,6 +4,7 @@ class User {
   final String email;
   final String fullName;
   final String role;
+  final UserNotificationSetting? notificationSetting;
 
   User({
     required this.id,
@@ -11,6 +12,7 @@ class User {
     required this.email,
     required this.fullName,
     required this.role,
+    this.notificationSetting,
   });
 
   factory User.fromJson(Map<String, dynamic> json) {
@@ -20,6 +22,9 @@ class User {
       email: json['email'],
       fullName: json['full_name'],
       role: json['role'],
+      notificationSetting: json['notification_setting'] != null
+          ? UserNotificationSetting.fromJson(json['notification_setting'])
+          : null,
     );
   }
 
@@ -58,6 +63,23 @@ class UserPage {
       total: json['total'] ?? 0,
       page: json['page'] ?? 1,
       pageSize: json['page_size'] ?? 10,
+    );
+  }
+}
+
+class UserNotificationSetting {
+  final bool enablePopups;
+  final String notificationLevel;
+
+  UserNotificationSetting({
+    required this.enablePopups,
+    required this.notificationLevel,
+  });
+
+  factory UserNotificationSetting.fromJson(Map<String, dynamic> json) {
+    return UserNotificationSetting(
+      enablePopups: json['enable_popups'] ?? true,
+      notificationLevel: json['notification_level'] ?? 'all',
     );
   }
 }

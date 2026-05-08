@@ -15,6 +15,7 @@ from app.services.metrics.aggregation import (
 from app.services.metrics.cache import MetricsCacheService
 from app.services.metrics.ping import ping_probe
 from app.services.monitoring.websocket_manager import ws_manager
+from app.services.settings_cache import settings_cache
 
 from . import state
 from .evaluator import evaluate_node_state, sync_threshold_alerts_logic
@@ -184,10 +185,16 @@ async def poll_and_broadcast_status() -> int:
     return changes
 
 
-async def run_status_poller(interval_seconds: int) -> None:
-    logger.info("Fast Ping poller starting (interval=%s seconds)", interval_seconds)
+async def run_status_poller(default_interval: int) -> None:
+    logger.info(
+        "Fast Ping poller starting (default interval=%s seconds)", default_interval
+    )
     while not state.status_poller_stop_event.is_set():
         loop_start = time.monotonic()
+
+        sys_config = settings_cache.get_system_config()
+        current_interval = sys_config.ping_frequency if sys_config else default_interval
+
         try:
             changes = await poll_and_broadcast_status()
             if changes > 0:
@@ -201,7 +208,7 @@ async def run_status_poller(interval_seconds: int) -> None:
         try:
             await asyncio.wait_for(
                 state.status_poller_stop_event.wait(),
-                timeout=max(0.0, interval_seconds - elapsed),
+                timeout=max(0.0, current_interval - elapsed),
             )
         except asyncio.TimeoutError:
             continue

@@ -1,9 +1,6 @@
 import asyncio
 from typing import Dict, Optional
 
-OFFLINE_FAIL_REQUIRED = 3
-RECOVERY_SUCCESS_REQUIRED = 2
-
 # Global Tasks
 status_poller_task: Optional[asyncio.Task] = None
 librenms_sync_task: Optional[asyncio.Task] = None

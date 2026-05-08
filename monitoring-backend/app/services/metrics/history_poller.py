@@ -2,37 +2,60 @@ import asyncio
 import logging
 from datetime import datetime, timedelta, timezone
 
+from sqlalchemy.orm import Session
+
 from app.core.database import SessionLocal
-from app.models import Device, Switch
+from app.models import Alert, Device, Switch, SwitchAlert
 from app.models.bandwidth import DeviceBandwidth, SwitchBandwidth
 from app.services.librenms.client import LibreNMSService
 from app.services.metrics.metrics_calculators import (
     calculate_device_metrics,
     calculate_switch_metrics,
 )
-from sqlalchemy.orm import Session
+from app.services.settings_cache import settings_cache
 
 logger = logging.getLogger(__name__)
 
 
 async def _cleanup_old_data(db: Session):
-    cutoff = datetime.now(timezone.utc) - timedelta(days=365)
-    db.query(DeviceBandwidth).filter(DeviceBandwidth.timestamp < cutoff).delete(
+    sys_config = settings_cache.get_system_config()
+    history_days = sys_config.history_retention_days if sys_config else 365
+    alert_days = sys_config.alert_retention_days if sys_config else 90
+
+    history_cutoff = datetime.now(timezone.utc) - timedelta(days=history_days)
+    alert_cutoff = datetime.now(timezone.utc) - timedelta(days=alert_days)
+
+    db.query(DeviceBandwidth).filter(DeviceBandwidth.timestamp < history_cutoff).delete(
         synchronize_session=False
     )
-    db.query(SwitchBandwidth).filter(SwitchBandwidth.timestamp < cutoff).delete(
+    db.query(SwitchBandwidth).filter(SwitchBandwidth.timestamp < history_cutoff).delete(
         synchronize_session=False
     )
+
+    db.query(Alert).filter(Alert.created_at < alert_cutoff).delete(
+        synchronize_session=False
+    )
+    db.query(SwitchAlert).filter(SwitchAlert.created_at < alert_cutoff).delete(
+        synchronize_session=False
+    )
+
     db.commit()
-    logger.info("Executed 1-year data retention cleanup.")
+    logger.info(
+        f"Executed data retention cleanup (History: {history_days}d, Alerts: {alert_days}d)."
+    )
 
 
 async def run_metrics_history_poller(
-    librenms: LibreNMSService, interval_seconds: int = 300
+    librenms: LibreNMSService, default_interval: int = 300
 ):
     last_cleanup = None
 
     while True:
+        sys_config = settings_cache.get_system_config()
+        current_interval = (
+            sys_config.history_interval_seconds if sys_config else default_interval
+        )
+
         try:
             db = SessionLocal()
             now = datetime.now(timezone.utc)
@@ -92,7 +115,7 @@ async def run_metrics_history_poller(
         except Exception as e:
             logger.error(f"Error in metrics history poller: {e}")
 
-        await asyncio.sleep(interval_seconds)
+        await asyncio.sleep(current_interval)
 
 
 _history_poller_task = None

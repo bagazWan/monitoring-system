@@ -95,116 +95,147 @@ class AnalyticsLineChart extends StatelessWidget {
     if (niceMaxY < 10) niceMaxY = 10;
     double yInterval = niceMaxY / 5;
 
-    return Column(
+    return Stack(
       children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
+        Column(
           children: [
-            if (hasLocA) ...[
-              Container(width: 12, height: 12, color: Colors.blue),
-              const SizedBox(width: 8),
-              Text(locationA!.replaceAll('↳', '').trim(),
-                  style: const TextStyle(fontWeight: FontWeight.bold)),
-            ],
-            if (hasLocA && hasLocB) const SizedBox(width: 24),
-            if (hasLocB) ...[
-              Container(width: 12, height: 12, color: Colors.orange),
-              const SizedBox(width: 8),
-              Text(locationB!.replaceAll('↳', '').trim(),
-                  style: const TextStyle(fontWeight: FontWeight.bold)),
-            ],
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                if (hasLocA) ...[
+                  Container(width: 12, height: 12, color: Colors.blue),
+                  const SizedBox(width: 8),
+                  Text(locationA!.replaceAll('↳', '').trim(),
+                      style: const TextStyle(fontWeight: FontWeight.bold)),
+                ],
+                if (hasLocA && hasLocB) const SizedBox(width: 24),
+                if (hasLocB) ...[
+                  Container(width: 12, height: 12, color: Colors.orange),
+                  const SizedBox(width: 8),
+                  Text(locationB!.replaceAll('↳', '').trim(),
+                      style: const TextStyle(fontWeight: FontWeight.bold)),
+                ],
+              ],
+            ),
+            const SizedBox(height: 32),
+            Expanded(
+              child: LineChart(
+                LineChartData(
+                  minX: minX,
+                  maxX: maxX,
+                  minY: 0,
+                  maxY: niceMaxY,
+                  lineTouchData: LineTouchData(
+                    touchTooltipData: LineTouchTooltipData(
+                      getTooltipItems: (touchedSpots) {
+                        return touchedSpots.map((spot) {
+                          final date = DateTime.fromMillisecondsSinceEpoch(
+                              spot.x.toInt());
+                          final timeStr =
+                              DateFormat('dd/MM HH:mm').format(date);
+                          return LineTooltipItem(
+                            '$timeStr\n${spot.y.toStringAsFixed(2)}',
+                            TextStyle(
+                              color: spot.bar.color ?? Colors.white,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          );
+                        }).toList();
+                      },
+                    ),
+                  ),
+                  lineBarsData: [
+                    if (spotsA.isNotEmpty)
+                      LineChartBarData(
+                          spots: spotsA,
+                          isCurved: true,
+                          color: Colors.blue,
+                          barWidth: 3,
+                          dotData: const FlDotData(show: true)),
+                    if (spotsB.isNotEmpty)
+                      LineChartBarData(
+                          spots: spotsB,
+                          isCurved: true,
+                          color: Colors.orange,
+                          barWidth: 3,
+                          dotData: const FlDotData(show: true)),
+                  ],
+                  titlesData: FlTitlesData(
+                    topTitles: const AxisTitles(
+                        sideTitles: SideTitles(showTitles: false)),
+                    rightTitles: const AxisTitles(
+                        sideTitles: SideTitles(showTitles: false)),
+                    leftTitles: AxisTitles(
+                      sideTitles: SideTitles(
+                        showTitles: true,
+                        reservedSize: 40,
+                        interval: yInterval,
+                      ),
+                    ),
+                    bottomTitles: AxisTitles(
+                      sideTitles: SideTitles(
+                        showTitles: true,
+                        reservedSize: 30,
+                        interval: xInterval,
+                        getTitlesWidget: (value, meta) {
+                          if (value == maxX || value == minX) {
+                            return const SizedBox.shrink();
+                          }
+                          final date = DateTime.fromMillisecondsSinceEpoch(
+                              value.toInt());
+                          final text = durationDays > 1
+                              ? DateFormat('dd/MM').format(date)
+                              : DateFormat('HH:mm').format(date);
+                          return Padding(
+                            padding: const EdgeInsets.only(top: 8.0),
+                            child: Text(text,
+                                style: const TextStyle(
+                                    fontSize: 10, color: Colors.grey)),
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                  gridData: FlGridData(
+                      show: true,
+                      drawVerticalLine: true,
+                      horizontalInterval: yInterval,
+                      verticalInterval: xInterval),
+                  borderData: FlBorderData(show: false),
+                ),
+              ),
+            ),
           ],
         ),
-        const SizedBox(height: 32),
-        Expanded(
-          child: LineChart(
-            LineChartData(
-              minX: minX,
-              maxX: maxX,
-              minY: 0,
-              maxY: niceMaxY,
-              lineTouchData: LineTouchData(
-                touchTooltipData: LineTouchTooltipData(
-                  getTooltipItems: (touchedSpots) {
-                    return touchedSpots.map((spot) {
-                      final date =
-                          DateTime.fromMillisecondsSinceEpoch(spot.x.toInt());
-                      final timeStr = DateFormat('dd/MM HH:mm').format(date);
-                      return LineTooltipItem(
-                        '$timeStr\n${spot.y.toStringAsFixed(2)}',
-                        TextStyle(
-                          color: spot.bar.color ?? Colors.white,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      );
-                    }).toList();
-                  },
-                ),
+        if (metric == 'latency')
+          Positioned(
+            top: 40,
+            right: 0,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.95),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.grey.shade300),
+                  boxShadow: const [
+                    BoxShadow(
+                        color: Colors.black12,
+                        blurRadius: 4,
+                        offset: Offset(0, 2))
+                  ]),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SizedBox(width: 8),
+                  Text("Semakin rendah semakin baik ",
+                      style: TextStyle(
+                          fontSize: 12,
+                          fontStyle: FontStyle.italic,
+                          color: Colors.black87)),
+                ],
               ),
-              lineBarsData: [
-                if (spotsA.isNotEmpty)
-                  LineChartBarData(
-                    spots: spotsA,
-                    isCurved: true,
-                    color: Colors.blue,
-                    barWidth: 3,
-                    dotData: const FlDotData(show: true),
-                  ),
-                if (spotsB.isNotEmpty)
-                  LineChartBarData(
-                    spots: spotsB,
-                    isCurved: true,
-                    color: Colors.orange,
-                    barWidth: 3,
-                    dotData: const FlDotData(show: true),
-                  ),
-              ],
-              titlesData: FlTitlesData(
-                topTitles:
-                    const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                rightTitles:
-                    const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                leftTitles: AxisTitles(
-                  sideTitles: SideTitles(
-                    showTitles: true,
-                    reservedSize: 40,
-                    interval: yInterval,
-                  ),
-                ),
-                bottomTitles: AxisTitles(
-                  sideTitles: SideTitles(
-                    showTitles: true,
-                    reservedSize: 30,
-                    interval: xInterval,
-                    getTitlesWidget: (value, meta) {
-                      if (value == maxX || value == minX) {
-                        return const SizedBox.shrink();
-                      }
-                      final date =
-                          DateTime.fromMillisecondsSinceEpoch(value.toInt());
-                      final text = durationDays > 1
-                          ? DateFormat('dd/MM').format(date)
-                          : DateFormat('HH:mm').format(date);
-                      return Padding(
-                        padding: const EdgeInsets.only(top: 8.0),
-                        child: Text(text,
-                            style: const TextStyle(
-                                fontSize: 10, color: Colors.grey)),
-                      );
-                    },
-                  ),
-                ),
-              ),
-              gridData: FlGridData(
-                show: true,
-                drawVerticalLine: true,
-                horizontalInterval: yInterval,
-                verticalInterval: xInterval,
-              ),
-              borderData: FlBorderData(show: false),
             ),
           ),
-        ),
       ],
     );
   }

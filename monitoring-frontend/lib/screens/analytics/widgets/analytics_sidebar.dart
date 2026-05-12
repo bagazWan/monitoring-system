@@ -7,6 +7,9 @@ class AnalyticsSidebar extends StatelessWidget {
   final String? locationB;
   final Function(String?) onLocationAChanged;
   final Function(String?) onLocationBChanged;
+  final List<String> deviceTypes;
+  final String? selectedDeviceType;
+  final Function(String?) onDeviceTypeChanged;
   final DateTimeRange dateRange;
   final VoidCallback onDateRangePressed;
   final String selectedMetric;
@@ -19,6 +22,9 @@ class AnalyticsSidebar extends StatelessWidget {
     required this.locationB,
     required this.onLocationAChanged,
     required this.onLocationBChanged,
+    required this.deviceTypes,
+    required this.selectedDeviceType,
+    required this.onDeviceTypeChanged,
     required this.dateRange,
     required this.onDateRangePressed,
     required this.selectedMetric,
@@ -28,7 +34,6 @@ class AnalyticsSidebar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 300,
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
@@ -41,9 +46,17 @@ class AnalyticsSidebar extends StatelessWidget {
           const Text("Lokasi",
               style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
           const SizedBox(height: 16),
-          _buildDropdown("Lokasi 1", locationA, onLocationAChanged),
+          _buildDropdown(
+              "Lokasi 1", locationA, allLocations, onLocationAChanged),
           const SizedBox(height: 16),
-          _buildDropdown("Lokasi 2", locationB, onLocationBChanged),
+          _buildDropdown(
+              "Lokasi 2", locationB, allLocations, onLocationBChanged),
+          const SizedBox(height: 32),
+          const Text("Perangkat",
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+          const SizedBox(height: 16),
+          _buildDropdown("Tipe Perangkat", selectedDeviceType, deviceTypes,
+              onDeviceTypeChanged),
           const SizedBox(height: 32),
           const Text("Periode Waktu",
               style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
@@ -99,8 +112,8 @@ class AnalyticsSidebar extends StatelessWidget {
     );
   }
 
-  Widget _buildDropdown(
-      String label, String? value, Function(String?) onChanged) {
+  Widget _buildDropdown(String label, String? value, List<String> items,
+      Function(String?) onChanged) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -116,10 +129,10 @@ class AnalyticsSidebar extends StatelessWidget {
             child: DropdownButton<String>(
               isExpanded: true,
               value: value,
-              items: allLocations.map((loc) {
+              items: items.map((item) {
                 return DropdownMenuItem(
-                  value: loc,
-                  child: Text(loc, overflow: TextOverflow.ellipsis),
+                  value: item,
+                  child: Text(item, overflow: TextOverflow.ellipsis),
                 );
               }).toList(),
               onChanged: onChanged,

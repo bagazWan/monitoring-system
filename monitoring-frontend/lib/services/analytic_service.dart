@@ -9,6 +9,7 @@ class AnalyticsService {
     required DateTime startDate,
     required DateTime endDate,
     required String locationName,
+    String? deviceType,
   }) async {
     final endInclusive =
         DateTime(endDate.year, endDate.month, endDate.day, 23, 59, 59, 999);
@@ -18,6 +19,10 @@ class AnalyticsService {
       'end_date': endInclusive.toUtc().toIso8601String(),
       'location_name': locationName,
     };
+
+    if (deviceType != null && deviceType != "-") {
+      params['device_type'] = deviceType;
+    }
 
     final uri =
         Uri.parse(ApiConfig.analyticsHistory).replace(queryParameters: params);

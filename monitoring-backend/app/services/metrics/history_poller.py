@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 async def _cleanup_old_data(db: Session):
     sys_config = settings_cache.get_system_config()
     history_days = sys_config.history_retention_days if sys_config else 365
-    alert_days = sys_config.alert_retention_days if sys_config else 90
+    alert_days = sys_config.alert_retention_days if sys_config else 365
 
     history_cutoff = datetime.now(timezone.utc) - timedelta(days=history_days)
     alert_cutoff = datetime.now(timezone.utc) - timedelta(days=alert_days)

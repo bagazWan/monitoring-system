@@ -6,12 +6,15 @@ from app.core.database import Base
 
 class SwitchBandwidth(Base):
     __tablename__ = "switch_bandwidth"
+    __table_args__ = (
+        Index("ix_switch_bandwidth_switch_time", "switch_id", "timestamp"),
+    )
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     switch_id = Column(
         Integer, ForeignKey("switches.switch_id", ondelete="CASCADE"), nullable=False
     )
-    timestamp = Column(DateTime(timezone=True))
+    timestamp = Column(DateTime(timezone=True), nullable=False)
     in_usage_mbps = Column(Float, nullable=False)
     out_usage_mbps = Column(Float, nullable=False)
     total_usage_mbps = Column(Float, nullable=False)
@@ -29,12 +32,15 @@ class SwitchBandwidth(Base):
 
 class DeviceBandwidth(Base):
     __tablename__ = "device_bandwidth"
+    __table_args__ = (
+        Index("ix_device_bandwidth_device_time", "device_id", "timestamp"),
+    )
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     device_id = Column(
         Integer, ForeignKey("devices.device_id", ondelete="CASCADE"), nullable=False
     )
-    timestamp = Column(DateTime(timezone=True))
+    timestamp = Column(DateTime(timezone=True), nullable=False)
     in_usage_mbps = Column(Float, nullable=False)
     out_usage_mbps = Column(Float, nullable=False)
     total_usage_mbps = Column(Float, nullable=False)

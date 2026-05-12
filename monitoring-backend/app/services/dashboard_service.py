@@ -16,18 +16,16 @@ from app.models import (
     SwitchAlert,
 )
 from app.services.metrics.aggregation import add_interval, aggregate_port_rates
+from app.services.metrics.cache import MetricsCacheService
 from app.services.metrics.ping import ping_probe
 
 
 async def get_current_average_latency(
     db: Session, location_ids: Optional[list[int]], device_type: Optional[str] = None
 ) -> Optional[float]:
-    dev_query = db.query(Device.ip_address).filter(
-        Device.ip_address.isnot(None), Device.ip_address != ""
-    )
-    sw_query = db.query(Switch.ip_address).filter(
-        Switch.ip_address.isnot(None), Switch.ip_address != ""
-    )
+
+    dev_query = db.query(Device.device_id)
+    sw_query = db.query(Switch.switch_id)
 
     if location_ids:
         dev_query = dev_query.filter(Device.location_id.in_(location_ids))
@@ -42,20 +40,19 @@ async def get_current_average_latency(
             )
             sw_query = sw_query.filter(Switch.switch_id == -1)
 
-    ips = [row[0] for row in dev_query.all()] + [row[0] for row in sw_query.all()]
+    device_ids = [row[0] for row in dev_query.all()]
 
-    if not ips:
+    if not device_ids:
         return None
 
-    await asyncio.gather(*[ping_probe.ping(ip) for ip in ips], return_exceptions=True)
+    latencies = []
+    for d_id in device_ids:
+        cached_data = MetricsCacheService.get_device(d_id)
 
-    latencies = [
-        ping_probe._cache.get(ip)[1]
-        for ip in ips
-        if ping_probe._cache.get(ip)
-        and ping_probe._cache.get(ip)[1] is not None
-        and not math.isnan(ping_probe._cache.get(ip)[1])
-    ]
+        if cached_data and cached_data.get("latency_ms") is not None:
+            val = cached_data["latency_ms"]
+            if not math.isnan(val):
+                latencies.append(val)
 
     if not latencies:
         return None
@@ -291,9 +288,10 @@ async def build_dashboard_stats(
         .filter(critical_sw_filter)
     )
 
-    if location_ids:
-        dev_down_q = dev_down_q.filter(Device.location_id.in_(location_ids))
-        sw_down_q = sw_down_q.filter(Switch.location_id.in_(location_ids))
+    # filter untuk top down locations
+    # if location_ids:
+    #     dev_down_q = dev_down_q.filter(Device.location_id.in_(location_ids))
+    #     sw_down_q = sw_down_q.filter(Switch.location_id.in_(location_ids))
 
     if device_type:
         if device_type.lower() == "switch":
@@ -386,13 +384,29 @@ async def build_dashboard_stats(
         )
     ]
 
+    alert_q = db.query(Alert).join(Device, Alert.device_id == Device.device_id)
+    sw_alert_q = db.query(SwitchAlert).join(
+        Switch, SwitchAlert.switch_id == Switch.switch_id
+    )
+
+    if location_ids:
+        alert_q = alert_q.filter(Device.location_id.in_(location_ids))
+        sw_alert_q = sw_alert_q.filter(Switch.location_id.in_(location_ids))
+
+    if device_type:
+        if device_type.lower() == "switch":
+            alert_q = alert_q.filter(Device.device_id == -1)
+        else:
+            alert_q = alert_q.filter(
+                func.lower(Device.device_type) == device_type.lower()
+            )
+            sw_alert_q = sw_alert_q.filter(Switch.switch_id == -1)
+
     active_alerts = (
-        db.query(Alert)
-        .filter(or_(Alert.status == "active", Alert.status == "1"))
-        .count()
-        + db.query(SwitchAlert)
-        .filter(or_(SwitchAlert.status == "active", SwitchAlert.status == "1"))
-        .count()
+        alert_q.filter(or_(Alert.status == "active", Alert.status == "1")).count()
+        + sw_alert_q.filter(
+            or_(SwitchAlert.status == "active", SwitchAlert.status == "1")
+        ).count()
     )
     uptime = (all_online / total_all * 100) if total_all > 0 else 0.0
 

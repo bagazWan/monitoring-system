@@ -29,7 +29,7 @@ class SwitchAlert(Base):
     created_at = Column(
         DateTime(timezone=True), server_default=func.now(), nullable=False, index=True
     )
-    cleared_at = Column(DateTime(timezone=True))
+    cleared_at = Column(DateTime(timezone=True), index=True)
     status = Column(String(255), index=True)
 
     switch = relationship("Switch", back_populates="alerts")
@@ -65,7 +65,7 @@ class Alert(Base):
     created_at = Column(
         DateTime(timezone=True), server_default=func.now(), nullable=False, index=True
     )
-    cleared_at = Column(DateTime(timezone=True))
+    cleared_at = Column(DateTime(timezone=True), index=True)
     status = Column(String(255), index=True)
 
     device = relationship("Device", back_populates="alerts")

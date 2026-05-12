@@ -1,6 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import '../../../providers/metrics_provider.dart';
 import '../../../models/dashboard_stats.dart';
 import '../../../widgets/components/summary_card.dart';
 import '../../../utils/bandwidth_formatter.dart';
@@ -8,11 +6,13 @@ import '../../../utils/bandwidth_formatter.dart';
 class DashboardSummaryGrid extends StatelessWidget {
   final DashboardStats stats;
   final int offlineCount;
+  final double liveTotalBandwidth;
 
   const DashboardSummaryGrid({
     super.key,
     required this.stats,
     required this.offlineCount,
+    required this.liveTotalBandwidth,
   });
 
   @override
@@ -40,22 +40,12 @@ class DashboardSummaryGrid extends StatelessWidget {
               types: stats.deviceTypeStats,
               totalDevices: stats.totalDevices,
             ),
-            Consumer<MetricsProvider>(
-              builder: (context, metrics, _) {
-                int liveOffline = metrics.allDeviceMetrics
-                        .where((d) => d['status'] == 'offline')
-                        .length +
-                    metrics.allSwitchMetrics
-                        .where((s) => s['status'] == 'offline')
-                        .length;
-                return SummaryCard(
-                  title: "Perangkat Down",
-                  value: liveOffline.toString(),
-                  icon: Icons.portable_wifi_off,
-                  iconColor: Colors.redAccent,
-                  subtitle: "Perangkat offline saat ini",
-                );
-              },
+            SummaryCard(
+              title: "Perangkat Down",
+              value: offlineCount.toString(),
+              icon: Icons.portable_wifi_off,
+              iconColor: Colors.redAccent,
+              subtitle: "Perangkat offline saat ini",
             ),
             SummaryCard(
               title: "Alert Aktif",
@@ -64,16 +54,12 @@ class DashboardSummaryGrid extends StatelessWidget {
               iconColor: Colors.orange,
               subtitle: "Alert yang belum terselesaikan",
             ),
-            Consumer<MetricsProvider>(
-              builder: (context, metrics, _) {
-                return SummaryCard(
-                  title: "Total Bandwidth",
-                  value: BandwidthFormatter.format(metrics.totalLiveBandwidth),
-                  icon: Icons.speed,
-                  iconColor: Colors.purple,
-                  subtitle: "Total trafik in + out",
-                );
-              },
+            SummaryCard(
+              title: "Total Bandwidth",
+              value: BandwidthFormatter.format(liveTotalBandwidth),
+              icon: Icons.speed,
+              iconColor: Colors.purple,
+              subtitle: "Total trafik in + out",
             ),
           ],
         );

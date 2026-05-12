@@ -57,4 +57,68 @@ class MetricsProvider extends ChangeNotifier {
     _metricsSub?.cancel();
     super.dispose();
   }
+
+  Map<String, dynamic> getFilteredDashboardMetrics(
+      {String? locationName, String? deviceType}) {
+    double totalIn = 0.0;
+    double totalOut = 0.0;
+    int offlineCount = 0;
+
+    double totalLatency = 0.0;
+    int latencyCount = 0;
+
+    void processItem(Map<String, dynamic> item, bool isSwitch) {
+      if (deviceType != null) {
+        if (isSwitch && deviceType.toLowerCase() != 'switch') return;
+        if (!isSwitch &&
+            (item['device_type']?.toString().toLowerCase() !=
+                deviceType.toLowerCase())) return;
+      }
+
+      if (locationName != null) {
+        String filterLoc =
+            locationName.replaceAll('↳', '').trim().toLowerCase();
+
+        String itemLoc =
+            (item['location_name']?.toString() ?? '').trim().toLowerCase();
+        String itemGroup =
+            (item['location_group']?.toString() ?? '').trim().toLowerCase();
+        String itemParent =
+            (item['location_parent']?.toString() ?? '').trim().toLowerCase();
+
+        if (itemLoc != filterLoc &&
+            itemGroup != filterLoc &&
+            itemParent != filterLoc) {
+          return;
+        }
+      }
+
+      totalIn += (item['in_mbps'] as num?)?.toDouble() ?? 0.0;
+      totalOut += (item['out_mbps'] as num?)?.toDouble() ?? 0.0;
+
+      String status = item['status']?.toString().toLowerCase() ?? 'offline';
+      if (status == 'offline' || status == 'down' || status == 'critical') {
+        offlineCount++;
+      }
+
+      final latency = (item['latency_ms'] as num?)?.toDouble();
+      if (latency != null && !latency.isNaN) {
+        totalLatency += latency;
+        latencyCount++;
+      }
+    }
+
+    for (var d in _deviceMetrics.values) processItem(d, false);
+    for (var s in _switchMetrics.values) processItem(s, true);
+
+    double avgLatency = latencyCount > 0 ? (totalLatency / latencyCount) : 0.0;
+
+    return {
+      'total_in': totalIn,
+      'total_out': totalOut,
+      'total_bandwidth': totalIn + totalOut,
+      'offline_count': offlineCount,
+      'average_latency': avgLatency,
+    };
+  }
 }

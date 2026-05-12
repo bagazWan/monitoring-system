@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'widgets/network_activity_chart.dart';
 import 'widgets/summary_grid.dart';
 import 'widgets/top_down.dart';
@@ -12,6 +13,7 @@ import '../../services/websocket_service.dart';
 import '../../widgets/common/visual_feedback.dart';
 import '../../widgets/components/filter_dropdown.dart';
 import '../../utils/location_group_formatter.dart';
+import '../../providers/metrics_provider.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -111,7 +113,36 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     _localChartTimer = Timer.periodic(const Duration(seconds: 30), (_) {
       if (!mounted) return;
-      _refreshTraffic();
+      final liveMetrics =
+          context.read<MetricsProvider>().getFilteredDashboardMetrics(
+                locationName: _resolveSelectedLocationFilter(),
+                deviceType: _selectedDeviceType.value,
+              );
+
+      final now = DateTime.now();
+
+      final dataPoint = NetworkActivityData(
+        timestamp: now,
+        inbound: liveMetrics['total_in'] as double,
+        outbound: liveMetrics['total_out'] as double,
+      );
+
+      final rawTrafficPoint = DashboardTraffic(
+        timestamp: now,
+        inboundMbps: liveMetrics['total_in'] as double,
+        outboundMbps: liveMetrics['total_out'] as double,
+        latencyMs: liveMetrics['average_latency'] as double,
+      );
+
+      final updated = List<NetworkActivityData>.from(_trafficData.value)
+        ..add(dataPoint);
+      if (updated.length > _maxTrafficPoints) updated.removeAt(0);
+      _trafficData.value = updated;
+
+      final updatedRaw = List<DashboardTraffic>.from(_rawTrafficData.value)
+        ..add(rawTrafficPoint);
+      if (updatedRaw.length > _maxTrafficPoints) updatedRaw.removeAt(0);
+      _rawTrafficData.value = updatedRaw;
     });
   }
 
@@ -336,9 +367,22 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       },
                     ),
                     const SizedBox(height: 20),
-                    DashboardSummaryGrid(
-                        stats: stats,
-                        offlineCount: stats.totalDevices - stats.onlineDevices),
+                    Consumer<MetricsProvider>(
+                      builder: (context, metricsProvider, child) {
+                        final liveMetrics =
+                            metricsProvider.getFilteredDashboardMetrics(
+                          locationName: _resolveSelectedLocationFilter(),
+                          deviceType: _selectedDeviceType.value,
+                        );
+
+                        return DashboardSummaryGrid(
+                          stats: stats,
+                          offlineCount: liveMetrics['offline_count'] as int,
+                          liveTotalBandwidth:
+                              liveMetrics['total_bandwidth'] as double,
+                        );
+                      },
+                    ),
                     const SizedBox(height: 30),
                     ValueListenableBuilder<bool>(
                       valueListenable: _chartsVisible,

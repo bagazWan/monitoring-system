@@ -8,6 +8,7 @@ class StatusHistory(Base):
     __table_args__ = (
         Index("ix_status_history_node_changed", "node_type", "node_id", "changed_at"),
         Index("ix_status_history_status", "status"),
+        Index("ix_status_history_node_time", "node_type", "node_id", "changed_at"),
     )
 
     history_id = Column(Integer, primary_key=True, autoincrement=True)

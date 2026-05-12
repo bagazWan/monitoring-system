@@ -138,6 +138,13 @@ async def poll_and_broadcast_status() -> int:
             in_mbps, out_mbps = state.cached_device_totals.get(
                 device.device_id, (0.0, 0.0)
             )
+
+            loc = device.location
+            grp = loc.group if loc else None
+            parent_name = (
+                grp.parent.name if grp and getattr(grp, "parent", None) else None
+            )
+
             MetricsCacheService.update_device(
                 device.device_id,
                 {
@@ -147,6 +154,10 @@ async def poll_and_broadcast_status() -> int:
                     "out_mbps": round(out_mbps, 2),
                     "latency_ms": to_finite_float(latency_ms),
                     "monitored": device.librenms_device_id is not None,
+                    "device_type": device.device_type,
+                    "location_name": loc.name if loc else None,
+                    "location_group": grp.name if grp else None,
+                    "location_parent": parent_name,
                 },
             )
 
@@ -160,6 +171,13 @@ async def poll_and_broadcast_status() -> int:
                 switch.switch_id, (0.0, 0.0)
             )
             capacity = state.cached_switch_capacity.get(switch.switch_id, 0.0)
+
+            loc = switch.location
+            grp = loc.group if loc else None
+            parent_name = (
+                grp.parent.name if grp and getattr(grp, "parent", None) else None
+            )
+
             MetricsCacheService.update_switch(
                 switch.switch_id,
                 {
@@ -168,6 +186,9 @@ async def poll_and_broadcast_status() -> int:
                     "in_mbps": round(in_mbps, 2),
                     "out_mbps": round(out_mbps, 2),
                     "capacity_mbps": capacity,
+                    "location_name": loc.name if loc else None,
+                    "location_group": grp.name if grp else None,
+                    "location_parent": parent_name,
                 },
             )
 

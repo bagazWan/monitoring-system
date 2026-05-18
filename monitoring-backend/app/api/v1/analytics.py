@@ -1,6 +1,6 @@
 from collections import defaultdict
 from datetime import datetime
-from typing import List, TypedDict
+from typing import List, Optional, TypedDict
 
 from app.core.database import get_db
 from app.models import Device, Switch
@@ -25,6 +25,7 @@ def get_historical_metrics(
     start_date: datetime,
     end_date: datetime,
     location_name: str,
+    device_type: Optional[str] = None,
     db: Session = Depends(get_db),
 ):
     loc_ids = resolve_location_ids(db, None, location_name)
@@ -44,8 +45,6 @@ def get_historical_metrics(
         .filter(Device.location_id.in_(loc_ids))
         .filter(DeviceBandwidth.timestamp >= start_date)
         .filter(DeviceBandwidth.timestamp <= end_date)
-        .group_by(dev_hour, DeviceBandwidth.device_id)
-        .all()
     )
 
     sw_hour = func.date_trunc("hour", SwitchBandwidth.timestamp).label("hour")
@@ -61,15 +60,25 @@ def get_historical_metrics(
         .filter(Switch.location_id.in_(loc_ids))
         .filter(SwitchBandwidth.timestamp >= start_date)
         .filter(SwitchBandwidth.timestamp <= end_date)
-        .group_by(sw_hour, SwitchBandwidth.switch_id)
-        .all()
     )
+
+    if device_type:
+        if device_type.lower() == "switch":
+            dev_query = dev_query.filter(Device.device_id == -1)  # Force 0 devices
+        else:
+            dev_query = dev_query.filter(
+                func.lower(Device.device_type) == device_type.lower()
+            )
+            sw_query = sw_query.filter(Switch.switch_id == -1)  # Force 0 switches
+
+    dev_results = dev_query.group_by(dev_hour, DeviceBandwidth.device_id).all()
+    sw_results = sw_query.group_by(sw_hour, SwitchBandwidth.switch_id).all()
 
     merged_data: dict[datetime, HourMetrics] = defaultdict(
         lambda: {"in_mbps": 0.0, "out_mbps": 0.0, "latencies": []}
     )
 
-    for row in dev_query + sw_query:
+    for row in dev_results + sw_results:
         hour = row.hour
         merged_data[hour]["in_mbps"] += row.avg_in or 0.0
         merged_data[hour]["out_mbps"] += row.avg_out or 0.0
@@ -80,10 +89,11 @@ def get_historical_metrics(
     results = []
     for hour in sorted(merged_data.keys()):
         data = merged_data[hour]
-
-        avg_lat = None
-        if data["latencies"]:
-            avg_lat = sum(data["latencies"]) / len(data["latencies"])
+        avg_lat = (
+            sum(data["latencies"]) / len(data["latencies"])
+            if data["latencies"]
+            else None
+        )
 
         results.append(
             AnalyticsDataPoint(

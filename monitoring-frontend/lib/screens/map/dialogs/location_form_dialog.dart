@@ -270,7 +270,7 @@ class _LocationFormDialogState extends State<LocationFormDialog> {
         LoadingButton(
           isLoading: _isLoadingGroups || _isSaving,
           onPressed: _submit,
-          label: isEdit ? "Simpan Perubahan" : "Buat Lokasi",
+          label: isEdit ? "Simpan" : "Buat Lokasi",
           width: 160,
           height: 40,
         ),

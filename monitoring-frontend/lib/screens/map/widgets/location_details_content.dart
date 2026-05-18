@@ -15,7 +15,7 @@ class LocationDetailsContent extends StatelessWidget {
   });
 
   Color _statusColor(String status, String? severity) {
-    if (status == 'offline') return Colors.red;
+    if (status == 'offline') return Colors.grey;
     if (status == 'warning') return Colors.orange;
 
     final sev = (severity ?? '').toLowerCase();

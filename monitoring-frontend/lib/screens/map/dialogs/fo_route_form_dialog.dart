@@ -157,7 +157,7 @@ class _FORouteFormDialogState extends State<FORouteFormDialog> {
         LoadingButton(
           isLoading: _isLoading,
           onPressed: _submit,
-          label: isEdit ? "Simpan Perubahan" : "Buat Garis Jalur",
+          label: isEdit ? "Simpan" : "Buat Garis Jalur",
           width: 180,
           height: 40,
         ),

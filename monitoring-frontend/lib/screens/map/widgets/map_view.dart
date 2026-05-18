@@ -16,6 +16,7 @@ class MapView extends StatefulWidget {
   final LatLng center;
   final void Function(Location loc, List<BaseNode> nodesAtLoc) onLocationTap;
   final bool showRoutes;
+  final Map<int, String> nodeStatuses;
 
   const MapView({
     super.key,
@@ -26,6 +27,7 @@ class MapView extends StatefulWidget {
     required this.center,
     required this.onLocationTap,
     required this.showRoutes,
+    required this.nodeStatuses,
   });
 
   @override
@@ -38,13 +40,25 @@ class _MapViewState extends State<MapView> {
   double _currentZoom = 0;
 
   String _nodeSeverity(BaseNode node) {
-    final status = (node.status ?? '').toLowerCase();
-    if (status == 'offline') return 'red';
-    if (status == 'warning') return 'yellow';
-
+    final liveStatus = (widget.nodeStatuses[node.id ?? -1] ?? '').toLowerCase();
+    final originalStatus = (node.status ?? '').toLowerCase();
     final sev = (node.severity ?? '').toLowerCase();
-    if (sev == 'red' || sev == 'critical') return 'red';
-    if (sev == 'yellow' || sev == 'warning') return 'yellow';
+
+    if (liveStatus == 'offline' ||
+        liveStatus == 'down' ||
+        originalStatus == 'offline' ||
+        originalStatus == 'down') {
+      return 'grey';
+    }
+
+    if (sev == 'red' || sev == 'critical' || liveStatus == 'critical') {
+      return 'red';
+    }
+
+    if (sev == 'yellow' || sev == 'warning' || liveStatus == 'warning') {
+      return 'yellow';
+    }
+
     return 'green';
   }
 
@@ -72,7 +86,6 @@ class _MapViewState extends State<MapView> {
   Widget build(BuildContext context) {
     final topo = widget.topology;
 
-    // nodeId -> location LatLng
     final nodeById = {for (final n in topo.networkNodes) n.id: n};
     LatLng? nodeLatLng(int nodeId) {
       final n = nodeById[nodeId];
@@ -82,16 +95,13 @@ class _MapViewState extends State<MapView> {
       return LatLng(loc.latitude, loc.longitude);
     }
 
-    // Polylines (set to static color for now)
     final polylines = <Polyline>[];
     for (final r in topo.foRoutes) {
       final start = nodeLatLng(r.startNodeId);
       final end = nodeLatLng(r.endNodeId);
       if (start == null || end == null) continue;
 
-      // Extract waypoints if they exist, otherwise fallback to straight line
       List<LatLng> path = [start, end];
-
       if (r.waypoints != null && r.waypoints!.isNotEmpty) {
         path = r.waypoints!;
       }
@@ -108,7 +118,6 @@ class _MapViewState extends State<MapView> {
       );
     }
 
-    // Markers
     final markers = widget.visibleLocations.map((loc) {
       final nodesAtLoc = widget.nodesByLocation[loc.id] ?? [];
 
@@ -116,12 +125,27 @@ class _MapViewState extends State<MapView> {
       if (nodesAtLoc.isEmpty) {
         statusColor = Colors.grey;
       } else {
-        final anyRed = nodesAtLoc.any((n) => _nodeSeverity(n) == 'red');
-        final anyYellow = nodesAtLoc.any((n) => _nodeSeverity(n) == 'yellow');
+        int total = nodesAtLoc.length;
+        int offlineCount = 0;
+        int criticalCount = 0;
+        int warningCount = 0;
 
-        if (anyRed) {
+        for (var n in nodesAtLoc) {
+          String state = _nodeSeverity(n);
+          if (state == 'grey') {
+            offlineCount++;
+          } else if (state == 'red') {
+            criticalCount++;
+          } else if (state == 'yellow') {
+            warningCount++;
+          }
+        }
+
+        if (offlineCount == total) {
+          statusColor = Colors.grey;
+        } else if (criticalCount == total || offlineCount > 0) {
           statusColor = Colors.red;
-        } else if (anyYellow) {
+        } else if (criticalCount > 0 || warningCount > 0) {
           statusColor = Colors.orange;
         } else {
           statusColor = Colors.green;
@@ -161,6 +185,14 @@ class _MapViewState extends State<MapView> {
             initialZoom: 13.20,
             minZoom: 13,
             maxZoom: 20,
+            cameraConstraint: CameraConstraint.contain(
+              bounds: LatLngBounds(
+                const LatLng(-5.182394550307023,
+                    119.3424239538415), // barat daya/kiri bawah
+                const LatLng(-5.048174653312404,
+                    119.56009381545908), // timur laut/kanan atas
+              ),
+            ),
           ),
           children: [
             TileLayer(

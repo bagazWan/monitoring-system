@@ -57,6 +57,8 @@ class SystemConfigBase(BaseModel):
     history_retention_days: int = Field(ge=1)
     alert_retention_days: int = Field(ge=1)
 
+    top_down_min_alert_duration_minutes: int = Field(default=30, ge=0)
+
 
 class SystemConfigUpdate(SystemConfigBase):
     pass

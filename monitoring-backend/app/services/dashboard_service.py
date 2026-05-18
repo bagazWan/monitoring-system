@@ -17,7 +17,7 @@ from app.models import (
 )
 from app.services.metrics.aggregation import add_interval, aggregate_port_rates
 from app.services.metrics.cache import MetricsCacheService
-from app.services.metrics.ping import ping_probe
+from app.services.settings_cache import settings_cache
 
 
 async def get_current_average_latency(
@@ -253,6 +253,18 @@ async def build_dashboard_stats(
         func.lower(func.coalesce(SwitchAlert.severity, "")) == "critical"
     )
 
+    sys_config = settings_cache.get_system_config()
+    min_duration_minutes = (
+        sys_config.top_down_min_alert_duration_minutes if sys_config else 30
+    )
+    min_duration_seconds = min_duration_minutes * 60
+
+    window_start = datetime.now(timezone.utc) - timedelta(days=top_down_window)
+    critical_filter = func.lower(func.coalesce(Alert.severity, "")) == "critical"
+    critical_sw_filter = (
+        func.lower(func.coalesce(SwitchAlert.severity, "")) == "critical"
+    )
+
     ParentGroup = aliased(LocationGroup)
     dev_down_q = (
         db.query(
@@ -269,6 +281,12 @@ async def build_dashboard_stats(
         .outerjoin(ParentGroup, LocationGroup.parent_id == ParentGroup.group_id)
         .filter(Alert.created_at >= window_start)
         .filter(critical_filter)
+        .filter(
+            func.extract(
+                "epoch", func.coalesce(Alert.cleared_at, func.now()) - Alert.created_at
+            )
+            >= min_duration_seconds
+        )
     )
 
     sw_down_q = (
@@ -286,6 +304,14 @@ async def build_dashboard_stats(
         .outerjoin(ParentGroup, LocationGroup.parent_id == ParentGroup.group_id)
         .filter(SwitchAlert.created_at >= window_start)
         .filter(critical_sw_filter)
+        .filter(
+            func.extract(
+                "epoch",
+                func.coalesce(SwitchAlert.cleared_at, func.now())
+                - SwitchAlert.created_at,
+            )
+            >= min_duration_seconds
+        )
     )
 
     # filter untuk top down locations

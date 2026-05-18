@@ -24,6 +24,8 @@ class SystemConfig(Base):
     history_retention_days = Column(Integer, default=365, nullable=False)
     alert_retention_days = Column(Integer, default=90, nullable=False)
 
+    top_down_min_alert_duration_minutes = Column(Integer, default=30, nullable=False)
+
     def __repr__(self):
         return f"<SystemConfig(ping_freq={self.ping_frequency}, history_retention={self.history_retention_days})>"
 

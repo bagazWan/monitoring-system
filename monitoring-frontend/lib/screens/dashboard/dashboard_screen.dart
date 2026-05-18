@@ -32,6 +32,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   StreamSubscription<WebSocketConnectionState>? _connectionSubscription;
   StreamSubscription<void>? _alertRefreshSub;
   Timer? _localChartTimer;
+  Timer? _debounceTimer;
 
   final GlobalKey _chartsKey = GlobalKey();
   final ValueNotifier<bool> _chartsVisible = ValueNotifier(false);
@@ -86,6 +87,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
+  void _debouncedRefresh() {
+    if (_debounceTimer?.isActive ?? false) {
+      _debounceTimer!.cancel();
+    }
+
+    _debounceTimer = Timer(const Duration(milliseconds: 1500), () {
+      if (!mounted) return;
+      _refreshDashboard();
+      if (_chartsInitialized) _refreshUptimeTrend();
+    });
+  }
+
   void _initWebSocket() {
     final wsService = WebSocketService();
     wsService.connect();
@@ -94,14 +107,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     _statusSubscription = wsService.statusChanges.listen((_) {
       if (!mounted) return;
-      _refreshDashboard();
-      if (_chartsInitialized) _refreshUptimeTrend();
+      _debouncedRefresh();
     });
 
     _alertRefreshSub = wsService.alertsRefresh.listen((_) {
       if (!mounted) return;
-      _refreshDashboard();
-      if (_chartsInitialized) _refreshUptimeTrend();
+      _debouncedRefresh();
     });
   }
 
@@ -289,6 +300,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     _isStatsLoading.dispose();
     _dashboardStats.dispose();
     _statsError.dispose();
+    _debounceTimer?.cancel();
     super.dispose();
   }
 

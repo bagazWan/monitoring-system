@@ -206,6 +206,54 @@ class _MainLayoutState extends State<MainLayout> {
     );
   }
 
+  Widget _buildDrawerItem(IconData icon, String title, int index,
+      {int badgeCount = 0}) {
+    final isSelected = _currentPageIndex == index;
+    return ListTile(
+      leading: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Icon(icon, color: isSelected ? Colors.blueAccent : Colors.grey[700]),
+          if (badgeCount > 0)
+            Positioned(
+              right: -4,
+              top: -4,
+              child: Container(
+                padding: const EdgeInsets.all(2),
+                decoration: BoxDecoration(
+                  color: Colors.red,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                constraints: const BoxConstraints(minWidth: 14, minHeight: 14),
+                child: Text(
+                  badgeCount > 99 ? '99+' : '$badgeCount',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 8,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+      title: Text(
+        title,
+        style: TextStyle(
+          color: isSelected ? Colors.blueAccent : Colors.black87,
+          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+        ),
+      ),
+      selected: isSelected,
+      selectedTileColor: Colors.blue.withOpacity(0.05),
+      onTap: () {
+        Navigator.pop(context);
+        _goToPage(index);
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     bool isMobile = MediaQuery.of(context).size.width < 600;
@@ -234,10 +282,6 @@ class _MainLayoutState extends State<MainLayout> {
       BottomNavigationBarItem(icon: _buildAlertNavIcon(), label: "Alert"),
       const BottomNavigationBarItem(
           icon: Icon(Icons.analytics), label: "Analitik"),
-      const BottomNavigationBarItem(
-          icon: Icon(Icons.settings), label: "Pengaturan"),
-      if (isAdmin)
-        const BottomNavigationBarItem(icon: Icon(Icons.people), label: "User"),
     ];
 
     return Scaffold(
@@ -246,7 +290,6 @@ class _MainLayoutState extends State<MainLayout> {
               backgroundColor: Colors.grey[50],
               elevation: 0,
               scrolledUnderElevation: 0,
-              toolbarHeight: 56,
               bottom: PreferredSize(
                 preferredSize: const Size.fromHeight(1.0),
                 child: Container(
@@ -261,26 +304,71 @@ class _MainLayoutState extends State<MainLayout> {
                     onPressed: () => _handleSync(context),
                     tooltip: "Sync ke LibreNMS",
                   ),
-                TextButton.icon(
+                IconButton(
+                  icon: const Icon(Icons.logout, color: Colors.redAccent),
                   onPressed: _handleLogout,
-                  icon: const Icon(Icons.logout, color: Colors.black87),
-                  label: const Text(
-                    "Logout",
-                    style: TextStyle(
-                      color: Colors.black87,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
+                  tooltip: "Logout",
                 ),
                 const SizedBox(width: 8),
               ],
             )
           : null,
-      bottomNavigationBar: isMobile
+      drawer: isMobile
+          ? Drawer(
+              backgroundColor: Colors.white,
+              child: Column(
+                children: [
+                  DrawerHeader(
+                    decoration: const BoxDecoration(color: Colors.blueAccent),
+                    child: Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const CircleAvatar(
+                            backgroundColor: Colors.white,
+                            radius: 30,
+                            child: Icon(Icons.person,
+                                size: 35, color: Colors.blueAccent),
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            _currentUser?.username ?? 'Admin',
+                            style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    child: ListView(
+                      padding: EdgeInsets.zero,
+                      children: [
+                        _buildDrawerItem(Icons.dashboard, "Home", 0),
+                        _buildDrawerItem(Icons.router, "Perangkat", 1),
+                        _buildDrawerItem(Icons.location_on, "Peta", 2),
+                        _buildDrawerItem(Icons.notifications, "Alert", 3,
+                            badgeCount: _unreadAlertCount),
+                        _buildDrawerItem(Icons.analytics, "Analitik", 4),
+                        const Divider(),
+                        _buildDrawerItem(Icons.settings, "Pengaturan", 5),
+                        if (isAdmin) _buildDrawerItem(Icons.people, "User", 6),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            )
+          : null,
+      bottomNavigationBar: (isMobile && _currentPageIndex <= 4)
           ? BottomNavigationBar(
               currentIndex: _currentPageIndex,
               onTap: _goToPage,
               type: BottomNavigationBarType.fixed,
+              selectedItemColor: Colors.blueAccent,
+              unselectedItemColor: Colors.grey,
               items: navItems,
             )
           : null,

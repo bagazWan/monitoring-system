@@ -31,6 +31,8 @@ class _SystemConfigTabState extends State<SystemConfigTab> {
   final _histIntervalCtrl = TextEditingController();
   final _histRetentionCtrl = TextEditingController();
   final _alertRetentionCtrl = TextEditingController();
+  final _minDurationHoursCtrl = TextEditingController();
+  final _minDurationMinutesCtrl = TextEditingController();
 
   // Dynamic Rules State
   String _selectedDeviceType = '';
@@ -76,6 +78,9 @@ class _SystemConfigTabState extends State<SystemConfigTab> {
         _histIntervalCtrl.text = config.historyIntervalSeconds.toString();
         _histRetentionCtrl.text = config.historyRetentionDays.toString();
         _alertRetentionCtrl.text = config.alertRetentionDays.toString();
+        int totalMinutes = config.topDownMinAlertDurationMinutes;
+        _minDurationHoursCtrl.text = (totalMinutes ~/ 60).toString();
+        _minDurationMinutesCtrl.text = (totalMinutes % 60).toString();
 
         _rulesMap = rules;
         for (var type in _deviceTypes) {
@@ -116,6 +121,9 @@ class _SystemConfigTabState extends State<SystemConfigTab> {
         }
         seenCombinations.add(combo);
       }
+      int durationHours = int.tryParse(_minDurationHoursCtrl.text) ?? 0;
+      int durationMins = int.tryParse(_minDurationMinutesCtrl.text) ?? 0;
+      int combinedTotalMinutes = (durationHours * 60) + durationMins;
 
       final updatedConfig = SystemConfig(
         pingFrequency: int.tryParse(_pingFreqCtrl.text) ?? 5,
@@ -127,7 +135,8 @@ class _SystemConfigTabState extends State<SystemConfigTab> {
         alertClearStreak: int.tryParse(_alertClearCtrl.text) ?? 2,
         historyIntervalSeconds: int.tryParse(_histIntervalCtrl.text) ?? 300,
         historyRetentionDays: int.tryParse(_histRetentionCtrl.text) ?? 365,
-        alertRetentionDays: int.tryParse(_alertRetentionCtrl.text) ?? 90,
+        alertRetentionDays: int.tryParse(_alertRetentionCtrl.text) ?? 365,
+        topDownMinAlertDurationMinutes: combinedTotalMinutes,
       );
 
       await _settingsService.updateBulkSettings(
@@ -162,6 +171,8 @@ class _SystemConfigTabState extends State<SystemConfigTab> {
     _histIntervalCtrl.dispose();
     _histRetentionCtrl.dispose();
     _alertRetentionCtrl.dispose();
+    _minDurationHoursCtrl.dispose();
+    _minDurationMinutesCtrl.dispose();
     super.dispose();
   }
 
@@ -186,6 +197,8 @@ class _SystemConfigTabState extends State<SystemConfigTab> {
           buildSensitivitySection(),
           const SizedBox(height: 32),
           buildRetentionSection(),
+          const SizedBox(height: 32),
+          buildDashboardFilterSection(),
           const Padding(
               padding: EdgeInsets.symmetric(vertical: 32), child: Divider()),
           buildThresholdSection(),

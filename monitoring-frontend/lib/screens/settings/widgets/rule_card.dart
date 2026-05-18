@@ -63,112 +63,103 @@ class RuleCard extends StatelessWidget {
             padding: const EdgeInsets.all(16),
             child: Column(
               children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: DropdownButtonFormField<String>(
-                        value: rule.metricType.isEmpty
-                            ? 'latency'
-                            : rule.metricType,
-                        decoration: const InputDecoration(
-                            labelText: "Tipe Metrik",
-                            isDense: true,
-                            border: OutlineInputBorder()),
-                        items: const [
-                          DropdownMenuItem(
-                              value: 'latency', child: Text("Latency (ms)")),
-                          DropdownMenuItem(
-                              value: 'bandwidth_in',
-                              child: Text("Bandwidth In (Mbps)")),
-                          DropdownMenuItem(
-                              value: 'bandwidth_out',
-                              child: Text("Bandwidth Out (Mbps)")),
-                        ],
-                        onChanged: (val) {
-                          if (val != null) {
-                            onChanged(ThresholdRule(
-                              metricType: val,
-                              condition: rule.condition,
-                              warningValue: rule.warningValue,
-                              criticalValue: rule.criticalValue,
-                            ));
-                          }
-                        },
-                      ),
+                _buildResponsiveRuleRow(
+                  context,
+                  [
+                    DropdownButtonFormField<String>(
+                      value:
+                          rule.metricType.isEmpty ? 'latency' : rule.metricType,
+                      decoration: const InputDecoration(
+                          labelText: "Tipe Metrik",
+                          isDense: true,
+                          border: OutlineInputBorder()),
+                      items: const [
+                        DropdownMenuItem(
+                            value: 'latency', child: Text("Latency (ms)")),
+                        DropdownMenuItem(
+                            value: 'bandwidth_in',
+                            child: Text("Bandwidth In (Mbps)")),
+                        DropdownMenuItem(
+                            value: 'bandwidth_out',
+                            child: Text("Bandwidth Out (Mbps)")),
+                      ],
+                      onChanged: (val) {
+                        if (val != null) {
+                          onChanged(ThresholdRule(
+                            metricType: val,
+                            condition: rule.condition,
+                            warningValue: rule.warningValue,
+                            criticalValue: rule.criticalValue,
+                          ));
+                        }
+                      },
                     ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: DropdownButtonFormField<String>(
-                        value: rule.condition,
-                        decoration: const InputDecoration(
-                            labelText: "Kondisi Pemicu",
-                            isDense: true,
-                            border: OutlineInputBorder()),
-                        items: const [
-                          DropdownMenuItem(
-                              value: 'above',
-                              child: Text("Melebihi (Lebih besar dari)")),
-                          DropdownMenuItem(
-                              value: 'below',
-                              child: Text("Menurun (Lebih kecil dari)")),
-                        ],
-                        onChanged: (val) {
-                          if (val != null) {
-                            onChanged(ThresholdRule(
-                              metricType: rule.metricType,
-                              condition: val,
-                              warningValue: rule.warningValue,
-                              criticalValue: rule.criticalValue,
-                            ));
-                          }
-                        },
-                      ),
+                    DropdownButtonFormField<String>(
+                      value: rule.condition,
+                      decoration: const InputDecoration(
+                          labelText: "Kondisi Pemicu",
+                          isDense: true,
+                          border: OutlineInputBorder()),
+                      items: const [
+                        DropdownMenuItem(
+                            value: 'above',
+                            child: Text("Melebihi (Lebih besar)")),
+                        DropdownMenuItem(
+                            value: 'below',
+                            child: Text("Menurun (Lebih kecil)")),
+                      ],
+                      onChanged: (val) {
+                        if (val != null) {
+                          onChanged(ThresholdRule(
+                            metricType: rule.metricType,
+                            condition: val,
+                            warningValue: rule.warningValue,
+                            criticalValue: rule.criticalValue,
+                          ));
+                        }
+                      },
                     ),
                   ],
                 ),
                 const SizedBox(height: 16),
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextFormField(
-                        key: ValueKey('${deviceType}_warning_$index'),
-                        initialValue: rule.warningValue.toString(),
-                        keyboardType: const TextInputType.numberWithOptions(
-                            decimal: true),
-                        decoration: const InputDecoration(
-                            labelText: "Batas Warning",
-                            isDense: true,
-                            border: OutlineInputBorder()),
-                        onChanged: (val) {
-                          onChanged(ThresholdRule(
-                            metricType: rule.metricType,
-                            condition: rule.condition,
-                            warningValue: double.tryParse(val) ?? 0.0,
-                            criticalValue: rule.criticalValue,
-                          ));
-                        },
-                      ),
+                _buildResponsiveRuleRow(
+                  context,
+                  [
+                    TextFormField(
+                      key: ValueKey('${deviceType}_warning_$index'),
+                      initialValue: rule.warningValue.toString(),
+                      keyboardType:
+                          const TextInputType.numberWithOptions(decimal: true),
+                      decoration: const InputDecoration(
+                          labelText: "Batas Warning",
+                          isDense: true,
+                          border: OutlineInputBorder()),
+                      onChanged: (val) {
+                        onChanged(ThresholdRule(
+                          metricType: rule.metricType,
+                          condition: rule.condition,
+                          warningValue: double.tryParse(val) ?? 0.0,
+                          criticalValue: rule.criticalValue,
+                        ));
+                      },
                     ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: TextFormField(
-                        key: ValueKey('${deviceType}_critical_$index'),
-                        initialValue: rule.criticalValue.toString(),
-                        keyboardType: const TextInputType.numberWithOptions(
-                            decimal: true),
-                        decoration: const InputDecoration(
-                            labelText: "Batas Critical",
-                            isDense: true,
-                            border: OutlineInputBorder()),
-                        onChanged: (val) {
-                          onChanged(ThresholdRule(
-                            metricType: rule.metricType,
-                            condition: rule.condition,
-                            warningValue: rule.warningValue,
-                            criticalValue: double.tryParse(val) ?? 0.0,
-                          ));
-                        },
-                      ),
+                    TextFormField(
+                      key: ValueKey('${deviceType}_critical_$index'),
+                      initialValue: rule.criticalValue.toString(),
+                      keyboardType:
+                          const TextInputType.numberWithOptions(decimal: true),
+                      decoration: const InputDecoration(
+                          labelText: "Batas Critical",
+                          isDense: true,
+                          border: OutlineInputBorder()),
+                      onChanged: (val) {
+                        onChanged(ThresholdRule(
+                          metricType: rule.metricType,
+                          condition: rule.condition,
+                          warningValue: rule.warningValue,
+                          criticalValue: double.tryParse(val) ?? 0.0,
+                        ));
+                      },
                     ),
                   ],
                 )
@@ -177,6 +168,36 @@ class RuleCard extends StatelessWidget {
           )
         ],
       ),
+    );
+  }
+
+  Widget _buildResponsiveRuleRow(BuildContext context, List<Widget> children) {
+    final isMobile = MediaQuery.of(context).size.width < 800;
+    if (isMobile) {
+      return Column(
+        children: children
+            .asMap()
+            .entries
+            .map((e) => Padding(
+                  padding: EdgeInsets.only(
+                      bottom: e.key == children.length - 1 ? 0 : 16),
+                  child: e.value,
+                ))
+            .toList(),
+      );
+    }
+    return Row(
+      children: children
+          .asMap()
+          .entries
+          .map((e) => Expanded(
+                child: Padding(
+                  padding: EdgeInsets.only(
+                      right: e.key == children.length - 1 ? 0 : 16),
+                  child: e.value,
+                ),
+              ))
+          .toList(),
     );
   }
 }

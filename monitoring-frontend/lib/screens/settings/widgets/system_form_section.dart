@@ -3,6 +3,34 @@ part of '../tabs/system_tab.dart';
 // ignore_for_file: invalid_use_of_protected_member
 
 extension _SystemConfigFormSections on _SystemConfigTabState {
+  Widget _buildResponsiveRow(List<Widget> children) {
+    final isMobile = MediaQuery.of(context).size.width < 800;
+    if (isMobile) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: children.asMap().entries.map((entry) {
+          return Padding(
+            padding: EdgeInsets.only(
+                bottom: entry.key == children.length - 1 ? 0 : 16),
+            child: entry.value,
+          );
+        }).toList(),
+      );
+    }
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: children.asMap().entries.map((entry) {
+        return Expanded(
+          child: Padding(
+            padding: EdgeInsets.only(
+                right: entry.key == children.length - 1 ? 0 : 24),
+            child: entry.value,
+          ),
+        );
+      }).toList(),
+    );
+  }
+
   Widget buildPollingSection() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -10,27 +38,20 @@ extension _SystemConfigFormSections on _SystemConfigTabState {
         const Text("Pengaturan Polling",
             style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
         const SizedBox(height: 16),
-        Row(
-          children: [
-            Expanded(
-                child: _buildTextField(
-                    controller: _pingFreqCtrl,
-                    label: "Frekuensi ping (detik)",
-                    tooltip: "Interval poller mengecek perangkat")),
-            const SizedBox(width: 24),
-            Expanded(
-                child: _buildTextField(
-                    controller: _pingProbeCtrl,
-                    label: "Jumlah paket per probe",
-                    tooltip: "Jumlah paket ICMP dalam satu siklus")),
-            const SizedBox(width: 24),
-            Expanded(
-                child: _buildTextField(
-                    controller: _pingTimeoutCtrl,
-                    label: "Timeout per paket (ms)",
-                    tooltip: "Waktu tunggu maksimal balasan ping")),
-          ],
-        ),
+        _buildResponsiveRow([
+          _buildTextField(
+              controller: _pingFreqCtrl,
+              label: "Frekuensi ping (detik)",
+              tooltip: "Interval poller mengecek perangkat"),
+          _buildTextField(
+              controller: _pingProbeCtrl,
+              label: "Jumlah paket per probe",
+              tooltip: "Jumlah paket ICMP dalam satu siklus"),
+          _buildTextField(
+              controller: _pingTimeoutCtrl,
+              label: "Timeout per paket (ms)",
+              tooltip: "Waktu tunggu maksimal balasan ping"),
+        ]),
       ],
     );
   }
@@ -42,38 +63,27 @@ extension _SystemConfigFormSections on _SystemConfigTabState {
         const Text("Pengaturan Status & Alert",
             style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
         const SizedBox(height: 16),
-        Row(
-          children: [
-            Expanded(
-                child: _buildTextField(
-                    controller: _offlineFailCtrl,
-                    label: "Batas gagal ping (Offline)",
-                    tooltip: "Kegagalan berturut-turut untuk status offline")),
-            const SizedBox(width: 24),
-            Expanded(
-                child: _buildTextField(
-                    controller: _recoverySuccCtrl,
-                    label: "Syarat Sukses (Online)",
-                    tooltip: "Sukses berturut-turut untuk pemulihan status")),
-          ],
-        ),
+        _buildResponsiveRow([
+          _buildTextField(
+              controller: _offlineFailCtrl,
+              label: "Batas gagal ping (Offline)",
+              tooltip: "Kegagalan berturut-turut untuk status offline"),
+          _buildTextField(
+              controller: _recoverySuccCtrl,
+              label: "Syarat Sukses (Online)",
+              tooltip: "Sukses berturut-turut untuk pemulihan status"),
+        ]),
         const SizedBox(height: 16),
-        Row(
-          children: [
-            Expanded(
-                child: _buildTextField(
-                    controller: _alertRaiseCtrl,
-                    label: "Siklus pemicu alert",
-                    tooltip:
-                        "Siklus threshold dilanggar sebelum alert muncul")),
-            const SizedBox(width: 24),
-            Expanded(
-                child: _buildTextField(
-                    controller: _alertClearCtrl,
-                    label: "Siklus pemulihan alert",
-                    tooltip: "Siklus threshold aman sebelum alert dihapus")),
-          ],
-        ),
+        _buildResponsiveRow([
+          _buildTextField(
+              controller: _alertRaiseCtrl,
+              label: "Siklus pemicu alert",
+              tooltip: "Siklus threshold dilanggar sebelum alert muncul"),
+          _buildTextField(
+              controller: _alertClearCtrl,
+              label: "Siklus pemulihan alert",
+              tooltip: "Siklus threshold aman sebelum alert dihapus"),
+        ]),
       ],
     );
   }
@@ -85,27 +95,20 @@ extension _SystemConfigFormSections on _SystemConfigTabState {
         const Text("Retensi & Penyimpanan Histori",
             style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
         const SizedBox(height: 16),
-        Row(
-          children: [
-            Expanded(
-                child: _buildTextField(
-                    controller: _histIntervalCtrl,
-                    label: "Interval simpan (detik)",
-                    tooltip: "Jeda penyimpanan histori metrik")),
-            const SizedBox(width: 24),
-            Expanded(
-                child: _buildTextField(
-                    controller: _histRetentionCtrl,
-                    label: "Masa simpan trafik (hari)",
-                    tooltip: "Batas penyimpanan data grafik/bandwidth")),
-            const SizedBox(width: 24),
-            Expanded(
-                child: _buildTextField(
-                    controller: _alertRetentionCtrl,
-                    label: "Masa simpan log alert (hari)",
-                    tooltip: "Batas penyimpanan histori alert")),
-          ],
-        ),
+        _buildResponsiveRow([
+          _buildTextField(
+              controller: _histIntervalCtrl,
+              label: "Interval simpan (detik)",
+              tooltip: "Jeda penyimpanan histori metrik"),
+          _buildTextField(
+              controller: _histRetentionCtrl,
+              label: "Masa simpan trafik (hari)",
+              tooltip: "Batas penyimpanan data grafik/bandwidth"),
+          _buildTextField(
+              controller: _alertRetentionCtrl,
+              label: "Masa simpan log alert (hari)",
+              tooltip: "Batas penyimpanan histori alert"),
+        ]),
       ],
     );
   }
@@ -150,7 +153,7 @@ extension _SystemConfigFormSections on _SystemConfigTabState {
         ),
         const SizedBox(height: 16),
         SizedBox(
-          width: 300,
+          width: double.infinity,
           child: DropdownButtonFormField<String>(
             value: _selectedDeviceType,
             decoration: InputDecoration(
@@ -201,6 +204,47 @@ extension _SystemConfigFormSections on _SystemConfigTabState {
               );
             },
           ),
+      ],
+    );
+  }
+
+  Widget buildDashboardFilterSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text("Filter Dashboard",
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 16),
+        const Text(
+          "Durasi Minimal Alert (Top Down Lokasi)",
+          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+        ),
+        const SizedBox(height: 4),
+        const Text(
+          "Hanya tampilkan lokasi sering gangguan lebih lama dari durasi ini.",
+          style: TextStyle(fontSize: 12, color: Colors.grey),
+        ),
+        const SizedBox(height: 16),
+        _buildResponsiveRow([
+          TextFormField(
+            controller: _minDurationHoursCtrl,
+            keyboardType: TextInputType.number,
+            decoration: const InputDecoration(
+              labelText: "Jam",
+              border: OutlineInputBorder(),
+              suffixText: "jam",
+            ),
+          ),
+          TextFormField(
+            controller: _minDurationMinutesCtrl,
+            keyboardType: TextInputType.number,
+            decoration: const InputDecoration(
+              labelText: "Menit",
+              border: OutlineInputBorder(),
+              suffixText: "menit",
+            ),
+          ),
+        ]),
       ],
     );
   }

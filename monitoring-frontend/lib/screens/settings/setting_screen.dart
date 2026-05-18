@@ -29,7 +29,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (_isAdmin) {
       tabs.add({
         'title': 'Konfigurasi Sistem',
-        'subtitle': 'Atur nilai parameter ambang batas',
+        'subtitle': 'Atur nilai parameter pada sistem',
         'icon': Icons.admin_panel_settings_outlined,
         'view': const SystemConfigTab(),
       });
@@ -40,6 +40,74 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
 
     final isMobile = MediaQuery.of(context).size.width < 800;
+
+    Widget tabListWidget = Container(
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey[200]!),
+      ),
+      child: isMobile
+          ? (tabs.length <= 3
+              ? Row(
+                  children: tabs.asMap().entries.map((entry) {
+                    final index = entry.key;
+                    final tab = entry.value;
+                    return Expanded(
+                      child: _buildTabItem(
+                        title: tab['title'],
+                        subtitle: tab['subtitle'],
+                        icon: tab['icon'],
+                        isActive: index == _selectedTabIndex,
+                        isMobile: isMobile,
+                        onTap: () => setState(() => _selectedTabIndex = index),
+                      ),
+                    );
+                  }).toList(),
+                )
+              : ListView.builder(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: tabs.length,
+                  itemBuilder: (context, index) {
+                    final tab = tabs[index];
+                    return _buildTabItem(
+                      title: tab['title'],
+                      subtitle: tab['subtitle'],
+                      icon: tab['icon'],
+                      isActive: index == _selectedTabIndex,
+                      isMobile: isMobile,
+                      onTap: () => setState(() => _selectedTabIndex = index),
+                    );
+                  },
+                ))
+          : ListView.builder(
+              scrollDirection: Axis.vertical,
+              shrinkWrap: true,
+              itemCount: tabs.length,
+              itemBuilder: (context, index) {
+                final tab = tabs[index];
+                return _buildTabItem(
+                  title: tab['title'],
+                  subtitle: tab['subtitle'],
+                  icon: tab['icon'],
+                  isActive: index == _selectedTabIndex,
+                  isMobile: isMobile,
+                  onTap: () => setState(() => _selectedTabIndex = index),
+                );
+              },
+            ),
+    );
+
+    Widget contentWidget = Container(
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey[200]!),
+      ),
+      child: tabs[_selectedTabIndex]['view'] as Widget,
+    );
 
     return Scaffold(
       backgroundColor: Colors.grey[50],
@@ -57,58 +125,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
             child: Padding(
               padding:
                   const EdgeInsets.only(left: 24.0, right: 24.0, bottom: 24.0),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  SizedBox(
-                    width: isMobile ? 80 : 300,
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
+              child: isMobile
+                  ? Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        Flexible(
-                          child: Container(
-                            clipBehavior: Clip.antiAlias,
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: Colors.grey[200]!),
-                            ),
-                            child: ListView.builder(
-                              shrinkWrap: true,
-                              itemCount: tabs.length,
-                              itemBuilder: (context, index) {
-                                final isActive = index == _selectedTabIndex;
-                                final tab = tabs[index];
-                                return _buildTabItem(
-                                  title: tab['title'],
-                                  subtitle: tab['subtitle'],
-                                  icon: tab['icon'],
-                                  isActive: isActive,
-                                  isMobile: isMobile,
-                                  onTap: () =>
-                                      setState(() => _selectedTabIndex = index),
-                                );
-                              },
-                            ),
-                          ),
-                        ),
+                        SizedBox(height: 60, child: tabListWidget),
+                        const SizedBox(height: 16),
+                        Expanded(child: contentWidget),
+                      ],
+                    )
+                  : Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        SizedBox(width: 300, child: tabListWidget),
+                        const SizedBox(width: 24),
+                        Expanded(child: contentWidget),
                       ],
                     ),
-                  ),
-                  const SizedBox(width: 24),
-                  Expanded(
-                    child: Container(
-                      clipBehavior: Clip.antiAlias,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.grey[200]!),
-                      ),
-                      child: tabs[_selectedTabIndex]['view'] as Widget,
-                    ),
-                  ),
-                ],
-              ),
             ),
           ),
         ],
@@ -127,21 +160,42 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return InkWell(
       onTap: onTap,
       child: Container(
+        alignment: Alignment.center,
         decoration: BoxDecoration(
           color: isActive ? Colors.blue.withOpacity(0.05) : Colors.transparent,
           border: Border(
-            left: BorderSide(
-              color: isActive ? Colors.blueAccent : Colors.transparent,
-              width: 4,
-            ),
+            left: !isMobile && isActive
+                ? const BorderSide(color: Colors.blueAccent, width: 4)
+                : BorderSide.none,
+            bottom: isMobile && isActive
+                ? const BorderSide(color: Colors.blueAccent, width: 4)
+                : BorderSide.none,
           ),
         ),
-        padding:
-            EdgeInsets.symmetric(horizontal: isMobile ? 0 : 20, vertical: 16),
+        padding: EdgeInsets.symmetric(
+            horizontal: isMobile ? 16 : 20, vertical: isMobile ? 0 : 16),
         child: isMobile
-            ? Center(
-                child: Icon(icon,
-                    color: isActive ? Colors.blueAccent : Colors.grey[600]))
+            ? Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(icon,
+                      color: isActive ? Colors.blueAccent : Colors.grey[600],
+                      size: 20),
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: Text(
+                      title,
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight:
+                            isActive ? FontWeight.bold : FontWeight.w500,
+                        color: isActive ? Colors.blueAccent : Colors.black87,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              )
             : Row(
                 children: [
                   Icon(icon,
